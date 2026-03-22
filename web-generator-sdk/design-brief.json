@@ -1,0 +1,928 @@
+{
+  "meta": {
+    "siteName": "Royal Healthcare",
+    "siteUrl": "https://royal-healthcare.com/",
+    "industry": "healthcare-medical",
+    "generatedAt": "2026-03-14T00:00:00.000Z",
+    "designSystem": "Vercel-inspired with Shadcn UI"
+  },
+  "pages": [
+    {
+      "page": "index",
+      "pageType": "landing",
+      "title": "Royal Healthcare - Home",
+      "url": "/",
+      "layout": "layouts/BaseLayout.astro",
+      "sections": [
+        {
+          "name": "hero",
+          "layout": "full-width, max-w-7xl mx-auto, text-center py-20 md:py-32",
+          "components": ["Button", "Badge"],
+          "content": {
+            "heading": "World-Class Healthcare for Your Wellness Journey",
+            "subheading": "Experience personalized medical care with our team of specialist doctors and state-of-the-art facilities.",
+            "primaryCta": "Book Appointment",
+            "secondaryCta": "Explore Services",
+            "badges": ["Accepting New Patients", "Multi-Specialty Care"]
+          }
+        },
+        {
+          "name": "servicesPreview",
+          "layout": "max-w-7xl mx-auto py-16, grid grid-cols-1 md:grid-cols-3 gap-8",
+          "components": ["Card", "Button"],
+          "content": {
+            "sectionHeading": "Our Specialized Services",
+            "sectionSubheading": "Comprehensive healthcare tailored to your needs",
+            "services": [
+              {
+                "title": "Specialist Care",
+                "description": "Expert medical specialists across cardiology, oncology, neurology, and more",
+                "icon": "stethoscope",
+                "link": "/our-services/specialist-care/"
+              },
+              {
+                "title": "Diagnostics & Imaging",
+                "description": "Advanced diagnostic technology for accurate and timely results",
+                "icon": "activity",
+                "link": "/diagnostics-imaging/"
+              },
+              {
+                "title": "Longevity Wellness",
+                "description": "Preventive care and wellness programs for optimal health",
+                "icon": "heart",
+                "link": "/our-services/longevity-wellness/"
+              }
+            ]
+          }
+        },
+        {
+          "name": "aboutPreview",
+          "layout": "max-w-7xl mx-auto py-16, grid grid-cols-1 md:grid-cols-2 gap-12 items-center",
+          "components": ["Card", "Button"],
+          "content": {
+            "heading": "About Royal Healthcare Group",
+            "description": "For over 20 years, we've been at the forefront of medical innovation, providing exceptional patient care with a commitment to excellence, compassion, and cutting-edge treatments.",
+            "stats": [
+              { "value": "20+", "label": "Years of Excellence" },
+              { "value": "50+", "label": "Specialist Doctors" },
+              { "value": "10000+", "label": "Patients Served" }
+            ],
+            "cta": "Learn More About Us",
+            "ctaLink": "/about-us/"
+          }
+        },
+        {
+          "name": "teamPreview",
+          "layout": "max-w-7xl mx-auto py-16",
+          "components": ["Card", "Avatar", "Button"],
+          "content": {
+            "sectionHeading": "Meet Our Expert Medical Team",
+            "sectionSubheading": "Led by renowned specialists committed to your health",
+            "featuredDoctors": [
+              {
+                "name": "Dr. Michael Lim",
+                "specialty": "Cardiology",
+                "image": "/images/doctors/dr-michael-lim.jpg",
+                "link": "/doctor/dr-michael-lim/"
+              },
+              {
+                "name": "Dr. Patrick Ang",
+                "specialty": "Oncology",
+                "image": "/images/doctors/dr-patrick-ang.jpg",
+                "link": "/doctor/dr-patrick-ang/"
+              },
+              {
+                "name": "Dr. Chong Yeh Woei",
+                "specialty": "Neurology",
+                "image": "/images/doctors/dr-chong-yeh-woei.jpg",
+                "link": "/doctor/dr-chong-yeh-woei/"
+              }
+            ],
+            "cta": "View All Doctors",
+            "ctaLink": "/meet-our-team/"
+          }
+        },
+        {
+          "name": "newsPreview",
+          "layout": "max-w-7xl mx-auto py-16, grid grid-cols-1 md:grid-cols-3 gap-8",
+          "components": ["Card", "Badge", "Button"],
+          "content": {
+            "sectionHeading": "Latest News & Insights",
+            "sectionSubheading": "Stay informed with health tips and medical updates",
+            "articles": [
+              {
+                "title": "The Latest Truths About Cholesterol",
+                "category": "Articles",
+                "date": "Recent",
+                "excerpt": "Understanding cholesterol management for heart health",
+                "link": "/the-latest-truths-about-cholesterol/"
+              },
+              {
+                "title": "The Science of Intermittent Fasting",
+                "category": "Wellness",
+                "date": "Recent",
+                "excerpt": "Evidence-based insights on fasting and longevity",
+                "link": "/the-science-of-intermittent-fasting-with-dr-keefe-tan/"
+              },
+              {
+                "title": "Advances in Cardiac Care",
+                "category": "Medical",
+                "date": "Recent",
+                "excerpt": "Latest innovations in heart disease treatment",
+                "link": "/advances-in-coronary-artery-disease-cme-lunch-symposium/"
+              }
+            ],
+            "cta": "View All News",
+            "ctaLink": "/news-events/"
+          }
+        },
+        {
+          "name": "cta",
+          "layout": "full-width py-20 bg-primary text-primary-foreground",
+          "components": ["Button"],
+          "content": {
+            "heading": "Ready to Prioritize Your Health?",
+            "subheading": "Book an appointment with one of our specialists today",
+            "primaryCta": "Book Appointment",
+            "secondaryCta": "Contact Us"
+          }
+        }
+      ]
+    },
+    {
+      "page": "about",
+      "pageType": "about",
+      "title": "About Us - Royal Healthcare",
+      "url": "/about-us/",
+      "layout": "layouts/BaseLayout.astro",
+      "sections": [
+        {
+          "name": "hero",
+          "layout": "full-width, max-w-4xl mx-auto, text-center py-16",
+          "components": ["Breadcrumb"],
+          "content": {
+            "heading": "About Royal Healthcare Group",
+            "subheading": "Dedicated to excellence in patient care since 2003"
+          }
+        },
+        {
+          "name": "mission",
+          "layout": "max-w-7xl mx-auto py-12, grid grid-cols-1 md:grid-cols-2 gap-12",
+          "components": ["Card"],
+          "content": {
+            "heading": "Our Mission & Values",
+            "description": "At Royal Healthcare, we believe in providing compassionate, patient-centered care that combines medical expertise with genuine concern for your wellbeing.",
+            "values": [
+              {
+                "title": "Excellence",
+                "description": "Commitment to the highest standards of medical care"
+              },
+              {
+                "title": "Innovation",
+                "description": "Embracing cutting-edge treatments and technology"
+              },
+              {
+                "title": "Compassion",
+                "description": "Treating every patient with dignity and respect"
+              },
+              {
+                "title": "Integrity",
+                "description": "Honest, transparent healthcare partnerships"
+              }
+            ]
+          }
+        },
+        {
+          "name": "history",
+          "layout": "max-w-7xl mx-auto py-12",
+          "components": ["Card"],
+          "content": {
+            "heading": "Our Journey of Excellence",
+            "description": "Founded with a vision to revolutionize healthcare delivery, Royal Healthcare has grown from a small clinic to a comprehensive medical group serving thousands of patients annually.",
+            "milestones": [
+              { "year": "2003", "event": "Royal Healthcare Group founded" },
+              { "year": "2010", "event": "Expanded to multi-specialty care" },
+              { "year": "2015", "event": "Launched longevity wellness program" },
+              { "year": "2020", "event": "Introduced advanced diagnostic imaging" },
+              { "year": "2025", "event": "Celebrating 22 years of excellence" }
+            ]
+          }
+        },
+        {
+          "name": "patientJourney",
+          "layout": "max-w-7xl mx-auto py-12",
+          "components": ["Card", "Button"],
+          "content": {
+            "heading": "The Patient Experience",
+            "description": "From your first visit to ongoing care, we ensure a seamless, supportive healthcare journey.",
+            "steps": [
+              {
+                "step": "1",
+                "title": "Book Appointment",
+                "description": "Easy online or phone booking system"
+              },
+              {
+                "step": "2",
+                "title": "Initial Consultation",
+                "description": "Comprehensive health assessment"
+              },
+              {
+                "step": "3",
+                "title": "Personalized Care Plan",
+                "description": "Tailored treatment for your needs"
+              },
+              {
+                "step": "4",
+                "title": "Ongoing Support",
+                "description": "Continuous care and follow-up"
+              }
+            ],
+            "cta": "Learn About Our Patient Journey",
+            "ctaLink": "/patient-journey/"
+          }
+        }
+      ]
+    },
+    {
+      "page": "patient-journey",
+      "pageType": "page",
+      "title": "Patient Journey - Royal Healthcare",
+      "url": "/patient-journey/",
+      "layout": "layouts/BaseLayout.astro",
+      "sections": [
+        {
+          "name": "hero",
+          "layout": "full-width, max-w-4xl mx-auto, text-center py-16",
+          "components": ["Breadcrumb"],
+          "content": {
+            "heading": "Your Healthcare Journey",
+            "subheading": "What to expect when you choose Royal Healthcare"
+          }
+        },
+        {
+          "name": "journeySteps",
+          "layout": "max-w-5xl mx-auto py-12",
+          "components": ["Card"],
+          "content": {
+            "heading": "Step-by-Step Process",
+            "steps": [
+              {
+                "step": "1",
+                "title": "Booking Your Appointment",
+                "description": "Choose your preferred specialist and book online or call our friendly reception team. New patients are always welcome.",
+                "tips": ["Have your ID ready", "Prepare a list of current medications", "Note down your symptoms"]
+              },
+              {
+                "step": "2",
+                "title": "First Visit",
+                "description": "Arrive 15 minutes early for registration. Our team will guide you through a comprehensive health history review.",
+                "tips": ["Bring insurance information", "List of previous medical procedures", "Emergency contact details"]
+              },
+              {
+                "step": "3",
+                "title": "Consultation & Diagnosis",
+                "description": "Your specialist will conduct a thorough examination, discuss your concerns, and may order diagnostic tests if needed.",
+                "tips": ["Ask questions freely", "Discuss all symptoms", "Mention any concerns"]
+              },
+              {
+                "step": "4",
+                "title": "Treatment Plan",
+                "description": "Receive a personalized care plan with clear explanations of your treatment options and next steps.",
+                "tips": ["Understand your diagnosis", "Review medication instructions", "Schedule follow-ups"]
+              },
+              {
+                "step": "5",
+                "title": "Ongoing Care",
+                "description": "We coordinate your care across specialists, provide preventive health guidance, and are always available for follow-up.",
+                "tips": ["Keep all appointments", "Track your progress", "Reach out with questions"]
+              }
+            ]
+          }
+        },
+        {
+          "name": "testimonials",
+          "layout": "max-w-7xl mx-auto py-12, grid grid-cols-1 md:grid-cols-3 gap-8",
+          "components": ["Card", "Avatar"],
+          "content": {
+            "heading": "What Our Patients Say",
+            "testimonials": [
+              {
+                "name": "Sarah Chen",
+                "text": "The care I received at Royal Healthcare was exceptional. Dr. Lim took time to explain everything and made me feel truly cared for.",
+                "rating": 5
+              },
+              {
+                "name": "James Mitchell",
+                "text": "From booking to follow-up, the entire process was seamless. Highly recommend their longevity wellness program.",
+                "rating": 5
+              },
+              {
+                "name": "Priya Sharma",
+                "text": "The diagnostic imaging team was professional and efficient. Results were explained clearly, and treatment started promptly.",
+                "rating": 5
+              }
+            ]
+          }
+        },
+        {
+          "name": "faq",
+          "layout": "max-w-4xl mx-auto py-12",
+          "components": ["Accordion"],
+          "content": {
+            "heading": "Frequently Asked Questions",
+            "faqs": [
+              {
+                "question": "What should I bring to my first appointment?",
+                "answer": "Please bring a valid ID, insurance card, list of current medications, and any relevant medical records."
+              },
+              {
+                "question": "How long does a typical consultation last?",
+                "answer": "Initial consultations typically last 30-60 minutes, depending on the complexity of your condition."
+              },
+              {
+                "question": "Do you accept walk-in patients?",
+                "answer": "We recommend booking appointments for optimal care, but we do accommodate urgent cases when possible."
+              },
+              {
+                "question": "Can I request a specific doctor?",
+                "answer": "Yes, you can request a specific specialist when booking your appointment, subject to availability."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "page": "services",
+      "pageType": "services",
+      "title": "Our Services - Royal Healthcare",
+      "url": "/our-services/",
+      "layout": "layouts/BaseLayout.astro",
+      "sections": [
+        {
+          "name": "hero",
+          "layout": "full-width, max-w-4xl mx-auto, text-center py-16",
+          "components": ["Breadcrumb"],
+          "content": {
+            "heading": "Comprehensive Medical Services",
+            "subheading": "Expert care across multiple specialties"
+          }
+        },
+        {
+          "name": "serviceCategories",
+          "layout": "max-w-7xl mx-auto py-12, grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8",
+          "components": ["Card", "Button"],
+          "content": {
+            "services": [
+              {
+                "title": "Specialist Care",
+                "description": "Access to board-certified specialists in cardiology, oncology, neurology, and more",
+                "icon": "stethoscope",
+                "features": ["Cardiology", "Oncology", "Neurology", "Gastroenterology"],
+                "link": "/specialist-care/"
+              },
+              {
+                "title": "Diagnostics & Imaging",
+                "description": "State-of-the-art diagnostic technology for accurate and timely results",
+                "icon": "activity",
+                "features": ["MRI", "CT Scan", "Ultrasound", "X-Ray"],
+                "link": "/diagnostics-imaging/"
+              },
+              {
+                "title": "Longevity Wellness",
+                "description": "Preventive care and personalized wellness programs for optimal health",
+                "icon": "heart",
+                "features": ["Health Assessments", "Nutrition Planning", "Fitness Programs", "Stress Management"],
+                "link": "/our-services/longevity-wellness/"
+              },
+              {
+                "title": "Concierge Services",
+                "description": "Premium personalized healthcare with dedicated care coordination",
+                "icon": "star",
+                "features": ["24/7 Access", "Priority Appointments", "Care Coordination", "Home Visits"],
+                "link": "/our-services/concierge-services/"
+              },
+              {
+                "title": "Preventive Care",
+                "description": "Comprehensive screenings and health maintenance programs",
+                "icon": "shield",
+                "features": ["Annual Checkups", "Cancer Screenings", "Vaccinations", "Health Coaching"]
+              },
+              {
+                "title": "Chronic Disease Management",
+                "description": "Ongoing care and support for managing chronic conditions",
+                "icon": "monitor",
+                "features": ["Diabetes Care", "Hypertension Management", "Asthma Care", "Arthritis Treatment"]
+              }
+            ]
+          }
+        },
+        {
+          "name": "whyChooseUs",
+          "layout": "max-w-7xl mx-auto py-12, grid grid-cols-1 md:grid-cols-2 gap-8",
+          "components": ["Card"],
+          "content": {
+            "heading": "Why Choose Royal Healthcare",
+            "reasons": [
+              {
+                "title": "Multidisciplinary Team",
+                "description": "Our specialists collaborate to provide comprehensive care addressing all aspects of your health"
+              },
+              {
+                "title": "Advanced Technology",
+                "description": "Investment in the latest medical equipment for accurate diagnosis and effective treatment"
+              },
+              {
+                "title": "Patient-Centered Approach",
+                "description": "Your comfort, understanding, and participation in care decisions are our priority"
+              },
+              {
+                "title": "Convenient Locations",
+                "description": "Multiple locations with extended hours and easy appointment scheduling"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "page": "team-listing",
+      "pageType": "team_listing",
+      "title": "Meet Our Team - Royal Healthcare",
+      "url": "/meet-our-team/",
+      "layout": "layouts/BaseLayout.astro",
+      "sections": [
+        {
+          "name": "hero",
+          "layout": "full-width, max-w-4xl mx-auto, text-center py-16",
+          "components": ["Breadcrumb"],
+          "content": {
+            "heading": "Our Medical Team",
+            "subheading": "World-class specialists dedicated to your health"
+          }
+        },
+        {
+          "name": "filters",
+          "layout": "max-w-7xl mx-auto py-8",
+          "components": ["Button"],
+          "content": {
+            "label": "Filter by Specialty:",
+            "specialties": [
+              "All Doctors",
+              "Cardiology",
+              "Oncology",
+              "Neurology",
+              "Internal Medicine",
+              "Pediatrics",
+              "Radiology",
+              "Wellness"
+            ]
+          }
+        },
+        {
+          "name": "doctorGrid",
+          "layout": "max-w-7xl mx-auto py-8, grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6",
+          "components": ["Card", "Avatar", "Badge"],
+          "content": {
+            "doctors": [
+              {
+                "name": "Dr. Michael Lim",
+                "specialty": "Cardiology",
+                "credentials": "MBBS, MRCP",
+                "image": "/images/doctors/dr-michael-lim.jpg",
+                "link": "/doctor/dr-michael-lim/"
+              },
+              {
+                "name": "Dr. Patrick Ang",
+                "specialty": "Oncology",
+                "credentials": "MBBS, FRCR",
+                "image": "/images/doctors/dr-patrick-ang.jpg",
+                "link": "/doctor/dr-patrick-ang/"
+              },
+              {
+                "name": "Dr. Chong Yeh Woei",
+                "specialty": "Neurology",
+                "credentials": "MBBS, MRCP",
+                "image": "/images/doctors/dr-chong-yeh-woei.jpg",
+                "link": "/doctor/dr-chong-yeh-woei/"
+              },
+              {
+                "name": "Dr. Keefe Tan",
+                "specialty": "Wellness",
+                "credentials": "MBBS, MPH",
+                "image": "/images/doctors/dr-keefe-tan.jpg",
+                "link": "/doctor/dr-keefe-tan/"
+              },
+              {
+                "name": "Dr. Teo Ngee",
+                "specialty": "Internal Medicine",
+                "credentials": "MBBS, MRCP",
+                "image": "/images/doctors/dr-teo-ngee.jpg",
+                "link": "/doctor/dr-teo-ngee/"
+              },
+              {
+                "name": "Dr. Lau Chin Wah",
+                "specialty": "Cardiology",
+                "credentials": "MBBS, FRCP",
+                "image": "/images/doctors/dr-lau-chin-wah.jpg",
+                "link": "/doctor/dr-lau-chin-wah/"
+              },
+              {
+                "name": "Dr. Francis Tjang",
+                "specialty": "Radiology",
+                "credentials": "MBBS, FRCR",
+                "image": "/images/doctors/dr-francis-tjang.jpg",
+                "link": "/doctor/dr-francis-tjang/"
+              },
+              {
+                "name": "Dr. Amy Wong",
+                "specialty": "Pediatrics",
+                "credentials": "MBBS, MRCPCH",
+                "image": "/images/doctors/dr-amy-wong.jpg",
+                "link": "/doctor/dr-amy-wong/"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "page": "doctor-profile",
+      "pageType": "doctor_profile",
+      "title": "Doctor Profile - Royal Healthcare",
+      "url": "/doctor/{slug}/",
+      "layout": "layouts/BaseLayout.astro",
+      "sections": [
+        {
+          "name": "hero",
+          "layout": "full-width, max-w-7xl mx-auto py-12, grid grid-cols-1 md:grid-cols-3 gap-8",
+          "components": ["Breadcrumb", "Card", "Avatar", "Button"],
+          "content": {
+            "image": "/images/doctors/doctor.jpg",
+            "name": "Dr. [Doctor Name]",
+            "credentials": "[Medical Credentials]",
+            "specialty": "[Specialty]",
+            "languages": "English, Mandarin, Malay",
+            "cta": "Book Appointment"
+          }
+        },
+        {
+          "name": "about",
+          "layout": "max-w-7xl mx-auto py-8, grid grid-cols-1 md:grid-cols-3 gap-8",
+          "components": ["Card"],
+          "content": {
+            "heading": "About",
+            "bio": "[Doctor's professional biography, education, training, and areas of expertise]",
+            "education": [
+              { "degree": "[Degree]", "institution": "[University]", "year": "[Year]" }
+            ],
+            "certifications": [
+              "[Board Certification]",
+              "[Specialty Certification]"
+            ]
+          }
+        },
+        {
+          "name": "specialties",
+          "layout": "max-w-7xl mx-auto py-8, col-span-2",
+          "components": ["Card"],
+          "content": {
+            "heading": "Clinical Specialties & Expertise",
+            "specialties": [
+              "[Specialty 1]",
+              "[Specialty 2]",
+              "[Specialty 3]"
+            ]
+          }
+        },
+        {
+          "name": "publications",
+          "layout": "max-w-7xl mx-auto py-8, col-span-2",
+          "components": ["Card"],
+          "content": {
+            "heading": "Publications & Research",
+            "publications": [
+              {
+                "title": "[Publication Title]",
+                "journal": "[Journal Name]",
+                "year": "[Year]"
+              }
+            ]
+          }
+        },
+        {
+          "name": "articles",
+          "layout": "max-w-7xl mx-auto py-8",
+          "components": ["Card", "Badge"],
+          "content": {
+            "heading": "Articles by [Doctor Name]",
+            "articles": [
+              {
+                "title": "[Article Title]",
+                "excerpt": "[Brief excerpt]",
+                "link": "/article-slug/"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "page": "blog-listing",
+      "pageType": "blog_listing",
+      "title": "News & Events - Royal Healthcare",
+      "url": "/news-events/",
+      "layout": "layouts/BaseLayout.astro",
+      "sections": [
+        {
+          "name": "hero",
+          "layout": "full-width, max-w-4xl mx-auto, text-center py-16",
+          "components": ["Breadcrumb"],
+          "content": {
+            "heading": "News & Events",
+            "subheading": "Health insights, medical updates, and upcoming events"
+          }
+        },
+        {
+          "name": "filters",
+          "layout": "max-w-7xl mx-auto py-8",
+          "components": ["Button"],
+          "content": {
+            "label": "Filter by Category:",
+            "categories": [
+              "All",
+              "Articles",
+              "Events",
+              "Medical Updates",
+              "Wellness Tips"
+            ]
+          }
+        },
+        {
+          "name": "articleGrid",
+          "layout": "max-w-7xl mx-auto py-8, grid grid-cols-1 md:grid-cols-3 gap-8",
+          "components": ["Card", "Badge", "Button"],
+          "content": {
+            "articles": [
+              {
+                "title": "[Article Title]",
+                "category": "[Category]",
+                "date": "[Date]",
+                "excerpt": "[Brief excerpt]",
+                "image": "/images/articles/article-1.jpg",
+                "link": "/article-slug/"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pagination",
+          "layout": "max-w-7xl mx-auto py-8 flex justify-center",
+          "components": ["Button"],
+          "content": {
+            "currentPage": 1,
+            "totalPages": 5
+          }
+        }
+      ]
+    },
+    {
+      "page": "blog-post",
+      "pageType": "blog_post",
+      "title": "[Article Title] - Royal Healthcare",
+      "url": "/{slug}/",
+      "layout": "layouts/BlogLayout.astro",
+      "sections": [
+        {
+          "name": "header",
+          "layout": "full-width, max-w-4xl mx-auto py-12",
+          "components": ["Breadcrumb", "Badge"],
+          "content": {
+            "category": "[Category]",
+            "title": "[Article Title]",
+            "date": "[Date]",
+            "author": "[Author Name]",
+            "readTime": "[X] min read"
+          }
+        },
+        {
+          "name": "featuredImage",
+          "layout": "max-w-4xl mx-auto py-8",
+          "components": [],
+          "content": {
+            "image": "/images/articles/article-featured.jpg",
+            "alt": "[Article alt text]"
+          }
+        },
+        {
+          "name": "content",
+          "layout": "max-w-4xl mx-auto py-8 prose prose-lg",
+          "components": [],
+          "content": {
+            "body": "[Full article content in HTML/Markdown]"
+          }
+        },
+        {
+          "name": "authorBox",
+          "layout": "max-w-4xl mx-auto py-8",
+          "components": ["Card", "Avatar"],
+          "content": {
+            "name": "[Author Name]",
+            "credentials": "[Credentials]",
+            "bio": "[Author bio]",
+            "image": "/images/authors/author.jpg"
+          }
+        },
+        {
+          "name": "relatedPosts",
+          "layout": "max-w-4xl mx-auto py-12",
+          "components": ["Card", "Button"],
+          "content": {
+            "heading": "Related Articles",
+            "posts": [
+              {
+                "title": "[Related Article Title]",
+                "excerpt": "[Brief excerpt]",
+                "link": "/related-article-slug/"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cta",
+          "layout": "max-w-4xl mx-auto py-12",
+          "components": ["Card", "Button"],
+          "content": {
+            "heading": "Stay Informed",
+            "description": "Subscribe to our newsletter for health tips and medical updates",
+            "cta": "Subscribe to Newsletter"
+          }
+        }
+      ]
+    }
+  ],
+  "sharedComponents": [
+    {
+      "name": "Header",
+      "componentPath": "components/Header.astro",
+      "description": "Site navigation with logo, main menu, and CTA button",
+      "components": ["NavigationMenu", "Button"],
+      "usedIn": ["all"],
+      "props": {
+        "logo": "/logo.svg",
+        "navLinks": [
+          { "label": "About", "url": "/about-us/" },
+          { "label": "Services", "url": "/our-services/" },
+          { "label": "Our Team", "url": "/meet-our-team/" },
+          { "label": "News", "url": "/news-events/" },
+          { "label": "Contact", "url": "/contact/" }
+        ],
+        "cta": { "label": "Book Appointment", "url": "/contact/" }
+      }
+    },
+    {
+      "name": "Footer",
+      "componentPath": "components/Footer.astro",
+      "description": "Site footer with links, social media, and legal",
+      "components": [],
+      "usedIn": ["all"],
+      "props": {
+        "columns": [
+          {
+            "title": "Royal Healthcare",
+            "links": [
+              { "label": "About Us", "url": "/about-us/" },
+              { "label": "Patient Journey", "url": "/patient-journey/" },
+              { "label": "Our Services", "url": "/our-services/" },
+              { "label": "Meet Our Team", "url": "/meet-our-team/" }
+            ]
+          },
+          {
+            "title": "Services",
+            "links": [
+              { "label": "Specialist Care", "url": "/specialist-care/" },
+              { "label": "Diagnostics", "url": "/diagnostics-imaging/" },
+              { "label": "Wellness", "url": "/our-services/longevity-wellness/" },
+              { "label": "Concierge", "url": "/our-services/concierge-services/" }
+            ]
+          },
+          {
+            "title": "Resources",
+            "links": [
+              { "label": "News & Events", "url": "/news-events/" },
+              { "label": "Patient Resources", "url": "/resources/" },
+              { "label": "FAQ", "url": "/faq/" }
+            ]
+          },
+          {
+            "title": "Contact",
+            "links": [
+              { "label": "Book Appointment", "url": "/contact/" },
+              { "label": "Emergency: +65 XXXX XXXX", "url": "tel:+65XXXXXXXX" }
+            ]
+          }
+        ],
+        "legal": [
+          { "label": "Privacy Policy", "url": "/privacy-policy/" },
+          { "label": "Terms & Conditions", "url": "/terms-conditions/" }
+        ],
+        "social": [
+          { "platform": "facebook", "url": "https://facebook.com/royalhealthcare" },
+          { "platform": "linkedin", "url": "https://linkedin.com/company/royalhealthcare" },
+          { "platform": "instagram", "url": "https://instagram.com/royalhealthcare" }
+        ]
+      }
+    },
+    {
+      "name": "CTASection",
+      "componentPath": "components/CTASection.astro",
+      "description": "Reusable call-to-action section with heading and buttons",
+      "components": ["Button"],
+      "usedIn": ["index", "about", "services"],
+      "props": {
+        "variant": "default",
+        "heading": "Ready to Get Started?",
+        "subheading": "Book your appointment today",
+        "primaryCta": "Book Now",
+        "secondaryCta": "Learn More"
+      }
+    },
+    {
+      "name": "ContactForm",
+      "componentPath": "components/ContactForm.astro",
+      "description": "Contact and appointment booking form",
+      "components": ["Input", "Textarea", "Button", "Label"],
+      "usedIn": ["contact", "doctor-profile"],
+      "props": {
+        "type": "appointment",
+        "fields": [
+          { "name": "name", "label": "Full Name", "type": "text", "required": true },
+          { "name": "email", "label": "Email", "type": "email", "required": true },
+          { "name": "phone", "label": "Phone", "type": "tel", "required": true },
+          { "name": "doctor", "label": "Preferred Doctor", "type": "select", "required": false },
+          { "name": "message", "label": "Message", "type": "textarea", "required": false }
+        ]
+      }
+    }
+  ],
+  "designDirection": {
+    "overall": "Modern, professional healthcare website with Vercel-inspired clean aesthetics. Emphasizes trust, expertise, and patient-centered care through generous whitespace, clear typography hierarchy, and a calming blue primary color palette.",
+    "colorStrategy": {
+      "primary": "Blue (oklch(0.470 0.113 264.0)) - conveys trust, professionalism, and medical expertise",
+      "background": "Near-white (oklch(0.983 0.000 158.2)) - clean, clinical feel",
+      "accent": "Same blue as primary for CTAs and highlights",
+      "muted": "Subtle gray (oklch(0.970 0.003 264.0)) for section backgrounds",
+      "usage": "High contrast for accessibility (foreground 0.000, background 0.983), blue accents for trust and professionalism in healthcare context"
+    },
+    "typography": {
+      "heading": "Geist font, semibold (600), tight tracking for modern feel",
+      "body": "Geist font, normal (400), comfortable line-height for readability",
+      "sizes": "48px for hero h1, 32px for section h2, 14-20px for body text",
+      "approach": "Clear hierarchy with generous spacing for medical content readability"
+    },
+    "spacing": {
+      "sectionPadding": "py-16 to py-20 (64-80px vertical padding)",
+      "contentWidth": "max-w-7xl for full sections, max-w-4xl for focused content",
+      "gridGap": "gap-6 to gap-8 (24-32px)",
+      "philosophy": "Generous whitespace creates calm, professional healthcare atmosphere"
+    },
+    "borderRadius": {
+      "cards": "xl (8px) for subtle, professional appearance",
+      "buttons": "lg (64px) for pill-shaped modern CTAs",
+      "images": "md (12px top) for consistent framing"
+    },
+    "shadows": {
+      "cards": "Multi-layered subtle shadows (lg) for depth without heavy feel",
+      "buttons": "Minimal shadow on hover",
+      "philosophy": "Subtle depth enhances trust and premium feel"
+    },
+    "interaction": {
+      "hover": "Subtle lift on cards, color shift on links",
+      "focus": "Visible ring state (oklch(0.556 0.400 285.2)) for accessibility",
+      "transitions": "Fast (150-200ms) for responsive feel"
+    }
+  },
+  "shadcnComponents": [
+    "Button",
+    "Card",
+    "Avatar",
+    "Badge",
+    "Input",
+    "Textarea",
+    "Label",
+    "NavigationMenu",
+    "Accordion",
+    "Breadcrumb",
+    "Separator",
+    "Tabs"
+  ],
+  "technicalNotes": {
+    "layout": "Use BaseLayout.astro for all pages with shared Header/Footer",
+    "responsive": "Mobile-first with Tailwind breakpoints (md, lg, xl)",
+    "interactivity": "Add client:load to NavigationMenu, Accordion, Tabs",
+    "images": "Use Astro Image component with optimized loading",
+    "fonts": "Load Geist font via CDN or self-host in public/",
+    "colors": "All OKLCH values map to CSS variables in globals.css",
+    "accessibility": "Ensure 4.5:1 contrast ratio, semantic HTML, ARIA labels"
+  }
+}

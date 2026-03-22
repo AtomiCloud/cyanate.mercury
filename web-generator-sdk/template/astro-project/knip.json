@@ -1,0 +1,18 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["src/**/*.astro", "src/**/*.ts"],
+  "project": ["src/**/*.ts", "src/**/*.astro"],
+  "ignore": [
+    "src/env.d.ts"
+  ],
+  "ignoreDependencies": [
+    "@astrojs/check",
+    "@astrojs/react",
+    "@tailwindcss/postcss",
+    "astro",
+    "react",
+    "react-dom",
+    "culori",
+    "typescript"
+  ]
+}

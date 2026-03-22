@@ -1,0 +1,69 @@
+{
+  "skill_name": "iterate-and-fix",
+  "evals": [
+    {
+      "id": 1,
+      "name": "fix-missing-section",
+      "prompt": "Fix src/pages/index.astro. The file is missing the testimonials section from the design brief. Design brief specifies sections: hero, features, testimonials. Current file only has hero and features. Add the missing testimonials section.",
+      "expected_output": "The file is updated to include the testimonials section in the correct position (after features). The section uses appropriate components (Card or similar) and layout.",
+      "assertions": [
+        {
+          "name": "section-added",
+          "check": "File now contains testimonials section"
+        },
+        {
+          "name": "section-position",
+          "check": "Testimonials section appears after features section"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "fix-interactive-component",
+      "prompt": "Fix src/components/Header.astro. The NavigationMenu component is not interactive - it needs a client directive. Add the appropriate client directive to make it work.",
+      "expected_output": "The NavigationMenu component now has 'client:load' or 'client:visible' directive. The menu should be interactive now.",
+      "assertions": [
+        {
+          "name": "directive-added",
+          "check": "NavigationMenu component has client:load or client:visible"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "fix-semantic-html",
+      "prompt": "Fix src/components/Header.astro. It uses <div class=\"header\"> instead of semantic <header> tag. Also uses <div class=\"nav\"> instead of <nav>. Convert to semantic HTML.",
+      "expected_output": "The file now uses <header> instead of div.header and <nav> instead of div.nav. Preserves all classes and functionality.",
+      "assertions": [
+        {
+          "name": "uses-header-tag",
+          "check": "File contains <header> element"
+        },
+        {
+          "name": "uses-nav-tag",
+          "check": "File contains <nav> element"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "fix-responsive-grid",
+      "prompt": "Fix src/pages/index.astro. The features grid is always 3 columns and breaks on mobile. Design brief specifies: '3 columns on desktop, 1 column on mobile'. Fix the responsive classes.",
+      "expected_output": "The features grid now uses responsive classes like 'grid-cols-1 md:grid-cols-3' or similar to handle mobile correctly.",
+      "assertions": [
+        {
+          "name": "responsive-classes",
+          "check": "Grid has responsive breakpoint classes (md: or lg:)"
+        },
+        {
+          "name": "mobile-grid",
+          "check": "Grid is single column on mobile (grid-cols-1)"
+        }
+      ],
+      "files": []
+    }
+  ]
+}
