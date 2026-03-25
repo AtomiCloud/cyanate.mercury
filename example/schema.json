@@ -1,0 +1,4639 @@
+{
+  "pages": {
+    "landing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            },
+            "language_selector": {
+              "type": "string"
+            },
+            "sticky_header": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "subtitle": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "main_menu": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "cta_button": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "aria_label": {
+                  "type": "string"
+                },
+                "popup_content": {
+                  "type": "object",
+                  "properties": {
+                    "form": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "note": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "placeholder": {
+                                "type": "string"
+                              },
+                              "required": {
+                                "type": "boolean"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              "id": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "submit_button": {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            }
+          }
+        },
+        "value_proposition": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "cta": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "mission_section": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "format": "uri"
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "cta": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "image": {
+                "type": "string",
+                "format": "uri"
+              },
+              "link": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "services_header": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "cta": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "awards_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            }
+          }
+        },
+        "video_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            }
+          }
+        },
+        "doctors_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "carousel": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            },
+            "grid_list": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "link": {
+                    "type": "string"
+                  },
+                  "cta_text": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "view_more_link": {
+              "type": "string"
+            }
+          }
+        },
+        "testimonials_section": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            }
+          }
+        },
+        "news_events": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "category": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "excerpt": {
+                    "type": "string"
+                  },
+                  "link": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            },
+            "cta_buttons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              }
+            },
+            "social_icons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "aria_label": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "app_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            },
+            "quick_links": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "details": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "link": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "copyright": {
+              "type": "string"
+            },
+            "legal_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "whatsapp_widget": {
+          "type": "object",
+          "properties": {
+            "button_text": {
+              "type": "string"
+            },
+            "popup_title": {
+              "type": "string"
+            },
+            "popup_intro": {
+              "type": "string"
+            },
+            "member_name": {
+              "type": "string"
+            },
+            "link": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "about": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "string",
+              "format": "uri",
+              "default": "https://royal-healthcare.com/wp-content/uploads/2025/10/RHC-logo-2.png"
+            },
+            "top_bar_text": {
+              "type": "string",
+              "default": "ENGLISH"
+            },
+            "main_menu": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "cta_button": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "default": "Book Now"
+                },
+                "form_content": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "default": "Book an appoinment"
+                    },
+                    "note": {
+                      "type": "string",
+                      "default": "Note: The time you choose is tentative — our team will reach out shortly to confirm your appointment details."
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "placeholder": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "submit_text": {
+                      "type": "string",
+                      "default": "Submit"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "default": "About Us"
+            },
+            "breadcrumbs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "story_commitment_section": {
+          "type": "object",
+          "properties": {
+            "section_id": {
+              "type": "string",
+              "default": "story-commitment"
+            },
+            "subsection_title": {
+              "type": "string",
+              "default": "Our Story & Commitment"
+            },
+            "intro_text": {
+              "type": "string",
+              "default": "Everything we do at Royal Healthcare is shaped by a simple belief — that medical care should feel deeply personal, comforting, and reassuring. We bring together world-class specialists, advanced diagnostics, and modern facilities under one roof, so you can focus fully on your health while we take care of every detail."
+            },
+            "intro_image": {
+              "type": "string",
+              "format": "uri"
+            },
+            "story_title": {
+              "type": "string",
+              "default": "Our Story"
+            },
+            "story_content": {
+              "type": "string",
+              "default": "Our journey began over two decades with the founding of Michael Lim Specialist Heart Centre at Mount Elizabeth Hospital."
+            },
+            "commitment_title": {
+              "type": "string",
+              "default": "Our Commitment"
+            },
+            "commitment_content": {
+              "type": "string",
+              "default": "At Royal Healthcare, we are committed to creating a healthcare experience that goes beyond medical excellence."
+            }
+          }
+        },
+        "royal_experience_section": {
+          "type": "object",
+          "properties": {
+            "section_id": {
+              "type": "string",
+              "default": "royal-experience"
+            },
+            "section_title": {
+              "type": "string",
+              "default": "The Royal Experience"
+            },
+            "section_intro": {
+              "type": "string",
+              "default": "At Royal Healthcare, every patient is at the heart of what we do. By bringing together medical expertise and the art of hospitality, we create a healthcare journey unlike any other."
+            },
+            "featured_image": {
+              "type": "string",
+              "format": "uri"
+            },
+            "experience_points": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "awards_section": {
+          "type": "object",
+          "properties": {
+            "section_id": {
+              "type": "string",
+              "default": "awards"
+            },
+            "title": {
+              "type": "string",
+              "default": "Awards"
+            },
+            "description": {
+              "type": "string",
+              "default": "We are truly humbled by this recognition, which strengthens our commitment to delivering the high-quality service and experience our clients deserve. We will continue to uphold the same standards of care and professionalism as we grow."
+            },
+            "awards_image": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "string",
+              "format": "uri"
+            },
+            "social_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            },
+            "quick_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "phone": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": "string"
+                }
+              }
+            },
+            "copyright": {
+              "type": "string"
+            },
+            "legal_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "page": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "top_bar": {
+              "type": "object",
+              "properties": {
+                "language_label": {
+                  "type": "string"
+                }
+              }
+            },
+            "logo": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            },
+            "primary_menu": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "has_submenu": {
+                    "type": "boolean"
+                  },
+                  "submenu_items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "cta_menu": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "form_content": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "note": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "placeholder": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "acceptance_text": {
+                            "type": "string"
+                          },
+                          "links": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "text": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "submit_button": {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "close_button_label": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "mobile_toggle_label": {
+              "type": "string"
+            }
+          }
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "page_title": {
+              "type": "string"
+            },
+            "breadcrumbs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "introduction_section": {
+          "type": "object",
+          "properties": {
+            "headline": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "media_carousel": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "image_src": {
+                "type": "string",
+                "format": "uri"
+              },
+              "alt_text": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              }
+            },
+            "social_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "label": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "app_download_badges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform_name": {
+                    "type": "string"
+                  },
+                  "image_src": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            },
+            "quick_links_column": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "contact_column": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "contact_info": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "copyright": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "policy_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_widget": {
+          "type": "object",
+          "properties": {
+            "button_text": {
+              "type": "string"
+            },
+            "button_tooltip": {
+              "type": "string"
+            },
+            "chat_window": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "response_notice": {
+                  "type": "string"
+                },
+                "contacts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "avatar_svg": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "services": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "top_bar": {
+              "type": "object",
+              "properties": {
+                "language_selector": {
+                  "type": "string",
+                  "description": "Text for language selection, e.g., 'ENGLISH'"
+                },
+                "logo": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "alt": {
+                      "type": "string"
+                    },
+                    "src": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  }
+                }
+              }
+            },
+            "main_menu": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "is_active": {
+                    "type": "boolean"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "call_to_action": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "mega_menu_content": {
+                  "type": "object",
+                  "properties": {
+                    "form": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "note": {
+                          "type": "string"
+                        },
+                        "fields": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "placeholder": {
+                                "type": "string"
+                              },
+                              "required": {
+                                "type": "boolean"
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "validation": {
+                                "type": "string"
+                              },
+                              "links": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "text": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "captcha": {
+                          "type": "boolean"
+                        },
+                        "submit_button": {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "breadcrumbs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "content_section": {
+          "type": "object",
+          "properties": {
+            "sidebar": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                }
+              }
+            },
+            "cards": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "background_image": {
+                    "type": "object",
+                    "properties": {
+                      "src": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  },
+                  "link": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "brand_column": {
+              "type": "object",
+              "properties": {
+                "logo": {
+                  "type": "object",
+                  "properties": {
+                    "src": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "alt": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "social_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                },
+                "app_store_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "image_src": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "image_alt": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "quick_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "details": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "bottom_bar": {
+              "type": "object",
+              "properties": {
+                "copyright_text": {
+                  "type": "string"
+                },
+                "legal_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "tooltip": {
+                "type": "string"
+              },
+              "chat_window_title": {
+                "type": "string"
+              },
+              "chat_window_intro": {
+                "type": "string"
+              },
+              "chat_notice": {
+                "type": "string"
+              },
+              "contacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "team_listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "string",
+              "format": "uri",
+              "default": "https://royal-healthcare.com/wp-content/uploads/2025/10/RHC-logo-2.png"
+            },
+            "logo_alt": {
+              "type": "string",
+              "default": "Royal Healthcare Logo"
+            },
+            "language_switcher": {
+              "type": "object",
+              "properties": {
+                "current_language": {
+                  "type": "string",
+                  "default": "ENGLISH"
+                }
+              }
+            },
+            "main_navigation": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "cta_button": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "default": "Book Now"
+                },
+                "form_title": {
+                  "type": "string",
+                  "default": "Book an appoinment"
+                },
+                "form_description": {
+                  "type": "string",
+                  "default": "Note: The time you choose is tentative — our team will reach out shortly to confirm your appointment details."
+                },
+                "form_fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "placeholder": {
+                        "type": "string"
+                      },
+                      "required": {
+                        "type": "boolean"
+                      },
+                      "options": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "submit_button_text": {
+                  "type": "string",
+                  "default": "Submit"
+                },
+                "privacy_policy_text": {
+                  "type": "string",
+                  "default": "*I have read and agreed to the Royal Healthcare Privacy Policy and Terms & Conditions. I understand that my personal information will be kept confidential and will not be disclosed to any third party."
+                }
+              }
+            }
+          }
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "default": "Meet Our Team"
+            },
+            "breadcrumb": {
+              "type": "object",
+              "properties": {
+                "home_text": {
+                  "type": "string",
+                  "default": "Home"
+                },
+                "current_page": {
+                  "type": "string",
+                  "default": "Meet Our Team"
+                }
+              }
+            }
+          }
+        },
+        "doctor_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "default": "Meet Our Doctors"
+            },
+            "description": {
+              "type": "string",
+              "default": "Experienced specialists focused on providing safe, effective, and personalised treatment for all."
+            },
+            "anchor_id": {
+              "type": "string",
+              "default": "doctor-list"
+            },
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "category_name": {
+                    "type": "string"
+                  },
+                  "doctors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "specialty": {
+                          "type": "string"
+                        },
+                        "image_src": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "profile_url": {
+                          "type": "string"
+                        },
+                        "view_profile_button_text": {
+                          "type": "string",
+                          "default": "View Profile"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "leadership_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "default": "Meet Our Leadership Team"
+            },
+            "description": {
+              "type": "string",
+              "default": "Trusted leaders dedicated to your health, each with a passion for personalised, quality care."
+            },
+            "anchor_id": {
+              "type": "string",
+              "default": "leadership-team"
+            },
+            "members": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "image_src": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "string",
+              "default": "https://royal-healthcare.com/wp-content/uploads/2025/10/Footer-logo-white.png"
+            },
+            "social_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "quick_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "default": "Get In Touch With Us"
+                },
+                "phone_label": {
+                  "type": "string",
+                  "default": "Phone"
+                },
+                "phone_number": {
+                  "type": "string",
+                  "default": "+65 6931 8000"
+                },
+                "email_label": {
+                  "type": "string",
+                  "default": "Email"
+                },
+                "email_address": {
+                  "type": "string",
+                  "default": "askus@royal-healthcare.com"
+                },
+                "address_label": {
+                  "type": "string",
+                  "default": "Address"
+                },
+                "address_text": {
+                  "type": "string",
+                  "default": "Royal Square Medical Centre, Level 7, 101 Irrawaddy Road, Singapore 329565"
+                }
+              }
+            },
+            "app_store_badges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "image_src": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "copyright_text": {
+              "type": "string",
+              "default": "Copyright 2026 © Royal Healthcare Pte Ltd. All Rights Reserved."
+            },
+            "privacy_policy_link": {
+              "type": "string",
+              "default": "https://royal-healthcare.com/privacy-policy/"
+            },
+            "terms_conditions_link": {
+              "type": "string",
+              "default": "https://royal-healthcare.com/terms-conditions/"
+            }
+          }
+        },
+        "floating_widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "action_url": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "blog_listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "link": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            },
+            "language_selector": {
+              "type": "string"
+            },
+            "primary_navigation": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "cta_button": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "popup_form": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "placeholder": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "submit_button_text": {
+                      "type": "string"
+                    },
+                    "close_button_aria_label": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "breadcrumbs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "news_section": {
+          "type": "object",
+          "properties": {
+            "heading": {
+              "type": "string"
+            },
+            "articles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "object",
+                    "properties": {
+                      "src": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "alt": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "excerpt": {
+                    "type": "string"
+                  },
+                  "read_more_link": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "events_section": {
+          "type": "object",
+          "properties": {
+            "heading": {
+              "type": "string"
+            },
+            "articles": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "object",
+                    "properties": {
+                      "src": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "alt": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "date": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "excerpt": {
+                    "type": "string"
+                  },
+                  "read_more_link": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "brand_column": {
+              "type": "object",
+              "properties": {
+                "logo": {
+                  "type": "object",
+                  "properties": {
+                    "src": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "alt": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "social_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "icon_label": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "app_store_badges": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "image_src": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "quick_links": {
+              "type": "object",
+              "properties": {
+                "heading": {
+                  "type": "string"
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "heading": {
+                  "type": "string"
+                },
+                "details": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "icon_label": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "link": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "bottom_bar": {
+              "type": "object",
+              "properties": {
+                "copyright_text": {
+                  "type": "string"
+                },
+                "legal_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_widgets": {
+          "type": "object",
+          "properties": {
+            "whatsapp_chat": {
+              "type": "object",
+              "properties": {
+                "button_text": {
+                  "type": "string"
+                },
+                "popup_title": {
+                  "type": "string"
+                },
+                "popup_intro": {
+                  "type": "string"
+                },
+                "chat_agent_name": {
+                  "type": "string"
+                },
+                "chat_link": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "default_avatar_color": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "event_listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "language_selector": {
+              "type": "string",
+              "description": "Text indicating the currently selected language"
+            },
+            "logo": {
+              "type": "string",
+              "format": "uri",
+              "description": "URL of the main site logo"
+            },
+            "book_now_menu": {
+              "type": "object",
+              "properties": {
+                "trigger_label": {
+                  "type": "string",
+                  "description": "Label for the menu item that opens the booking form"
+                },
+                "form_title": {
+                  "type": "string",
+                  "description": "Title of the booking form inside the menu"
+                },
+                "form_description": {
+                  "type": "string",
+                  "description": "Note or disclaimer text inside the booking form"
+                },
+                "form_fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "text",
+                          "email",
+                          "tel",
+                          "textarea",
+                          "select",
+                          "radio",
+                          "checkbox",
+                          "hidden"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "required": {
+                        "type": "boolean"
+                      },
+                      "placeholder": {
+                        "type": "string"
+                      },
+                      "options": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Options for select, radio, or checkbox fields"
+                      },
+                      "validation": {
+                        "type": "string",
+                        "description": "Validation pattern or message"
+                      }
+                    }
+                  }
+                },
+                "submit_button_text": {
+                  "type": "string"
+                },
+                "policy_text": {
+                  "type": "string",
+                  "description": "Text for privacy policy and terms agreement"
+                }
+              }
+            },
+            "main_menu": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "mobile_toggle_icon": {
+              "type": "object",
+              "properties": {
+                "open_icon_path": {
+                  "type": "string"
+                },
+                "close_icon_path": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "page_header": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "breadcrumbs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "is_current": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "events_listing": {
+          "type": "object",
+          "properties": {
+            "section_title": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "excerpt": {
+                    "type": "string"
+                  },
+                  "date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "read_more_link": {
+                    "type": "object",
+                    "properties": {
+                      "url": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "string",
+              "format": "uri"
+            },
+            "social_media": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "icon_path": {
+                    "type": "string",
+                    "description": "SVG path data for the icon"
+                  }
+                }
+              }
+            },
+            "app_store_badges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "description": "e.g. 'Apple Store', 'Google Play'"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            },
+            "quick_access_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "phone",
+                          "email",
+                          "address"
+                        ]
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "icon_path": {
+                        "type": "string",
+                        "description": "SVG path data for the contact icon"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "copyright_text": {
+              "type": "string"
+            }
+          }
+        },
+        "sticky_widgets": {
+          "type": "object",
+          "properties": {
+            "whatsapp_chat": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "notice": {
+                  "type": "string"
+                },
+                "members": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "avatar_svg": {
+                        "type": "string",
+                        "description": "SVG code for the default avatar"
+                      }
+                    }
+                  }
+                },
+                "button_icon": {
+                  "type": "object",
+                  "properties": {
+                    "background_color": {
+                      "type": "string"
+                    },
+                    "icon_svg": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "legal": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "type": "object",
+          "properties": {
+            "language_toggle": {
+              "type": "object",
+              "properties": {
+                "current_language": {
+                  "type": "string"
+                }
+              }
+            },
+            "logo": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "src": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "width": {
+                  "type": "string"
+                },
+                "height": {
+                  "type": "string"
+                }
+              }
+            },
+            "call_to_action": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "form_popup": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "placeholder": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "submit_button_text": {
+                      "type": "string"
+                    },
+                    "terms_checkbox_label": {
+                      "type": "string"
+                    },
+                    "terms_links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "main_navigation": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "page_content": {
+          "type": "object",
+          "properties": {
+            "title_section": {
+              "type": "object",
+              "properties": {
+                "page_title": {
+                  "type": "string"
+                },
+                "breadcrumbs": {
+                  "type": "string"
+                }
+              }
+            },
+            "policy_content": {
+              "type": "object",
+              "properties": {
+                "languages": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "language_name": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "intro_paragraphs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "data_collection_table": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "category": {
+                              "type": "string"
+                            },
+                            "examples": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "content_sections": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "heading": {
+                              "type": "string"
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "contact_email": {
+                        "type": "string",
+                        "format": "email"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "branding": {
+              "type": "object",
+              "properties": {
+                "logo_src": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "social_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "quick_links": {
+              "type": "object",
+              "properties": {
+                "heading": {
+                  "type": "string"
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "heading": {
+                  "type": "string"
+                },
+                "phone": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": "string"
+                }
+              }
+            },
+            "bottom_bar": {
+              "type": "object",
+              "properties": {
+                "copyright_text": {
+                  "type": "string"
+                },
+                "legal_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          }
+        }
+      }
+    },
+    "doctor_profile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "type": "object",
+          "properties": {
+            "language_switcher": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              }
+            },
+            "logo": {
+              "type": "string",
+              "format": "uri",
+              "description": "URL of the main site logo"
+            },
+            "main_menu": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "mega_menu": {
+              "type": "object",
+              "properties": {
+                "trigger_label": {
+                  "type": "string"
+                },
+                "booking_form": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "placeholder": {
+                            "type": "string"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "submit_button_label": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "profile_header": {
+          "type": "object",
+          "properties": {
+            "page_title": {
+              "type": "string"
+            },
+            "breadcrumbs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "sidebar": {
+          "type": "object",
+          "properties": {
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "category_name": {
+                    "type": "string"
+                  },
+                  "doctors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "is_active": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "doctor_profile": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "type": "string",
+              "format": "uri"
+            },
+            "name": {
+              "type": "string"
+            },
+            "titles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "e.g., Medical Director, Senior Consultant"
+            },
+            "qualifications": {
+              "type": "string"
+            },
+            "social_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "biography": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Paragraphs of text describing the doctor"
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "string",
+              "format": "uri"
+            },
+            "social_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "app_store_badges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "apple",
+                      "google"
+                    ]
+                  },
+                  "image_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "alt_text": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "quick_links": {
+              "type": "object",
+              "properties": {
+                "column_1": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "column_2": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "phone": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "address_lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "copyright": {
+              "type": "string"
+            },
+            "legal_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "whatsapp"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "button_label": {
+                "type": "string"
+              },
+              "popup_title": {
+                "type": "string"
+              },
+              "popup_description": {
+                "type": "string"
+              },
+              "contacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "phone": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "blog_category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "top_bar": {
+              "type": "object",
+              "properties": {
+                "language_label": {
+                  "type": "string",
+                  "const": "ENGLISH"
+                }
+              }
+            },
+            "logo": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "src": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              }
+            },
+            "main_menu": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "has_submenu": {
+                    "type": "boolean"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "book_now_menu": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "const": "Book Now"
+                },
+                "dropdown_title": {
+                  "type": "string",
+                  "const": "Book an appoinment"
+                },
+                "note": {
+                  "type": "string",
+                  "const": "Note: The time you choose is tentative — our team will reach out shortly to confirm your appointment details."
+                },
+                "form": {
+                  "type": "object",
+                  "properties": {
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "placeholder": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "acceptance_text": {
+                            "type": "string"
+                          },
+                          "links": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "text": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "submit_button_text": {
+                      "type": "string",
+                      "const": "Submit"
+                    },
+                    "close_button_label": {
+                      "type": "string",
+                      "const": "Close Book Now form"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "page_header": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "const": "Category: Articles"
+            }
+          }
+        },
+        "content_sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "article_post"
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "excerpt": {
+                "type": "string"
+              },
+              "image": {
+                "type": "object",
+                "properties": {
+                  "src": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "alt": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "next_page": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "logo_src": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "social_links": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "platform": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri"
+                                },
+                                "icon_path": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "heading": {
+                            "type": "string"
+                          },
+                          "links": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "text": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "heading": {
+                            "type": "string"
+                          },
+                          "contact_info": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                },
+                                "icon_path": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "bottom_bar": {
+              "type": "object",
+              "properties": {
+                "copyright_text": {
+                  "type": "string"
+                },
+                "legal_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "whatsapp_chat"
+              },
+              "button": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon_style": {
+                    "type": "string"
+                  },
+                  "position": {
+                    "type": "string"
+                  }
+                }
+              },
+              "popup": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "intro_message": {
+                    "type": "string"
+                  },
+                  "response_time_notice": {
+                    "type": "string"
+                  },
+                  "contact": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "blog_post": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "page_metadata": {
+          "type": "object",
+          "properties": {
+            "language_switcher": {
+              "type": "string"
+            },
+            "breadcrumbs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "header": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "string",
+              "format": "uri"
+            },
+            "actions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "dropdown_content": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "note": {
+                        "type": "string"
+                      },
+                      "form_fields": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string"
+                            },
+                            "placeholder": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "options": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "submit_button": {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "main_menu": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "article_section": {
+          "type": "object",
+          "properties": {
+            "featured_image": {
+              "type": "string",
+              "format": "uri"
+            },
+            "title": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "read_more_link": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                }
+              }
+            },
+            "navigation": {
+              "type": "object",
+              "properties": {
+                "previous": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "next": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "logo": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "social_links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "platform": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "icon": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "heading": {
+                    "type": "string"
+                  },
+                  "links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "contact_info": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "link": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "copyright": {
+              "type": "string"
+            },
+            "legal_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "chat_button_text": {
+                "type": "string"
+              },
+              "chat_window_title": {
+                "type": "string"
+              },
+              "chat_window_intro": {
+                "type": "string"
+              },
+              "contacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "doctor_listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_link": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "type": "object",
+          "properties": {
+            "top_bar": {
+              "type": "object",
+              "properties": {
+                "language_label": {
+                  "type": "string"
+                }
+              }
+            },
+            "logo": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "image_src": {
+                  "type": "string"
+                },
+                "alt_text": {
+                  "type": "string"
+                }
+              }
+            },
+            "book_now_menu": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "toggle_text_open": {
+                  "type": "string"
+                },
+                "toggle_text_close": {
+                  "type": "string"
+                },
+                "form": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "note": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "placeholder": {
+                            "type": "string"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "submit_button_text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "main_navigation": {
+              "type": "object",
+              "properties": {
+                "menu_items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "has_children": {
+                        "type": "boolean"
+                      },
+                      "children": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "mobile_toggle_label_open": {
+                  "type": "string"
+                },
+                "mobile_toggle_label_close": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "page_header": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "category_label": {
+              "type": "string"
+            }
+          }
+        },
+        "main_content": {
+          "type": "object",
+          "properties": {
+            "doctor_list": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "link": {
+                    "type": "string"
+                  },
+                  "image_src": {
+                    "type": "string"
+                  },
+                  "image_alt": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "branding": {
+              "type": "object",
+              "properties": {
+                "logo_src": {
+                  "type": "string"
+                },
+                "logo_alt": {
+                  "type": "string"
+                },
+                "social_links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "quick_links": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "details": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "copyright": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "links": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_widgets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "button_text": {
+                "type": "string"
+              },
+              "button_label": {
+                "type": "string"
+              },
+              "popup_title": {
+                "type": "string"
+              },
+              "popup_description": {
+                "type": "string"
+              },
+              "contact_name": {
+                "type": "string"
+              },
+              "contact_link": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "date_archive": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "page_header": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "const": "Day: February 15, 2024"
+            },
+            "subtitle": {
+              "type": "string"
+            }
+          }
+        },
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "top_bar": {
+              "type": "object",
+              "properties": {
+                "language_text": {
+                  "type": "string",
+                  "const": "ENGLISH"
+                }
+              }
+            },
+            "logo": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string",
+                  "format": "uri",
+                  "const": "https://royal-healthcare.com/wp-content/uploads/2025/10/RHC-logo-2.png"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "width": {
+                  "type": "string"
+                },
+                "height": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "const": "https://royal-healthcare.com"
+                }
+              }
+            },
+            "menu": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "submenu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "cta_button": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "const": "Book Now"
+                },
+                "form_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "main_content": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "excerpt": {
+                "type": "string"
+              },
+              "image": {
+                "type": "object",
+                "properties": {
+                  "src": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "alt": {
+                    "type": "string"
+                  },
+                  "width": {
+                    "type": "string"
+                  },
+                  "height": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "appointment_form": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "const": "Book an appoinment"
+            },
+            "description": {
+              "type": "string",
+              "const": "Note: The time you choose is tentative — our team will reach out shortly to confirm your appointment details."
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "placeholder": {
+                    "type": "string"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "submit_button": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "const": "Submit"
+                }
+              }
+            },
+            "links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "type": "object",
+          "properties": {
+            "logo": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string",
+                  "format": "uri",
+                  "const": "https://royal-healthcare.com/wp-content/uploads/2025/10/Footer-logo-white.png"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              }
+            },
+            "social_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            },
+            "quick_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "contact_info": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "const": "Get In Touch With Us"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "icon_type": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "copyright": {
+              "type": "string"
+            },
+            "policy_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "app_store_badges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "image_src": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "floating_chat": {
+          "type": "object",
+          "properties": {
+            "button_text": {
+              "type": "string",
+              "const": "Need Help? Chat with us"
+            },
+            "popup_title": {
+              "type": "string",
+              "const": "Start a Conversation"
+            },
+            "popup_description": {
+              "type": "string"
+            },
+            "contact": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "const": "Royal Healthcare"
+                },
+                "url": {
+                  "type": "string",
+                  "const": "https://api.whatsapp.com/send?phone=6581818671"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
