@@ -30,7 +30,7 @@ export class WebGeneratorOrchestrator {
     // System prompt for the orchestrator
     this.systemPrompt = `You are the Web Generator Orchestrator. Your role is to coordinate the generation of Astro.js projects from scraped website data.
 
-## Your Process (8-Step Pipeline)
+## Your Process (9-Step Pipeline)
 
 1. **Setup**: Copy template to output directory
 2. **Extract**: Extract design tokens from reference URL
@@ -38,8 +38,9 @@ export class WebGeneratorOrchestrator {
 4. **Plan Brief**: Create design brief with layout + design tokens
 5. **Generate**: Generate Astro code (layout-first, content from data files)
 6. **Validate**: Run typecheck, astro check, build
-7. **Iterate**: Fix any issues (loops up to 3 times)
-8. **Done**: Return generated project path
+7. **Functional Check**: Test links, buttons, pages work (Playwright)
+8. **Iterate**: Fix any issues (loops up to 3 times)
+9. **Done**: Return generated project path
 
 ## Layout-First Philosophy
 
@@ -106,8 +107,11 @@ When providing your final result, output a complete summary of what was accompli
       // Step 4: Generate - Generate Astro code (layout-first, content from data)
       await this.step4_GenerateAstroCode(outputPath, designBrief, scraperOutput, layoutPlan);
 
-      // Step 5: Validate - Validate generated code
+      // Step 5: Validate - Validate generated code (typecheck, build)
       const validation = await this.step5_Validate(outputPath);
+
+      // Step 5b: Functional Check - Check links, buttons, pages work
+      const functionalCheck = await this.step5b_FunctionalCheck(outputPath);
 
       // Step 6: Iterate - Fix validation errors (loops until max iterations reached)
       let iterations = 0;
@@ -427,6 +431,69 @@ If there are errors, list them clearly so they can be fixed.`;
 
     const result = await this.runQuery(prompt, 'Step 5: Validate');
     const passed = result.includes('VALIDATION_PASSED') || !result.toLowerCase().includes('error');
+
+    return {
+      passed,
+      errors: passed ? undefined : this.extractErrors(result),
+    };
+  }
+
+  /**
+   * Step 5b: Functional Check
+   * Check that links, buttons, and pages actually work
+   *
+   * Skills used: test-and-quality, webapp-testing
+   */
+  private async step5b_FunctionalCheck(outputPath: string): Promise<{ passed: boolean; errors?: string[] }> {
+    console.log('🔍 Step 5b: Functional Check - Testing links, buttons, and pages...');
+
+    const prompt = `Use the **webapp-testing** skill to test the generated Astro project at: ${outputPath}
+
+IMPORTANT: Start the dev server first with: npm run dev
+
+## Functional Checks
+
+Run the following tests using Playwright:
+
+1. **Page Load Test**
+   - Visit the homepage (http://localhost:4321)
+   - Check the page loads without crash
+   - Check for console errors (Error level only, ignore warnings)
+
+2. **Link Checker**
+   - Find all links on the homepage
+   - Visit each link and verify it returns 200 or navigates correctly
+   - Check for any 404 errors
+   - Report broken links
+
+3. **Navigation Test**
+   - Click on main navigation links
+   - Verify they navigate to correct pages
+   - Check that all nav items work
+
+4. **Button Test**
+   - Find all buttons on the homepage
+   - Click each button
+   - Verify buttons are clickable (not disabled)
+   - Report any broken buttons
+
+5. **All Pages Test**
+   - Visit each page defined in src/pages/
+   - Verify each page loads without crash
+   - Report any pages that fail to load
+
+For each check:
+- If pass, note it
+- If fail, list the specific link/button/page that failed
+
+Output format:
+- If all checks pass: "✅ FUNCTIONAL_CHECK_PASSED"
+- If any check fails: List the failures clearly
+
+DO NOT take screenshots unless explicitly asked. Focus on functional verification.`;
+
+    const result = await this.runQuery(prompt, 'Step 5b: Functional Check');
+    const passed = result.includes('FUNCTIONAL_CHECK_PASSED');
 
     return {
       passed,
