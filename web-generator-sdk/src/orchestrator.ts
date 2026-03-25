@@ -514,13 +514,20 @@ If all checks pass with scores >= 7/10, output "✅ QUALITY_PASSED" at the end.`
       let output = '';
       let turnCount = 0;
 
+      // Heartbeat to show activity
+      const heartbeat = setInterval(() => {
+        console.log(`  ⏳ ${stepName}: Still working...`);
+      }, 30000); // Log every 30 seconds
+
       for await (const message of result) {
         if (message.type === 'result') {
+          clearInterval(heartbeat);
           const resultMsg = message as SDKResultMessage;
           if (resultMsg.subtype === 'success') {
             output = resultMsg.result;
             turnCount = resultMsg.num_turns || 0;
           } else {
+            clearInterval(heartbeat);
             // Handle error result (error_during_execution, error_max_turns, etc.)
             const errorMsg = (resultMsg as any).errors?.join('; ') || 'Unknown error';
             console.error(`❌ ${stepName} error:`, errorMsg);
