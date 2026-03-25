@@ -6,9 +6,8 @@
  */
 
 // Load environment variables from .env file
+// Can be overridden with --env flag
 import { config } from 'dotenv';
-config({ path: '.env' });
-
 import { WebGeneratorOrchestrator } from './orchestrator.js';
 import { join } from 'path';
 import { parseArgs } from 'util';
@@ -18,6 +17,7 @@ interface CliArgs {
   input?: string;
   reference?: string;
   output?: string;
+  env?: string;
   help?: boolean;
 }
 
@@ -33,9 +33,14 @@ export async function main() {
       input: { type: 'string' },
       reference: { type: 'string' },
       output: { type: 'string' },
+      env: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   }).values as CliArgs;
+
+  // Load environment from specified file (or default .env)
+  const envPath = args.env || '.env';
+  config({ path: envPath });
 
   // Show help
   if (args.help) {
@@ -50,10 +55,14 @@ Options:
   --input <path>        Path to scraper output directory (default: ./output)
   --reference <url>     Reference website URL for design extraction (optional)
   --output <path>       Output directory for generated project (default: ./projects/<site-name>)
+  --env <file>          Path to .env file (default: .env)
   -h, --help            Show this help message
 
 Example:
   npm run dev -- --site-name my-site --input ./output --reference https://example.com
+
+Using custom env:
+  npm run dev -- --site-name my-site --input ./output --env .env.production
     `);
     process.exit(0);
   }
