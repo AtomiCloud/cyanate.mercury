@@ -30,15 +30,25 @@ export class WebGeneratorOrchestrator {
     // System prompt for the orchestrator
     this.systemPrompt = `You are the Web Generator Orchestrator. Your role is to coordinate the generation of Astro.js projects from scraped website data.
 
-## Your Process
+## Your Process (8-Step Pipeline)
 
-1. **Setup**: Load scraper output (structure.json, schema.json, content.json)
+1. **Setup**: Copy template to output directory
 2. **Extract**: Extract design tokens from reference URL
-3. **Plan**: Create design brief
-4. **Generate**: Generate Astro code
-5. **Validate**: Validate and repair
-6. **Iterate**: Fix any issues
-7. **Done**: Return generated project path
+3. **Plan Layout**: Create layout plan (page structure, sections, responsive strategy)
+4. **Plan Brief**: Create design brief with layout + design tokens
+5. **Generate**: Generate Astro code (layout-first, content from data files)
+6. **Validate**: Run typecheck, astro check, build
+7. **Iterate**: Fix any issues (loops up to 3 times)
+8. **Done**: Return generated project path
+
+## Layout-First Philosophy
+
+IMPORTANT: Generate code in this order:
+1. Layout structure (HTML divs, sections) FIRST with placeholder text
+2. Then integrate content from src/data/content.json
+3. Then apply visual design (colors, fonts, spacing)
+
+Content is NEVER hardcoded - always read from src/data/content.json via src/lib/content.ts
 
 ## Template Reference
 
@@ -47,17 +57,20 @@ The Astro template is located at: ${this.templatePath}
 This template contains:
 - Pre-configured Astro + React + Tailwind CSS v4
 - Shadcn UI configuration (components.json)
-- Folder structure (components/ui, layouts, pages, styles, lib)
+- Folder structure (components/ui, layouts, pages, styles, lib, data)
+- src/lib/content.ts - content fetcher with getPageByUrl(), getAllPages(), etc.
+- src/data/content.json - placeholder for scraper output
 - Empty Layout.astro with <slot/>
 - globals.css with OKLCH CSS variable placeholders
 
 ## Key Constraints
 
 - Always copy the template to projects/[site-name]/ before modifying
+- Copy content.json to src/data/content.json during generation
 - Install Shadcn components during generation: npx shadcn add [component]
 - Replace OKLCH CSS variables in globals.css with extracted design tokens
 - Use OKLCH color format for all design tokens
-- Follow the 11-step pipeline defined in web-generator.md
+- DO NOT hardcode content in .astro files - use content.ts helpers
 
 ## Error Handling
 
@@ -84,11 +97,14 @@ When providing your final result, output a complete summary of what was accompli
       // Step 2: Extract - Extract design tokens from reference site
       const designTokens = await this.step2_ExtractDesignTokens(config);
 
-      // Step 3: Plan - Create design brief
-      const designBrief = await this.step3_CreateDesignBrief(scraperOutput, designTokens);
+      // Step 2b: Plan - Plan layout structure before code generation
+      const layoutPlan = await this.step2b_PlanLayout(scraperOutput);
 
-      // Step 4: Generate - Generate Astro code
-      await this.step4_GenerateAstroCode(outputPath, designBrief, scraperOutput);
+      // Step 3: Plan - Create design brief (now with layout context)
+      const designBrief = await this.step3_CreateDesignBrief(scraperOutput, designTokens, layoutPlan);
+
+      // Step 4: Generate - Generate Astro code (layout-first, content from data)
+      await this.step4_GenerateAstroCode(outputPath, designBrief, scraperOutput, layoutPlan);
 
       // Step 5: Validate - Validate generated code
       const validation = await this.step5_Validate(outputPath);
@@ -220,12 +236,69 @@ Also include typography, spacing, border radius, and shadow tokens.`;
   }
 
   /**
+   * Step 2b: Plan Layout
+   * Create a layout plan for the site structure
+   *
+   * This step comes BEFORE design brief to establish:
+   * - Page routing structure
+   * - Section hierarchy per page
+   * - Responsive breakpoint strategy
+   * - Component composition
+   *
+   * Skills used: design-brief
+   */
+  private async step2b_PlanLayout(scraperOutput: ScraperOutput): Promise<string> {
+    console.log('📐 Step 2b: Plan Layout - Creating layout plan...');
+
+    const prompt = `Use the **design-brief** skill to create a layout plan for the site structure.
+
+## Scraper Structure
+\`\`\`json
+${JSON.stringify(scraperOutput.structure).slice(0, 15000)}
+\`\`\`
+
+## Scraper Schema (defines content structure per page type)
+\`\`\`json
+${JSON.stringify(scraperOutput.schema).slice(0, 15000)}
+\`\`\`
+
+Create a layout plan that specifies:
+
+1. **Page Routing Structure**
+   - List all pages with their URL patterns
+   - Identify static vs dynamic routes (e.g., /blog/[slug])
+   - Map page relationships (navigation hierarchy)
+
+2. **Section Composition for Each Page Type**
+   - What sections appear on each page (e.g., landing: hero, features, testimonials, CTA)
+   - Section order within each page
+   - Which sections are shared (header, footer) vs page-specific
+
+3. **Responsive Strategy**
+   - Mobile-first breakpoints
+   - Layout patterns (stack on mobile, grid on desktop)
+   - Content prioritization for smaller screens
+
+4. **Component Mapping**
+   - Which reusable Astro components to create for each section type
+   - Section-to-component relationship
+
+5. **Content Data Requirements**
+   - What content fields each section needs from content.json
+   - Field mappings from schema to components
+
+This layout plan will guide the code generation step. Focus on structure and layout - NOT colors or styling (that comes later).`;
+
+    return await this.runQuery(prompt, 'Step 2b: Plan Layout');
+  }
+
+  /**
    * Step 3: Plan
    * Create design brief
    *
    * Skills used: design-brief
    */
-  private async step3_CreateDesignBrief(scraperOutput: ScraperOutput, designTokens: string): Promise<string> {
+  private async step3_CreateDesignBrief(scraperOutput: ScraperOutput, designTokens: string, layoutPlan: string): Promise<string> {
     console.log('📝 Step 3: Plan - Creating design brief...');
 
     const prompt = `Use the **design-brief** skill to create a comprehensive design brief based on the following:
@@ -240,14 +313,19 @@ ${JSON.stringify(scraperOutput).slice(0, 15000)}
 ${designTokens}
 \`\`\`
 
-Create a design brief that includes:
-1. Site structure and navigation
-2. Page layouts for each page type
-3. Component requirements
-4. Content mapping
-5. Styling approach
+## Layout Plan
+\`\`\`
+${layoutPlan.slice(0, 10000)}
+\`\`\`
 
-The brief should guide the Astro code generation process.`;
+Create a design brief that includes:
+1. Site structure and navigation (from layout plan)
+2. Page layouts for each page type (from layout plan)
+3. Component requirements (from layout plan)
+4. Content mapping (which content fields go where)
+5. Styling approach (colors, typography, spacing from design tokens)
+
+The brief should guide the Astro code generation process. Use the layout plan as the source of truth for structure.`;
 
     return await this.runQuery(prompt, 'Step 3: Create Design Brief');
   }
@@ -258,7 +336,7 @@ The brief should guide the Astro code generation process.`;
    *
    * Skills used: astro-codegen, Astro, Shadcn, Frontend Design
    */
-  private async step4_GenerateAstroCode(outputPath: string, designBrief: string, scraperOutput: ScraperOutput): Promise<void> {
+  private async step4_GenerateAstroCode(outputPath: string, designBrief: string, scraperOutput: ScraperOutput, layoutPlan: string): Promise<void> {
     console.log('🔨 Step 4: Generate - Generating Astro code...');
 
     const prompt = `Use the **astro-codegen** skill to generate Astro pages, components, and layouts for the output directory: ${outputPath}
@@ -267,39 +345,55 @@ Consult the **Astro** skill for Astro framework best practices, CLI commands, an
 Consult the **Shadcn** skill for proper component usage and installation patterns.
 Reference the **Frontend Design** skill for layout best practices and design patterns.
 
+## Layout Plan
+\`\`\`
+${layoutPlan.slice(0, 10000)}
+\`\`\`
+
 ## Design Brief
 \`\`\`
-${designBrief}
+${designBrief.slice(0, 10000)}
 \`\`\`
 
-## Scraper Content
+## Content Data (to be used at build time)
 \`\`\`json
-${JSON.stringify(scraperOutput).slice(0, 15000)}
+${JSON.stringify(scraperOutput.content).slice(0, 15000)}
 \`\`\`
 
-## Instructions
+## Instructions - LAYOUT FIRST APPROACH
 
-Generate the following:
+Follow this phased approach:
 
-1. **Pages** (src/pages/): Create an Astro page for each page in the scraper output
-   - Use the Layout component
-   - Include proper metadata (title, description)
-   - Use Tailwind CSS classes for styling
-   - Follow the design brief for layout and content
+### Phase 1: Data Setup
+1. Copy content.json to src/data/content.json (the scraper's content data)
+2. Review the src/lib/content.ts helper - it already has functions to read content
 
-2. **Components** (src/components/): Create reusable components
-   - Header/Navigation
-   - Footer
-   - Any other UI components needed
+### Phase 2: Layout Structure (DO THIS FIRST)
+1. Create the page file structure matching the layout plan's routing
+2. For each page, create the HTML/Tailwind structure (divs, sections) - use PLACEHOLDER text like "Hero Title", "Feature 1"
+3. DO NOT use real content from content.json yet - focus purely on layout/structure
+4. Ensure responsive breakpoints match the layout plan
+5. Use import to read content: \`import { getPageByUrl } from '../lib/content'\`
 
-3. **Update globals.css**: Replace the placeholder OKLCH CSS variables with the actual design tokens from the design brief
+### Phase 3: Content Integration
+1. Now replace placeholders with actual content from src/data/content.json
+2. Use the content.ts helper functions (getPageByUrl, getAllPages, etc.)
+3. Map schema fields to component props
 
-4. **Install Shadcn components**: After generating the code, install any needed Shadcn UI components using: npx shadcn add [component]
+### Phase 4: Visual Design
+1. Apply design tokens (colors, typography, spacing) from design brief to globals.css
+2. Refine component styling to match the design brief aesthetic
+
+### Important Constraints
+- DO NOT hardcode content in .astro files - all content must come from src/data/content.json via content.ts
+- Layout structure (HTML divs, sections) comes FIRST, before styling
+- Follow the layout plan's section composition exactly
+- Use Astro's static generation - content is injected at BUILD time, not runtime
 
 Output directory: ${outputPath}
 Template directory: ${this.templatePath}
 
-Start by reading the existing template files to understand the structure, then make your modifications.
+Start by reading the existing template files and src/lib/content.ts to understand the structure.
 
 When you're done, provide a summary of all files created and modified.`;
 
