@@ -25,3 +25,5 @@ npm-debug.log*
 
 # Generated projects
 projects/
+.env.*
+runs/

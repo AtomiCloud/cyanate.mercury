@@ -1,0 +1,6 @@
+{
+  "input": "../example",
+  "reference": "https://vercel.com/",
+  "profile": "claude",
+  "steps": {}
+}
