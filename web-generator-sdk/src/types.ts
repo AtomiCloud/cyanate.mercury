@@ -1,8 +1,9 @@
 /**
- * Type definitions for the Web Generator SDK
+ * Shared type definitions for the Web Generator SDK.
  */
 
-// Input from scraper
+// --- Scraper output types ---
+
 export interface ScraperOutput {
   structure: StructureData;
   schema: SchemaData;
@@ -40,7 +41,8 @@ export interface PageContent {
   content: Record<string, unknown>;
 }
 
-// Design tokens extracted from reference site
+// --- Design tokens ---
+
 export interface DesignTokens {
   colors: {
     primary: string;
@@ -61,22 +63,38 @@ export interface DesignTokens {
   shadows: Record<string, string>;
 }
 
-// Generator configuration
-export interface GeneratorConfig {
-  siteName: string;
-  referenceUrl?: string;
-  outputPath: string;
-  scraperOutput: ScraperOutput;
-  designTokens?: DesignTokens;
-  /** Run quality checks using test-and-quality skill */
-  runQualityChecks?: boolean;
+// --- Config types ---
+
+export interface CuiConfig {
+  /** Path to scraper output directory */
+  input: string;
+  /** Reference website URL for design extraction */
+  reference?: string;
+  /** Default env profile name (e.g., "claude" -> .env.claude) */
+  profile: string;
+  /** Per-step overrides keyed by step ID */
+  steps?: Record<string, StepConfigOverride>;
 }
 
-// Generation result
-export interface GenerationResult {
-  success: boolean;
-  outputPath: string;
-  errors?: string[];
-  warnings?: string[];
-  validationPassed: boolean;
+export interface StepConfigOverride {
+  profile?: string;
+  env?: Record<string, string>;
+  skip?: boolean;
+}
+
+// --- Run metadata ---
+
+export interface RunMetadata {
+  runId: string;
+  status: 'running' | 'completed' | 'failed';
+  config: CuiConfig;
+  inputPath: string;
+  referenceUrl?: string;
+  profileName: string;
+  runDir: string;
+  createdAt: string;
+  finishedAt?: string;
+  completedSteps: string[];
+  failedStep?: string;
+  resumedFrom?: string;
 }
