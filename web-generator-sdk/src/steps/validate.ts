@@ -11,7 +11,6 @@ export const validateStep: Step = {
   id: 'validate',
   name: 'Validate',
   description: 'Run typecheck, astro check, and build',
-  modifiesSite: true,
 
   async run(workingDir: string, ctx: StepContext): Promise<StepStatus> {
     const startTime = Date.now();

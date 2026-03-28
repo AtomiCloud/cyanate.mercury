@@ -11,7 +11,6 @@ export const planLayoutStep: Step = {
   id: 'plan-layout',
   name: 'Plan Layout',
   description: 'Create layout plan for page structure and responsive strategy',
-  modifiesSite: false,
 
   async run(workingDir: string, ctx: StepContext): Promise<StepStatus> {
     const startTime = Date.now();

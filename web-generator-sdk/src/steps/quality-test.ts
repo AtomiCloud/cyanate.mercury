@@ -16,7 +16,6 @@ export const qualityTestStep: Step = {
   id: 'quality-test',
   name: 'Quality Test',
   description: 'Run visual and functional quality checks',
-  modifiesSite: false,
 
   async run(workingDir: string, ctx: StepContext): Promise<StepStatus> {
     const startTime = Date.now();

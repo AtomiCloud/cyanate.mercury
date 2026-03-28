@@ -11,7 +11,6 @@ export const functionalCheckStep: Step = {
   id: 'functional-check',
   name: 'Functional Check',
   description: 'Test links, buttons, and pages work correctly',
-  modifiesSite: false,
 
   async run(workingDir: string, ctx: StepContext): Promise<StepStatus> {
     const startTime = Date.now();

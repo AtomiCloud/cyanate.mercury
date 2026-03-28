@@ -11,7 +11,6 @@ export const extractTokensStep: Step = {
   id: 'extract-tokens',
   name: 'Extract Design Tokens',
   description: 'Extract design tokens from reference website',
-  modifiesSite: false,
 
   async run(workingDir: string, ctx: StepContext): Promise<StepStatus> {
     const startTime = Date.now();

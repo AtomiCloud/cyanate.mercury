@@ -1,5 +1,5 @@
 /**
- * Shared type definitions for the Web Generator SDK.
+ * Shared type definitions for the Web Generator SDK v2.
  */
 
 // --- Scraper output types ---
@@ -41,26 +41,206 @@ export interface PageContent {
   content: Record<string, unknown>;
 }
 
-// --- Design tokens ---
+// --- Phase 0: Style Fingerprint ---
 
-export interface DesignTokens {
-  colors: {
+export interface StyleFingerprint {
+  $schema: string;
+  style: {
     primary: string;
-    secondary: string;
-    accent: string;
-    background: string;
-    foreground: string;
-    muted: string;
-    border: string;
+    secondary: string[];
+    dimensions: {
+      ornament: number;
+      playfulness: number;
+      warmth: number;
+      density: number;
+      motion: number;
+      depth: number;
+      darkness: number;
+      formality: number;
+    };
+    treatments: {
+      surface: string;
+      corners: string;
+      shadows: string;
+      borders: string;
+      gradients: string;
+      blur: boolean;
+      transparency: boolean;
+      animation_style: string;
+    };
   };
-  typography: {
-    fontFamily: string;
-    fontSize: Record<string, string>;
-    fontWeight: Record<string, number>;
+  confidence: number;
+}
+
+// --- Phase 0: 7-Layer Design Tokens ---
+
+export interface DesignTokensV2 {
+  atomic: {
+    colors: Record<string, string>;
+    typography: {
+      fontFamily: Record<string, string>;
+      fontSize: Record<string, string>;
+      fontWeight: Record<string, number>;
+    };
+    spacing: Record<string, string>;
+    borderRadius: Record<string, string>;
+    shadows: Record<string, string>;
   };
-  spacing: Record<string, string>;
-  borderRadius: Record<string, string>;
-  shadows: Record<string, string>;
+  gradients: Record<string, GradientDef>;
+  layout: {
+    grid: {
+      columns: Record<string, string>;
+      gutter: Record<string, string>;
+    };
+    container: {
+      maxWidth: Record<string, string>;
+    };
+    breakpoints: Record<string, string>;
+    sections: Record<string, { top: string; bottom: string }>;
+    density: { mode: string };
+    rhythm: {
+      baseUnit: string;
+      verticalRhythm: Record<string, string>;
+    };
+  };
+  componentSpacing: Record<string, Record<string, string>>;
+  motion: {
+    duration: Record<string, string>;
+    easing: Record<string, string>;
+    state: {
+      hover: Record<string, unknown>;
+      focus: Record<string, unknown>;
+      active: Record<string, unknown>;
+      disabled: Record<string, unknown>;
+    };
+    scroll: Record<string, unknown>;
+    skeleton: Record<string, unknown>;
+  };
+  surfaces: {
+    glass: Record<string, Record<string, unknown>>;
+    texture: Record<string, Record<string, unknown>>;
+    imageTreatment: Record<string, Record<string, unknown>>;
+  };
+  visualIdentity: {
+    colorDistribution: {
+      dominant: Record<string, unknown>;
+      secondary: Record<string, unknown>;
+      accent: Record<string, unknown>;
+    };
+    borders: Record<string, Record<string, unknown>>;
+  };
+}
+
+export interface GradientDef {
+  type: string;
+  angle?: string;
+  stops: Array<{ color: string; position?: string }>;
+}
+
+// --- Phase 0: Component Recipes ---
+
+export interface ComponentRecipes {
+  [componentName: string]: ComponentRecipe;
+}
+
+export interface ComponentRecipe {
+  base: Record<string, unknown>;
+  variants: Record<string, Record<string, unknown>>;
+  states?: Record<string, Record<string, unknown>>;
+}
+
+// --- Phase 1: Structure types ---
+
+export interface ReducedMeta {
+  source: {
+    total_pages: number;
+    page_types: number;
+    scraped_at: string;
+    site_url: string;
+  };
+  global_keys: string[];
+  page_types: PageTypeInfo[];
+  pagination_candidates: Array<{
+    pagetype: string;
+    evidence: string;
+  }>;
+}
+
+export interface PageTypeInfo {
+  pagetype: string;
+  route: string;
+  count: number;
+  multi: boolean;
+  has_pagination: boolean;
+  slug_param?: string;
+  schema_keys: string[];
+  own_keys: string[];
+}
+
+export interface Registry {
+  layouts: Record<string, {
+    description: string;
+    page_types: string[];
+  }>;
+  collections: Record<string, {
+    source_pagetype: string;
+    slug_field: string;
+    listable_by: string[];
+    filterable_by: string;
+  }>;
+  listings: Record<string, {
+    route: string;
+    queries: Array<{
+      collection: string;
+      group_by?: string;
+      filter_by_param?: string;
+    }>;
+    paginated: boolean;
+  }>;
+  static_pages: Array<{
+    pagetype: string;
+    route: string;
+  }>;
+  navigation: {
+    source: string;
+    structure: string;
+  };
+}
+
+// --- Phase 6: Quality ---
+
+export interface QualityScores {
+  overall: number;
+  dimensions: {
+    layoutConsistency: number;
+    designTokenUsage: number;
+    componentComposition: number;
+    responsiveDesign: number;
+    semanticHtml: number;
+    visualAppeal: number;
+    motionQuality: number;
+  };
+}
+
+export interface TestReport {
+  timestamp: string;
+  pages: Array<{
+    url: string;
+    loadOk: boolean;
+    consoleErrors: string[];
+    brokenLinks: string[];
+  }>;
+  responsive: {
+    mobile375: { passed: boolean; issues: string[] };
+    tablet768: { passed: boolean; issues: string[] };
+    desktop1280: { passed: boolean; issues: string[] };
+  };
+  functional: {
+    linksChecked: number;
+    brokenLinks: string[];
+    buttonsChecked: number;
+    brokenButtons: string[];
+  };
 }
 
 // --- Config types ---
@@ -97,4 +277,12 @@ export interface RunMetadata {
   completedSteps: string[];
   failedStep?: string;
   resumedFrom?: string;
+}
+
+// --- Phase gate validation ---
+
+export interface PhaseGateResult {
+  passed: boolean;
+  errors: string[];
+  warnings?: string[];
 }

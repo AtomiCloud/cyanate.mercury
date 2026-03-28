@@ -64,9 +64,9 @@ function pad(s: string, width: number, align: 'left' | 'right' = 'left'): string
   return align === 'left' ? str + pad : pad + str;
 }
 
-export function createPipelineLogger(opts: { interactive: boolean }): PipelineLogger {
-  if (opts.interactive) return new InteractiveLogger();
-  return new NonInteractiveLogger();
+export function createPipelineLogger(opts: { interactive: boolean; runId?: string }): PipelineLogger {
+  if (opts.interactive) return new InteractiveLogger(opts.runId);
+  return new NonInteractiveLogger(opts.runId);
 }
 
 class NonInteractiveLogger implements PipelineLogger {
@@ -77,8 +77,12 @@ class NonInteractiveLogger implements PipelineLogger {
   private outputTokens = 0;
   private cost = 0;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
+  private stepCount = 0;
+
+  constructor(private runId?: string) {}
 
   startStep(name: string): void {
+    this.stepCount++;
     this.currentStep = name;
     this.startTime = Date.now();
     this.turns = 0;
@@ -90,7 +94,7 @@ class NonInteractiveLogger implements PipelineLogger {
     this.heartbeat = setInterval(() => {
       const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(0);
       console.log(
-        `  [heartbeat] ${this.currentStep}: turn ${this.turns}, ` +
+        `  [heartbeat] [${this.stepCount}] ${this.currentStep}: turn ${this.turns}, ` +
         `${formatTokens(this.inputTokens)} in / ${formatTokens(this.outputTokens)} out, ` +
         `${formatCost(this.cost)}, ${elapsed}s`,
       );
@@ -103,7 +107,7 @@ class NonInteractiveLogger implements PipelineLogger {
     this.outputTokens = outputTokens;
     if (cost !== undefined) this.cost = cost;
     console.log(
-      `  [turn ${turns}] ${this.currentStep}: ` +
+      `  [turn ${turns}] [${this.stepCount}] ${this.currentStep}: ` +
       `${formatTokens(inputTokens)} in, ${formatTokens(outputTokens)} out ` +
       `(total: ${formatTokens(this.inputTokens)} / ${formatTokens(this.outputTokens)})`,
     );
@@ -114,7 +118,7 @@ class NonInteractiveLogger implements PipelineLogger {
     this.cost = cost;
     const duration = Date.now() - this.startTime;
     console.log(
-      `  [done] ${this.currentStep}: ${this.turns} turns, ` +
+      `  [done] [${this.stepCount}] ${this.currentStep}: ${this.turns} turns, ` +
       `${formatTokens(this.inputTokens)} in, ${formatTokens(this.outputTokens)} out, ` +
       `${formatCost(this.cost)}, ${formatDuration(duration)}`,
     );
@@ -123,11 +127,11 @@ class NonInteractiveLogger implements PipelineLogger {
   failStep(error: string): void {
     if (this.heartbeat) clearInterval(this.heartbeat);
     const duration = Date.now() - this.startTime;
-    console.error(`  [FAILED] ${this.currentStep}: ${error} (${formatDuration(duration)})`);
+    console.error(`  [FAILED] [${this.stepCount}] ${this.currentStep}: ${error} (${formatDuration(duration)})`);
   }
 
   skipStep(): void {
-    console.log(`  [SKIP] ${this.currentStep}`);
+    console.log(`  [SKIP] [${this.stepCount}] ${this.currentStep}`);
   }
 
   flush(): void {}
@@ -141,6 +145,8 @@ class InteractiveLogger implements PipelineLogger {
   private spinnerFrame = 0;
   private spinnerInterval: ReturnType<typeof setInterval> | null = null;
   private linesUsed = 0;
+
+  constructor(private runId?: string) {}
 
   startStep(name: string): void {
     // Finalize previous step if running
@@ -231,7 +237,8 @@ class InteractiveLogger implements PipelineLogger {
     const allSteps = [...this.steps];
     if (this.currentStep) allSteps.push(this.currentStep);
 
-    const totalLines = allSteps.length + 2; // header + steps + status bar
+    // 2 header lines (run id + column headers) + steps + status bar
+    const totalLines = 2 + allSteps.length + 1;
 
     // Move cursor up to overwrite previous render
     if (this.linesUsed > 0) {
@@ -241,29 +248,38 @@ class InteractiveLogger implements PipelineLogger {
     // Clear from cursor down
     process.stdout.write('\x1b[J');
 
-    // Header
-    const stepNum = this.currentStep ? this.steps.length + 1 : this.steps.length;
+    // Run ID header
+    if (this.runId) {
+      process.stdout.write(`  ${C.bold}${C.dim}Run ${this.runId}${C.reset}\n`);
+    } else {
+      process.stdout.write('\n');
+    }
+
+    // Column headers
     process.stdout.write(
-      `${C.bold}${C.dim}  STEP  NAME                      TURNS    TOKENS (IN/OUT)   COST       DURATION${C.reset}\n`,
+      `${C.bold}${C.dim}       NAME                      TURNS    TOKENS (IN/OUT)   COST       DURATION${C.reset}\n`,
     );
 
     // Step rows
-    for (const step of allSteps) {
+    for (let i = 0; i < allSteps.length; i++) {
+      const step = allSteps[i];
       const icon = this.statusIcon(step);
       const color = this.statusColor(step);
+      const ordinal = pad(`${i + 1}`, 2, 'right') + '.';
       const name = pad(step.name, 26);
       const turns = pad(`${step.turns} turn${step.turns !== 1 ? 's' : ''}`, 9);
       const tokens = pad(`${formatTokens(step.inputTokens)} / ${formatTokens(step.outputTokens)}`, 18);
       const cost = pad(formatCost(step.cost), 10);
       const duration = pad(formatDuration(step.duration), 10);
 
-      process.stdout.write(`  ${color}${icon}${C.reset}  ${name}${turns}${tokens}${cost}${duration}\n`);
+      process.stdout.write(`  ${color}${ordinal} ${icon}${C.reset}  ${name}${turns}${tokens}${cost}${duration}\n`);
     }
 
     // Status bar
     if (this.currentStep) {
       const elapsed = formatDuration(this.currentStep.duration);
       const spinner = SPINNER_FRAMES[this.spinnerFrame];
+      const stepNum = this.steps.length + 1;
       process.stdout.write(
         `  ${C.yellow}${spinner}${C.reset}  ${C.dim}Running step ${stepNum}...  ${elapsed} elapsed${C.reset}\n`,
       );

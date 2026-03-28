@@ -11,7 +11,6 @@ export const generateStep: Step = {
   id: 'generate',
   name: 'Generate',
   description: 'Generate Astro pages, components, and layouts',
-  modifiesSite: true,
 
   async run(workingDir: string, ctx: StepContext): Promise<StepStatus> {
     const startTime = Date.now();

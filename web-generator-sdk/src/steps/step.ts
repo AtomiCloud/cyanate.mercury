@@ -1,9 +1,9 @@
 /**
- * Step interface and related types for the pipeline.
+ * Step and Phase interfaces for the v2 pipeline.
  *
- * Each step is isolated - it receives a working directory and context,
- * does its work (usually via an agent), and returns a status.
- * The runner handles copying between steps.
+ * A Phase is a group of related steps that share a validation gate.
+ * Phases run sequentially; within a phase, steps run in order.
+ * Each phase has an approval gate that must pass before proceeding.
  */
 
 import type { ScraperOutput } from '../types.js';
@@ -29,20 +29,22 @@ export interface StepStatus {
 export interface StepContext {
   id: string;
   name: string;
+  phase: string;
   runDir: string;
+  scratchDir: string;
   templateDir: string;
   scraperOutput: ScraperOutput;
   referenceUrl?: string;
   env: Record<string, string>;
   logger?: PipelineLogger;
+  /** Prior reviewer rejection feedback, available on retry iterations */
+  rejectionContext?: string;
 }
 
 export interface Step {
   id: string;
   name: string;
   description: string;
-  /** Whether this step modifies the project files (triggers copy forward) */
-  modifiesSite: boolean;
   envOverride?: StepEnvOverride;
   run(workingDir: string, ctx: StepContext): Promise<StepStatus>;
 }
@@ -64,3 +66,32 @@ export type PipelineItem = Step | StepLoop;
 export function isStepLoop(item: PipelineItem): item is StepLoop {
   return 'steps' in item && Array.isArray((item as StepLoop).steps);
 }
+
+// --- v2 Phase types ---
+
+export type PhaseId =
+  | 'analyze'
+  | 'structure'
+  | 'layout'
+  | 'design'
+  | 'color'
+  | 'motion'
+  | 'polish';
+
+export interface PhaseGate {
+  /** Phase identifier */
+  id: PhaseId;
+  /** Human-readable name */
+  name: string;
+  /** Description of what this phase does */
+  description: string;
+  /** Steps within this phase */
+  steps: Step[];
+  /** Whether this phase has an iteration loop for validation + fix */
+  maxRetries?: number;
+  /** Validation step that acts as the gate */
+  gateStep?: Step;
+}
+
+/** The v2 pipeline is an ordered list of phases */
+export type PipelinePhase = PhaseGate;

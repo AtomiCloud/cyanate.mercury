@@ -5,22 +5,43 @@
  * - Token usage tracking (per turn)
  * - Pluggable logger (interactive TUI or non-interactive verbose)
  *
- * Note: The SDK uses process.env, not the env option.
- * We set process.env from the resolved step env before calling query().
+ * Note: Env vars are passed through the SDK's env option to avoid race conditions
+ * when multiple agents run concurrently.
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKResultMessage, SDKAssistantMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { PipelineLogger } from './logger.js';
 
-const SYSTEM_PROMPT = `You are the Web Generator Orchestrator. Your role is to coordinate the generation of Astro.js projects from scraped website data.
+const SYSTEM_PROMPT = `You are the Web Generator Orchestrator v2. Your role is to coordinate the phased generation of Astro.js projects from scraped website data.
 
-## Key Constraints
+## Pipeline Architecture v2
 
-- Follow the layout-first philosophy: HTML structure first, then content, then visual design
-- Content is NEVER hardcoded - always read from src/data/content.json via src/lib/content.ts
-- Use OKLCH color format for all design tokens
-- Install Shadcn components with: npx shadcn add [component]
+The pipeline has 7 independent phases, each with its own validator:
+- Phase 0: ANALYZE — style fingerprint, 7-layer design tokens, component recipes
+- Phase 1: STRUCTURE — reduce, classify, seed (content collections)
+- Phase 2: LAYOUT — grid/flex/spacing (gray-box, no color/typography)
+- Phase 3: DESIGN — typography/components/surfaces (neutral grays only)
+- Phase 4: COLOR — color system, light+dark theme, WCAG contrast
+- Phase 5: MOTION — transitions, hover/focus states, scroll reveals, reduced-motion
+- Phase 6: POLISH — final validation, quality scoring, style fingerprint fidelity
+
+## Key Principles
+
+1. **Layered independence** — Each phase touches different CSS/HTML properties. Layout (Phase 2) never regresses when Color (Phase 4) runs.
+2. **Structured handoffs** — Data passes between phases as JSON files in scratch/ directory, never as truncated strings.
+3. **Style-aware generation** — The style fingerprint drives all decisions: density, formality, motion, depth.
+4. **Content collections** — Multi-instance pages use Astro content collections with [slug] routing, not flat content.json queries.
+5. **OKLCH colors** — All color values use OKLCH format.
+6. **Shadcn components** — Install with: npx shadcn add [component]
+
+## Phase Constraints
+
+When you receive a prompt specifying a phase, you MUST:
+- Only modify the files and CSS properties that phase owns
+- Read the style-fingerprint.json and design-tokens.json from the scratch directory
+- Follow the component-recipes.json for component styling
+- Run validation (typecheck, astro check, build) before reporting success
 
 ## Error Handling
 
@@ -32,26 +53,15 @@ export interface AgentQueryOptions {
   env: Record<string, string>;
   stepName: string;
   logger?: PipelineLogger;
+  maxTurns?: number;
 }
 
 export async function agentQuery(opts: AgentQueryOptions): Promise<string> {
-  const { prompt, cwd, env, stepName, logger } = opts;
+  const { prompt, cwd, env, stepName, logger, maxTurns } = opts;
 
-  // Set process.env from the resolved step env (SDK reads process.env, not the env option)
-  const prevEnv: Record<string, string | undefined> = {};
-  for (const [key, value] of Object.entries(env)) {
-    prevEnv[key] = process.env[key];
-    process.env[key] = value;
-  }
-
-  try {
-    return await runQuery(prompt, cwd, stepName, logger);
-  } finally {
-    for (const [key, value] of Object.entries(prevEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  }
+  // Pass env through the SDK's env option instead of mutating process.env.
+  // This avoids race conditions when multiple agents run concurrently.
+  return await runQuery(prompt, cwd, stepName, logger, env, maxTurns);
 }
 
 async function runQuery(
@@ -59,6 +69,8 @@ async function runQuery(
   cwd: string,
   stepName: string,
   logger?: PipelineLogger,
+  env?: Record<string, string>,
+  maxTurns?: number,
 ): Promise<string> {
   const startTime = Date.now();
 
@@ -71,6 +83,8 @@ async function runQuery(
       settingSources: ['project'],
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
+      maxTurns,
+      env: env ? { ...process.env, ...env } : undefined,
     },
   });
 

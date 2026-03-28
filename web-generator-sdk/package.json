@@ -7,13 +7,18 @@
   "scripts": {
     "dev": "bun src/index.ts",
     "start": "bun src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --declaration --outDir dist"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.76"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.76",
+    "playwright": "^1.58.2"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.8",
+    "@playwright/test": "^1.58.2",
     "@types/bun": "latest",
-    "typescript": "^5.7.2"
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2"
   }
 }

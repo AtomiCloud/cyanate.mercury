@@ -13,7 +13,6 @@ export const iterateStep: Step = {
   id: 'iterate',
   name: 'Iterate',
   description: 'Fix validation errors and functional issues',
-  modifiesSite: true,
 
   async run(workingDir: string, ctx: StepContext): Promise<StepStatus> {
     const startTime = Date.now();

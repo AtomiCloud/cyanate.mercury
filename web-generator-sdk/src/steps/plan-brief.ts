@@ -11,7 +11,6 @@ export const planBriefStep: Step = {
   id: 'plan-brief',
   name: 'Plan Brief',
   description: 'Create design brief from layout plan and design tokens',
-  modifiesSite: false,
 
   async run(workingDir: string, ctx: StepContext): Promise<StepStatus> {
     const startTime = Date.now();
