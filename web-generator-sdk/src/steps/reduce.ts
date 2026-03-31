@@ -34,6 +34,7 @@ export const reduceStep: Step = {
   id: 'reduce',
   name: 'Phase 1a: Reduce',
   description: 'Programmatically reduce scraper output into per-page-type packages',
+  deterministic: true,
 
   async run(workingDir: string, ctx: StepContext): Promise<StepStatus> {
     const startTime = Date.now();
@@ -107,7 +108,10 @@ export const reduceStep: Step = {
         total_pages: structure.pages.length,
         page_types: pageTypes.length,
         scraped_at: new Date().toISOString(),
-        site_url: ctx.referenceUrl || structure.pages[0]?.url || '',
+        site_url: ((structure as unknown) as Record<string, unknown>)?.site_url as string
+        || ctx.referenceUrl
+        || structure.pages[0]?.url
+        || (() => { throw new Error('Cannot determine site_url: structure.site_url, referenceUrl, and first page URL are all empty'); })(),
       },
       global_keys: globalKeys,
       page_types: pageTypeInfos,

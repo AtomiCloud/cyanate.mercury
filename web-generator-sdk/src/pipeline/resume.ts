@@ -12,27 +12,46 @@ import { copyDirectory } from '../lib/fs.js';
 
 interface ResumeInfo {
   sourceRunDir: string;
-  resumeStepIdx: number;
+  /** The step ID to resume from (e.g., "layout", "seed") */
+  resumeStepId: string;
 }
 
 export async function parseResumePath(fromPath: string, steps: Step[]): Promise<ResumeInfo> {
   const resolved = join(process.cwd(), fromPath);
-  const dirName = basename(resolved); // e.g., "step-4-generate"
-  const match = dirName.match(/^step-(\d+)-(.+)$/);
-
-  if (!match) {
-    throw new Error(`Invalid --from path: expected step-N-{id}, got "${dirName}"`);
-  }
-
-  const resumeStepIdx = parseInt(match[1], 10);
+  const dirName = basename(resolved);
   const sourceRunDir = dirname(resolved);
 
-  // Validate the source step exists and is completed
+  // Try reading step.json for identity (preferred)
+  let resumeStepId: string;
+  try {
+    const stepMeta = JSON.parse(await readFile(join(resolved, 'step.json'), 'utf-8'));
+    resumeStepId = stepMeta.stepId;
+    console.log(`  [resume] Read step.json — step: ${stepMeta.stepId}, phase: ${stepMeta.phase}, retry: ${stepMeta.retry}`);
+    if (stepMeta.prevStep) {
+      console.log(`  [resume] Previous step: ${stepMeta.prevStep}`);
+    }
+  } catch {
+    // Fallback: parse directory name
+    const match = dirName.match(/^step-(\d+)-(.+)$/);
+    if (!match) {
+      throw new Error(`Invalid --from path: expected step-N-{id} directory with step.json, got "${dirName}"`);
+    }
+    resumeStepId = match[2];
+    console.log(`  [resume] No step.json found, parsed step ID from directory name: ${resumeStepId}`);
+  }
+
+  // Validate the step ID exists in the pipeline
+  const stepExists = steps.some(s => s.id === resumeStepId);
+  if (!stepExists) {
+    throw new Error(`Step "${resumeStepId}" not found in pipeline. Valid steps: ${steps.map(s => s.id).join(', ')}`);
+  }
+
+  // Validate the source step is completed
   const statusPath = join(resolved, 'status.json');
   try {
-    const status = JSON.parse(await readFile(statusPath, 'utf-8'));
-    if (status.status !== 'completed') {
-      throw new Error(`Cannot resume from step "${dirName}" with status "${status.status}" - must be completed`);
+    const statusData = JSON.parse(await readFile(statusPath, 'utf-8'));
+    if (statusData.status !== 'completed') {
+      throw new Error(`Cannot resume from step "${dirName}" with status "${statusData.status}" - must be completed`);
     }
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -41,12 +60,7 @@ export async function parseResumePath(fromPath: string, steps: Step[]): Promise<
     throw e;
   }
 
-  // Validate step index
-  if (resumeStepIdx >= steps.length) {
-    throw new Error(`Step index ${resumeStepIdx} out of range (0-${steps.length - 1})`);
-  }
-
-  return { sourceRunDir, resumeStepIdx };
+  return { sourceRunDir, resumeStepId };
 }
 
 export async function copyCompletedSteps(

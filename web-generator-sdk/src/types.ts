@@ -11,6 +11,7 @@ export interface ScraperOutput {
 }
 
 export interface StructureData {
+  site_url?: string;
   pages: PageStructure[];
 }
 
@@ -252,6 +253,8 @@ export interface CuiConfig {
   reference?: string;
   /** Default env profile name (e.g., "claude" -> .env.claude) */
   profile: string;
+  /** Env profile for reviewer agents (e.g., "zai" -> .env.zai). Falls back to `profile` if not set. */
+  reviewerProfile?: string;
   /** Per-step overrides keyed by step ID */
   steps?: Record<string, StepConfigOverride>;
 }

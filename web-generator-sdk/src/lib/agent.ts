@@ -10,8 +10,14 @@
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { SDKResultMessage, SDKAssistantMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { SDKResultMessage, SDKAssistantMessage, SDKMessage, SDKToolProgressMessage, SDKToolUseSummaryMessage } from '@anthropic-ai/claude-agent-sdk';
+import { appendFile } from 'fs/promises';
+import { join } from 'path';
 import type { PipelineLogger } from './logger.js';
+
+/** Frozen snapshot of process.env at module load time.
+ *  Avoids race conditions when multiple agents read process.env concurrently. */
+const frozenProcessEnv: Record<string, string | undefined> = { ...process.env };
 
 const SYSTEM_PROMPT = `You are the Web Generator Orchestrator v2. Your role is to coordinate the phased generation of Astro.js projects from scraped website data.
 
@@ -80,11 +86,12 @@ async function runQuery(
       systemPrompt: SYSTEM_PROMPT,
       tools: ['Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'Skill', 'WebFetch'],
       cwd,
-      settingSources: ['project'],
+      settingSources: ['local'],
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       maxTurns,
-      env: env ? { ...process.env, ...env } : undefined,
+      env: env ? { ...frozenProcessEnv, ...env } : undefined,
+      debugFile: join(cwd, 'agent-debug.log'),
     },
   });
 
@@ -93,6 +100,11 @@ async function runQuery(
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let totalCost = 0;
+
+  const eventLog = join(cwd, 'agent-events.jsonl');
+  const logEvent = (event: Record<string, unknown>) => {
+    appendFile(eventLog, JSON.stringify({ t: new Date().toISOString(), ...event }) + '\n', 'utf-8').catch(() => {});
+  };
 
   // If no logger provided, use a minimal internal one for non-interactive
   const log = logger || createFallbackLogger(stepName, startTime);
@@ -109,6 +121,36 @@ async function runQuery(
         totalOutputTokens += usage.output_tokens || 0;
       }
       log.updateTurn(turnCount, totalInputTokens, totalOutputTokens);
+
+      // Extract tool calls from the assistant message content
+      const content = assistantMsg.message?.content;
+      const tools: string[] = [];
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.type === 'tool_use') {
+            const tb = block as { name?: string; input?: Record<string, unknown> };
+            const snippet = tb.name === 'Bash'
+              ? (tb.input?.command as string || '').slice(0, 120)
+              : tb.name === 'Write' || tb.name === 'Edit'
+                ? (tb.input?.file_path as string || '')
+                : tb.name === 'Read'
+                  ? (tb.input?.file_path as string || '')
+                  : tb.name === 'Grep'
+                    ? (tb.input?.pattern as string || '')
+                    : '';
+            tools.push(snippet ? `${tb.name}(${snippet})` : (tb.name || 'unknown'));
+          }
+        }
+      }
+      logEvent({ type: 'turn', turn: turnCount, tools, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, elapsed: Math.round((Date.now() - startTime) / 1000) });
+
+    } else if (msg.type === 'tool_use_summary') {
+      const toolMsg = msg as unknown as SDKToolUseSummaryMessage;
+      logEvent({ type: 'tool_done', summary: toolMsg.summary });
+
+    } else if (msg.type === 'tool_progress') {
+      const toolMsg = msg as unknown as SDKToolProgressMessage;
+      logEvent({ type: 'tool_progress', tool: toolMsg.tool_name, elapsed: toolMsg.elapsed_time_seconds });
 
     } else if (msg.type === 'result') {
       const resultMsg = message as SDKResultMessage;

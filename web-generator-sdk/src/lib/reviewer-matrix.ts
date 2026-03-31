@@ -6,7 +6,17 @@
  * Per-page reviewers spawn one agent per page.
  */
 
-import type { ReviewerDef, ReviewerContext } from './reviewer.js';
+import type { ReviewerDef, ReviewerContext, ReviewVerdict } from './reviewer.js';
+import { runAllInvariants, generateInvariantReport } from './invariants.js';
+import { checkPhaseBoundary, formatBoundaryViolations } from './phase-boundary.js';
+import {
+  readPreviousSnapshot,
+  createSnapshot,
+  compareSnapshots,
+  formatRegressionReport,
+} from './snapshot.js';
+import { runPlaywrightSampler, formatSamplerReport } from './playwright-sampler.js';
+import type { PhaseId } from '../steps/step.js';
 
 // --- Generic reviewer (runs npm run check) ---
 
@@ -86,8 +96,10 @@ try {
 // 3. component-recipes.json
 try {
   const cr = JSON.parse(fs.readFileSync(path.join(scratch, 'component-recipes.json'), 'utf8'));
-  if (!cr.button || !cr.button.base) errors.push('component-recipes: missing button.base');
-  if (!cr.card || !cr.card.base) errors.push('component-recipes: missing card.base');
+  const btn = cr.recipes?.button || cr.button;
+  const crd = cr.recipes?.card || cr.card;
+  if (!btn || !btn.base) errors.push('component-recipes: missing button.base');
+  if (!crd || !crd.base) errors.push('component-recipes: missing card.base');
 } catch(e) { errors.push('component-recipes: ' + e.message); }
 
 if (errors.length > 0) { console.log('FAILURES:'); errors.forEach(e => console.log('  - ' + e)); process.exit(1); }
@@ -237,17 +249,19 @@ Start the dev server (npm run dev), then for each page:
 2. Find all <a href> elements
 3. Visit each link and verify it returns 200 (not 404/500)
 4. Check for broken internal links and external links
+5. CRITICAL: Flag any links that point to the original source site (absolute URLs to external domains other than the current dev server). All internal navigation must use relative local routes like "/about-us", not "https://original-site.com/about-us".
 
 Write the following evidence files to ${ctx.evidenceDir}:
 - \`broken-links.json\` — array of { page, href, status, error } for all broken links
+- \`external-links.json\` — array of { page, href } for links pointing to the original source site (not local routes)
 - \`page-links.json\` — adjacency list: { page: string, linksTo: string[] } for each page
 
-Report all broken links found.
+Report all broken and external-source links found.
 
-If no broken links found, output:
+If no broken or external-source links found, output:
 VERDICT: PASS
 
-If any broken links found, output:
+If any broken or external-source links found, output:
 VERDICT: REJECT
 
 ## Evidence
@@ -257,7 +271,43 @@ Pages checked, links verified, results per page.
 Link check results.
 
 ## Rejection Context (if rejected)
-List of broken links with page URL and link URL.`;
+List of broken or external-source links with page URL and link URL.`;
+}
+
+function externalUrlLeakagePrompt(ctx: ReviewerContext): string {
+  return `You are an external URL leakage reviewer. Check that the Astro project does NOT contain any links pointing to the original source site.
+
+Search all .astro, .tsx, and .ts files in the project for absolute URLs that should have been rewritten to relative routes during the seed phase.
+
+1. First, determine the source site URL:
+   - Read src/data/static-pages.json and look for any absolute URLs
+   - Read the registry from output/reduced/registry.json to find the site URL
+   - Check src/data/navigation.json and src/data/footer.json for external domains
+
+2. Then search all source files for:
+   - href="https://" or href='https://' pointing to the source site domain
+   - Any remaining absolute URLs from the original site in src/pages/ or src/components/
+
+3. Allowed external links: social media, CDN resources, third-party services
+4. NOT allowed: links to the source site for navigation, content, or pages
+
+Write evidence to ${ctx.evidenceDir}:
+- \`url-leakage.json\` — array of { file, line, url } for each leaked external URL
+
+If no source-site URL leakage found, output:
+VERDICT: PASS
+
+If any source-site URLs found where local routes should be used, output:
+VERDICT: REJECT
+
+## Evidence
+Files checked, URLs found.
+
+## Findings
+Leakage summary.
+
+## Rejection Context (if rejected)
+Specific files and lines containing source-site URLs.`;
 }
 
 function imagesReviewerPrompt(ctx: ReviewerContext): string {
@@ -676,10 +726,11 @@ Divergence analysis.
 Dimensions that diverge with specific examples of what doesn't match.`;
 }
 
-// --- Phase 2: Layout programmatic check ---
+// --- Phase 2: Layout programmatic check (dynamic — reads registry.json) ---
 
 function layoutCheckPrompt(ctx: ReviewerContext): string {
   return `You are a layout check reviewer. Run a script to programmatically validate the Phase 2 layout output.
+The script reads registry.json to determine which pages should exist — it is fully generic.
 
 Run this command in bash:
 \`\`\`bash
@@ -689,47 +740,125 @@ const path = require('path');
 const dir = '${ctx.workingDir}';
 const errors = [];
 
-// Helper: check if file exists
 function exists(p) { try { fs.accessSync(path.join(dir, p)); return true; } catch { return false; } }
-
-// Helper: read file content
 function read(p) { try { return fs.readFileSync(path.join(dir, p), 'utf8'); } catch { return ''; } }
+function readdir(p) { try { return fs.readdirSync(path.join(dir, p), { withFileTypes: true }); } catch { return []; } }
 
-// 1. Check REQUIRED static pages exist
-const requiredPages = ['index.astro', 'about-us.astro', 'our-services.astro'];
-for (const page of requiredPages) {
-  if (!exists('src/pages/' + page)) errors.push('Missing required page: src/pages/' + page);
+// Load registry to determine expected pages dynamically
+let registry;
+try {
+  registry = JSON.parse(fs.readFileSync(path.join(dir, 'output/reduced/registry.json'), 'utf8'));
+} catch(e) {
+  console.log('FAILURES:'); console.log('  - Cannot read registry.json: ' + e.message); process.exit(1);
 }
 
-// 2. Check dynamic routes exist with getStaticPaths
-const dynamicRoutes = [
-  'src/pages/blog/[slug].astro',
-  'src/pages/doctor/[slug].astro',
-  'src/pages/legal/[slug].astro',
-];
-for (const route of dynamicRoutes) {
-  if (!exists(route)) {
-    errors.push('Missing dynamic route: ' + route);
+// Helper: strip domain prefix from route (e.g. https://example.com/about -> /about)
+function normalizeRoute(r) {
+  try { r = new URL(r).pathname; } catch {}
+  return (r || '/').replace(/\\/+$/g, '') || '/';
+}
+
+// 1. Check static pages from registry exist
+const staticPages = registry.static_pages || [];
+for (const sp of staticPages) {
+  const route = normalizeRoute(sp.route);
+  let filePath;
+  if (route === '/') {
+    filePath = 'src/pages/index.astro';
   } else {
-    const content = read(route);
-    if (!content.includes('getStaticPaths')) {
-      errors.push(route + ' missing getStaticPaths() — build will fail');
+    filePath = 'src/pages/' + route.replace(/^\\//, '') + '.astro';
+  }
+  if (!exists(filePath)) {
+    // Try with /index.astro for directory-style routes
+    const altPath = 'src/pages/' + route.replace(/^\\//, '') + '/index.astro';
+    if (!exists(altPath)) {
+      errors.push('Missing static page: ' + filePath + ' (or ' + altPath + ')');
     }
   }
 }
 
-// 3. Check listing pages exist
-const listingPages = [
-  'src/pages/news-events/index.astro',
-  'src/pages/meet-our-team/index.astro',
-];
-for (const page of listingPages) {
-  if (!exists(page)) errors.push('Missing listing page: ' + page);
+// 2. Check collection dynamic routes exist with getStaticPaths
+// Strategy: find ALL [slug].astro files and check which collection each imports.
+// This is more robust than guessing directory names.
+const collections = registry.collections || {};
+function findAstroFiles(dirPath) {
+  let results = [];
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        results = results.concat(findAstroFiles(full));
+      } else if (entry.name.endsWith('.astro') && full.includes('[')) {
+        results.push(full);
+      }
+    }
+  } catch {}
+  return results;
+}
+const allDynamicRoutes = findAstroFiles(path.join(dir, 'src/pages'));
+
+// Extract collection names. Registry collections can be:
+//   Object: { doctor_profiles: {...}, blog_posts: {...} } — keys are names
+//   Array: [{ name: 'doctor_profiles', ... }] — .name field is the name
+const collectionNames = [];
+if (Array.isArray(registry.collections)) {
+  for (const coll of registry.collections) {
+    if (coll && typeof coll === 'object' && coll.name) collectionNames.push(String(coll.name));
+  }
+} else if (registry.collections && typeof registry.collections === 'object') {
+  collectionNames.push(...Object.keys(registry.collections));
 }
 
-// 4. Check layout components exist
-if (!exists('src/layouts/Layout.astro') && !exists('src/layouts/layout.astro') && !exists('src/layouts/BaseLayout.astro')) {
-  errors.push('No layout file found in src/layouts/');
+for (const collName of collectionNames) {
+  if (!collName) continue;
+
+  // Find any .astro file that uses getCollection with this collection name
+  const collStrSq = \"'\" + collName + \"'\";
+  let found = false;
+  for (const routePath of allDynamicRoutes) {
+    const content = fs.readFileSync(routePath, 'utf8');
+    if (content.includes('getCollection(' + collStrSq)) {
+      found = true;
+      if (!content.includes('getStaticPaths')) {
+        errors.push(routePath.replace(dir + '/', '') + ' uses getCollection(' + collStrSq + ') but missing getStaticPaths()');
+      }
+      break;
+    }
+  }
+  if (!found) {
+    // Fallback: also check if a file in src/pages/{collName}/[slug].astro exists
+    const fallbacks = [
+      'src/pages/' + collName + '/[slug].astro',
+      'src/pages/' + collName.replace(/_/g, '-') + '/[slug].astro',
+    ];
+    let fbFound = false;
+    for (const fb of fallbacks) {
+      if (exists(fb)) { fbFound = true; break; }
+    }
+    if (!fbFound) {
+      errors.push('No dynamic route found for collection ' + collName + ' - no .astro file imports getCollection(' + collStrSq + ')');
+    }
+  }
+}
+
+// 3. Check listing pages from registry exist
+const listings = registry.listings || {};
+for (const [name, listing] of Object.entries(listings)) {
+  const route = normalizeRoute(listing.route || '').replace(/:(\\w+)/g, '[\$1]');
+  if (!route || route === '/') continue;
+  const filePath = 'src/pages/' + route.replace(/^\\//, '') + '/index.astro';
+  const altPath = 'src/pages/' + route.replace(/^\\//, '') + '.astro';
+  if (!exists(filePath) && !exists(altPath)) {
+    errors.push('Missing listing page: ' + filePath + ' (or ' + altPath + ') for listing \"' + name + '\"');
+  }
+}
+
+// 4. Check layout components exist (at least one)
+let layouts = [];
+try { layouts = fs.readdirSync(path.join(dir, 'src/layouts')); } catch {}
+if (layouts.length === 0) {
+  errors.push('No layout files found in src/layouts/');
 }
 
 // 5. Check shared components exist
@@ -747,6 +876,59 @@ const indexContent = read('src/pages/index.astro');
 if (indexContent && !indexContent.includes('getCollection') && !indexContent.includes('import') && !indexContent.includes('static-pages.json')) {
   errors.push('index.astro appears to be a placeholder — no content imports');
 }
+
+// 8. Check dynamic routes use getCollection() not hardcoded params
+for (const routePath of allDynamicRoutes) {
+  const content = fs.readFileSync(routePath, 'utf8');
+  const relPath = routePath.replace(dir + '/', '');
+  if (content.includes('getStaticPaths')) {
+    // Check for hardcoded params arrays — a sign the agent didn't use getCollection
+    const hardcodedParamsRe = /return\\s*\\[\\s*\\{\\s*params:/;
+    const usesGetCollection = /getCollection\\s*\\(/.test(content);
+    if (hardcodedParamsRe.test(content) && !usesGetCollection) {
+      errors.push(relPath + ' has hardcoded getStaticPaths params instead of using getCollection()');
+    }
+  }
+}
+
+// 9. Check static pages reference content data (not just an h1)
+for (const sp of staticPages) {
+  const route = normalizeRoute(sp.route);
+  let filePath;
+  if (route === '/') filePath = 'src/pages/index.astro';
+  else filePath = 'src/pages/' + route.replace(/^\\//, '') + '.astro';
+  const content = read(filePath) || read('src/pages/' + route.replace(/^\\//, '') + '/index.astro');
+  if (content && content.length > 0) {
+    const hasDataAccess = /getStaticPage|static-pages\\.json|entry\\.data|page\\.content|Astro\\.props/.test(content);
+    if (!hasDataAccess) {
+      errors.push(filePath + ' does not reference content data (no getStaticPage, static-pages.json, or entry.data)');
+    }
+  }
+}
+
+// 10. Check content collections have actual data files
+for (const collName of collectionNames) {
+  const collDir = path.join(dir, 'src/content', collName);
+  let entries = [];
+  try { entries = fs.readdirSync(collDir).filter(f => f.endsWith('.json')); } catch {}
+  if (entries.length === 0) {
+    errors.push('Collection ' + collName + ' has no data files in src/content/' + collName + '/');
+  }
+}
+
+// 11. Check static-pages.json has entries with non-null content
+try {
+  const spData = JSON.parse(fs.readFileSync(path.join(dir, 'src/data/static-pages.json'), 'utf8'));
+  if (!Array.isArray(spData) || spData.length === 0) {
+    errors.push('src/data/static-pages.json is empty or not an array');
+  } else {
+    for (const entry of spData) {
+      if (!entry.content || Object.keys(entry.content).length === 0) {
+        errors.push('static-pages.json entry for route ' + (entry.route || '?') + ' has empty content');
+      }
+    }
+  }
+} catch(e) { errors.push('Cannot read static-pages.json: ' + e.message); }
 
 if (errors.length > 0) { console.log('FAILURES:'); errors.forEach(e => console.log('  - ' + e)); process.exit(1); }
 else { console.log('ALL CHECKS PASSED'); process.exit(0); }
@@ -791,7 +973,8 @@ try {
 // 2. Check component-recipes.json exists in scratch
 try {
   const cr = JSON.parse(fs.readFileSync(path.join(dir, 'scratch/component-recipes.json'), 'utf8'));
-  if (!cr.button) errors.push('component-recipes.json missing button');
+  const btn = cr.recipes?.button || cr.button;
+  if (!btn) errors.push('component-recipes.json missing button');
 } catch(e) { errors.push('component-recipes.json missing or invalid: ' + e.message); }
 
 // 3. Check at least one component exists in src/components/
@@ -805,6 +988,59 @@ try {
   const dt = JSON.parse(fs.readFileSync(path.join(dir, 'scratch/design-tokens.json'), 'utf8'));
   if (!dt.atomic?.typography) errors.push('design-tokens.json missing atomic.typography');
 } catch {}
+
+// 5. Check inline style abuse — max 10 style= per file
+function findAstroFiles2(d) {
+  let r = [];
+  try {
+    const ents = fs.readdirSync(d, { withFileTypes: true });
+    for (const e of ents) {
+      const fp = path.join(d, e.name);
+      if (e.isDirectory() && e.name !== 'node_modules' && e.name !== 'dist') r = r.concat(findAstroFiles2(fp));
+      else if (e.name.endsWith('.astro')) r.push(fp);
+    }
+  } catch {}
+  return r;
+}
+const astroFiles = findAstroFiles2(path.join(dir, 'src/pages'));
+for (const af of astroFiles) {
+  const content = fs.readFileSync(af, 'utf8');
+  const inlineCount = (content.match(/style=\"/g) || []).length;
+  if (inlineCount > 10) {
+    errors.push(af.replace(dir + '/', '') + ' has ' + inlineCount + ' inline style= attributes (max 10) — use CSS classes or design tokens instead');
+  }
+}
+
+// 6. Check that at least one Shadcn UI component is imported somewhere
+const uiDir = path.join(dir, 'src/components/ui');
+let uiComponents = [];
+try { uiComponents = fs.readdirSync(uiDir).filter(f => f.endsWith('.tsx')); } catch {}
+if (uiComponents.length > 0) {
+  let anyImported = false;
+  const allSourceFiles = findAstroFiles2(path.join(dir, 'src'));
+  for (const sf of allSourceFiles) {
+    const c = fs.readFileSync(sf, 'utf8');
+    if (/from.*['\"].*components\\/ui\\//.test(c) || /from.*['\"]@\\/components\\/ui\\//.test(c)) {
+      anyImported = true; break;
+    }
+  }
+  if (!anyImported) {
+    errors.push('Shadcn UI components exist in src/components/ui/ but none are imported in any page');
+  }
+}
+
+// 7. Check design token adoption — pages should use var(-- not raw rgba/hex
+let totalVarRefs = 0;
+let totalRawColors = 0;
+for (const af of astroFiles) {
+  const content = fs.readFileSync(af, 'utf8');
+  totalVarRefs += (content.match(/var\\(--/g) || []).length;
+  totalRawColors += (content.match(/rgba?\\(/g) || []).length;
+  totalRawColors += (content.match(/#[0-9a-fA-F]{3,8}[^a-zA-Z0-9]/g) || []).length;
+}
+if (totalRawColors > totalVarRefs && totalRawColors > 5) {
+  errors.push('Design token adoption low: ' + totalRawColors + ' raw color values vs ' + totalVarRefs + ' var(-- references in pages');
+}
 
 if (errors.length > 0) { console.log('FAILURES:'); errors.forEach(e => console.log('  - ' + e)); process.exit(1); }
 else { console.log('ALL CHECKS PASSED'); process.exit(0); }
@@ -856,6 +1092,50 @@ try {
 try {
   const dt = JSON.parse(fs.readFileSync(path.join(dir, 'scratch/design-tokens.json'), 'utf8'));
   if (!dt.atomic?.colors) errors.push('design-tokens.json missing atomic.colors');
+} catch {}
+
+// 3. Check dark mode is actually ACTIVATED (not just defined)
+// Check layout files for class="dark" or prefers-color-scheme media query
+function findAllFiles(d, exts) {
+  let r = [];
+  try {
+    const ents = fs.readdirSync(d, { withFileTypes: true });
+    for (const e of ents) {
+      const fp = path.join(d, e.name);
+      if (e.isDirectory() && e.name !== 'node_modules' && e.name !== 'dist') r = r.concat(findAllFiles(fp, exts));
+      else if (exts.some(ext => e.name.endsWith(ext))) r.push(fp);
+    }
+  } catch {}
+  return r;
+}
+const layoutFiles = findAllFiles(path.join(dir, 'src/layouts'), ['.astro']);
+const pageFiles = findAllFiles(path.join(dir, 'src/pages'), ['.astro']);
+let darkModeActivated = false;
+// Check if any layout sets class='dark' on html/body
+for (const lf of layoutFiles.concat(pageFiles.slice(0, 3))) {
+  try {
+    const content = fs.readFileSync(lf, 'utf8');
+    if (/class=.*dark/.test(content) || /data-mode.*dark/.test(content)) darkModeActivated = true;
+  } catch {}
+}
+// Check if CSS uses prefers-color-scheme to set dark as default
+try {
+  const css = fs.readFileSync(path.join(dir, 'src/styles/globals.css'), 'utf8');
+  if (/prefers-color-scheme\\s*:\\s*dark/.test(css)) darkModeActivated = true;
+  // Check for a theme toggle script
+  for (const lf of layoutFiles) {
+    const content = fs.readFileSync(lf, 'utf8');
+    if (/theme.*toggle|dark.*toggle|setTheme|colorScheme/.test(content)) darkModeActivated = true;
+  }
+} catch {}
+
+// Check style-fingerprint: if darkness > 0.25, dark mode should be the default
+try {
+  const sf = JSON.parse(fs.readFileSync(path.join(dir, 'scratch/style-fingerprint.json'), 'utf8'));
+  const darkness = sf.style?.dimensions?.darkness || sf.dimensions?.darkness || 0;
+  if (darkness > 0.25 && !darkModeActivated) {
+    errors.push('Style fingerprint has darkness=' + darkness + ' (>0.25) but dark mode is not activated — add class=\"dark\" to <html> in the layout or use prefers-color-scheme');
+  }
 } catch {}
 
 if (errors.length > 0) { console.log('FAILURES:'); errors.forEach(e => console.log('  - ' + e)); process.exit(1); }
@@ -1127,10 +1407,244 @@ Specific checklist items that failed with details.`;
   };
 }
 
+// --- Programmatic Reviewers ---
+
+/** Invariant check reviewer — runs static checks against source files */
+async function runInvariantCheck(ctx: ReviewerContext): Promise<ReviewVerdict> {
+  const result = await runAllInvariants({
+    srcDir: ctx.workingDir,
+    sourceOrigin: ctx.sourceOrigin,
+    phaseId: ctx.phaseId,
+  });
+
+  const report = generateInvariantReport(result);
+
+  if (result.passed) {
+    return {
+      reviewerId: 'invariant-check',
+      verdict: 'PASS',
+      evidence: report,
+      findings: `${result.errors.length} errors, ${result.warnings.length} warnings (${result.duration}ms)`,
+    };
+  }
+
+  return {
+    reviewerId: 'invariant-check',
+    verdict: 'REJECT',
+    evidence: report,
+    findings: `${result.errors.length} invariant violations found`,
+    rejectionContext: `Invariant check failed:\n${result.errors.slice(0, 10).map(e => `- ${e.check}: ${e.file}${e.line ? `:${e.line}` : ''} — ${e.message}`).join('\n')}`,
+  };
+}
+
+/** Phase boundary reviewer — checks for forbidden property additions */
+async function runPhaseBoundaryCheck(ctx: ReviewerContext): Promise<ReviewVerdict> {
+  const violations = await checkPhaseBoundary(ctx.workingDir, ctx.phaseId as PhaseId);
+  const report = formatBoundaryViolations(violations);
+
+  if (violations.length === 0) {
+    return {
+      reviewerId: 'phase-boundary',
+      verdict: 'PASS',
+      evidence: report,
+      findings: 'No phase boundary violations',
+    };
+  }
+
+  return {
+    reviewerId: 'phase-boundary',
+    verdict: 'REJECT',
+    evidence: report,
+    findings: `${violations.length} phase boundary violation(s)`,
+    rejectionContext: `Phase boundary violations:\n${violations.slice(0, 10).map(v => `- ${v.file}:${v.line} — ${v.description}`).join('\n')}`,
+  };
+}
+
+/** Snapshot regression reviewer — compares against previous phase snapshot */
+async function runRegressionCheck(ctx: ReviewerContext): Promise<ReviewVerdict> {
+  if (!ctx.runDir) {
+    return {
+      reviewerId: 'regression-check',
+      verdict: 'PASS',
+      evidence: 'No runDir provided — skipping regression check',
+      findings: 'Skipped',
+    };
+  }
+
+  const prevSnapshot = await readPreviousSnapshot(ctx.phaseId as PhaseId, ctx.runDir);
+  if (!prevSnapshot) {
+    return {
+      reviewerId: 'regression-check',
+      verdict: 'PASS',
+      evidence: 'No previous snapshot found — skipping regression check',
+      findings: 'First phase with snapshot support',
+    };
+  }
+
+  const currentSnapshot = await createSnapshot(ctx.phaseId as PhaseId, ctx.workingDir, ctx.sourceOrigin);
+  const report = compareSnapshots(prevSnapshot, currentSnapshot);
+  const formatted = formatRegressionReport(report);
+
+  if (!report.hasRegressions) {
+    return {
+      reviewerId: 'regression-check',
+      verdict: 'PASS',
+      evidence: formatted,
+      findings: 'No regressions',
+    };
+  }
+
+  return {
+    reviewerId: 'regression-check',
+    verdict: 'REJECT',
+    evidence: formatted,
+    findings: `${report.regressions.length} regression(s) detected`,
+    rejectionContext: `Snapshot regressions:\n${report.regressions.map(r => `- ${r.metric}: ${r.description}`).join('\n')}`,
+  };
+}
+
+/** Content check reviewer — verifies pages render actual content, not just headings */
+async function runContentCheck(ctx: ReviewerContext): Promise<ReviewVerdict> {
+  const { readFile, readdir } = await import('fs/promises');
+  const { join, relative } = await import('path');
+  const errors: string[] = [];
+
+  // Load registry
+  let registry: { static_pages?: Array<{ route: string; pagetype: string }>; collections?: Record<string, unknown> } = {};
+  try {
+    registry = JSON.parse(await readFile(join(ctx.workingDir, 'output/reduced/registry.json'), 'utf-8'));
+  } catch {
+    return {
+      reviewerId: 'content-check',
+      verdict: 'REJECT',
+      evidence: 'Cannot read registry.json',
+      findings: 'Registry not found',
+      rejectionContext: 'Cannot read registry.json — content check cannot proceed',
+    };
+  }
+
+  // Check static pages render content (not just an h1)
+  for (const sp of (registry.static_pages || [])) {
+    const route = (sp.route || '/').replace(/\/+$/, '') || '/';
+    const filePath = route === '/'
+      ? join(ctx.workingDir, 'src/pages/index.astro')
+      : join(ctx.workingDir, 'src/pages', route.replace(/^\//, '') + '.astro');
+    const altPath = route === '/'
+      ? filePath
+      : join(ctx.workingDir, 'src/pages', route.replace(/^\//, ''), 'index.astro');
+
+    let content = '';
+    try { content = await readFile(filePath, 'utf-8'); } catch {
+      try { content = await readFile(altPath, 'utf-8'); } catch { continue; }
+    }
+
+    // Check the page has actual content rendering, not just a heading
+    const hasDataBinding = /\{[^}]*(entry|page|data|content|props)\.[^}]+\}/.test(content)
+      || /getStaticPage|static-pages\.json/.test(content);
+    const hasSlot = /<slot\s*\/?>/.test(content);
+    const hasConditionalContent = /\{#|{entry|{page|\.map\(|\.filter\(/.test(content);
+
+    if (!hasDataBinding && !hasSlot && !hasConditionalContent) {
+      errors.push(`${sp.route} (${sp.pagetype}): page does not bind to content data — likely renders blank`);
+    }
+  }
+
+  // Check collection directories have data files
+  for (const [collName] of Object.entries(registry.collections || {})) {
+    const collDir = join(ctx.workingDir, 'src/content', collName);
+    try {
+      const entries = await readdir(collDir);
+      const jsonFiles = entries.filter((f: string) => f.endsWith('.json'));
+      if (jsonFiles.length === 0) {
+        errors.push(`Collection "${collName}" has no JSON data files in src/content/${collName}/`);
+      }
+    } catch {
+      errors.push(`Collection "${collName}" directory missing: src/content/${collName}/`);
+    }
+  }
+
+  // Check static-pages.json has entries with non-null content
+  try {
+    const spData = JSON.parse(await readFile(join(ctx.workingDir, 'src/data/static-pages.json'), 'utf-8'));
+    if (!Array.isArray(spData) || spData.length === 0) {
+      errors.push('src/data/static-pages.json is empty or not an array');
+    } else {
+      for (const entry of spData) {
+        if (!entry.content || Object.keys(entry.content).length === 0) {
+          errors.push(`static-pages.json: entry for route "${entry.route || '?'}" has empty content`);
+        }
+      }
+    }
+  } catch (e) {
+    errors.push(`Cannot read static-pages.json: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  if (errors.length === 0) {
+    return {
+      reviewerId: 'content-check',
+      verdict: 'PASS',
+      evidence: 'All static pages bind to content data, all collections have data files',
+      findings: 'Content check passed',
+    };
+  }
+
+  return {
+    reviewerId: 'content-check',
+    verdict: 'REJECT',
+    evidence: errors.join('\n'),
+    findings: `${errors.length} content issue(s) found`,
+    rejectionContext: `Content check failed:\n${errors.map(e => `- ${e}`).join('\n')}`,
+  };
+}
+
+/** Playwright page-type sampler — runs Playwright against sample pages */
+async function runPlaywrightSampleCheck(ctx: ReviewerContext): Promise<ReviewVerdict> {
+  // Skip if no dev server URL available
+  if (!ctx.devServerUrl) {
+    return {
+      reviewerId: 'playwright-sample',
+      verdict: 'PASS',
+      evidence: 'No dev server URL available — skipping Playwright sampling',
+      findings: 'Skipped (no dev server)',
+    };
+  }
+
+  const baseUrl = ctx.devServerUrl.replace(/\/$/, '');
+
+  const result = await runPlaywrightSampler({
+    siteDir: ctx.workingDir,
+    baseUrl,
+    maxSamplesPerType: 3,
+    pageTimeout: 15000,
+  });
+
+  const report = formatSamplerReport(result);
+
+  if (result.failed === 0) {
+    return {
+      reviewerId: 'playwright-sample',
+      verdict: 'PASS',
+      evidence: report,
+      findings: `${result.totalChecks} pages tested, all passed`,
+    };
+  }
+
+  return {
+    reviewerId: 'playwright-sample',
+    verdict: 'REJECT',
+    evidence: report,
+    findings: `${result.failed}/${result.totalChecks} page checks failed`,
+    rejectionContext: `Playwright sampling failures:\n${result.checks.filter(c => !c.passed).slice(0, 10).map(c => `- ${c.url} (${c.viewport}): ${[...c.headingIssues, ...c.consoleErrors, ...c.brokenImages.map(i => `broken img: ${i}`), ...(!c.hasContent ? ['empty content'] : []), ...(!c.hasNav ? ['missing nav'] : []), ...(!c.hasFooter ? ['missing footer'] : [])].join('; ')}`).join('\n')}`,
+  };
+}
+
 // --- Reviewer Matrix ---
 
 /**
  * Get the list of reviewers for a given phase.
+ *
+ * Polish phase includes per-page reviewers for links, images, and external URL leakage
+ * to catch the most common quality issues before shipping.
  */
 export function getReviewersForPhase(phaseId: string): ReviewerDef[] {
   switch (phaseId) {
@@ -1147,26 +1661,54 @@ export function getReviewersForPhase(phaseId: string): ReviewerDef[] {
     case 'layout':
       return [
         { id: 'layout-check', name: 'Layout Check', phase: 'layout', model: 'M1', prompt: layoutCheckPrompt },
+        { id: 'content-check', name: 'Content Check', phase: 'layout', model: 'M1', prompt: () => '', programmatic: true, runFn: runContentCheck },
+        { id: 'invariant-check', name: 'Invariant Check', phase: 'layout', model: 'M1', prompt: () => '', programmatic: true, runFn: runInvariantCheck },
+        { id: 'phase-boundary', name: 'Phase Boundary', phase: 'layout', model: 'M1', prompt: () => '', programmatic: true, runFn: runPhaseBoundaryCheck },
+        { id: 'playwright-sample', name: 'Playwright Sample', phase: 'layout', model: 'M1', prompt: () => '', programmatic: true, runFn: runPlaywrightSampleCheck },
       ];
 
     case 'design':
       return [
         { id: 'design-check', name: 'Design Check', phase: 'design', model: 'M1', prompt: designCheckPrompt },
+        { id: 'content-check', name: 'Content Check', phase: 'design', model: 'M1', prompt: () => '', programmatic: true, runFn: runContentCheck },
+        { id: 'invariant-check', name: 'Invariant Check', phase: 'design', model: 'M1', prompt: () => '', programmatic: true, runFn: runInvariantCheck },
+        { id: 'phase-boundary', name: 'Phase Boundary', phase: 'design', model: 'M1', prompt: () => '', programmatic: true, runFn: runPhaseBoundaryCheck },
+        { id: 'regression-check', name: 'Regression Check', phase: 'design', model: 'M1', prompt: () => '', programmatic: true, runFn: runRegressionCheck },
+        { id: 'playwright-sample', name: 'Playwright Sample', phase: 'design', model: 'M1', prompt: () => '', programmatic: true, runFn: runPlaywrightSampleCheck },
       ];
 
     case 'color':
       return [
         { id: 'color-check', name: 'Color Check', phase: 'color', model: 'M1', prompt: colorCheckPrompt },
+        { id: 'invariant-check', name: 'Invariant Check', phase: 'color', model: 'M1', prompt: () => '', programmatic: true, runFn: runInvariantCheck },
+        { id: 'phase-boundary', name: 'Phase Boundary', phase: 'color', model: 'M1', prompt: () => '', programmatic: true, runFn: runPhaseBoundaryCheck },
+        { id: 'regression-check', name: 'Regression Check', phase: 'color', model: 'M1', prompt: () => '', programmatic: true, runFn: runRegressionCheck },
+        { id: 'playwright-sample', name: 'Playwright Sample', phase: 'color', model: 'M1', prompt: () => '', programmatic: true, runFn: runPlaywrightSampleCheck },
       ];
 
     case 'motion':
       return [
         { id: 'motion-check', name: 'Motion Check', phase: 'motion', model: 'M1', prompt: motionCheckPrompt },
+        { id: 'invariant-check', name: 'Invariant Check', phase: 'motion', model: 'M1', prompt: () => '', programmatic: true, runFn: runInvariantCheck },
+        { id: 'phase-boundary', name: 'Phase Boundary', phase: 'motion', model: 'M1', prompt: () => '', programmatic: true, runFn: runPhaseBoundaryCheck },
+        { id: 'regression-check', name: 'Regression Check', phase: 'motion', model: 'M1', prompt: () => '', programmatic: true, runFn: runRegressionCheck },
+        { id: 'playwright-sample', name: 'Playwright Sample', phase: 'motion', model: 'M1', prompt: () => '', programmatic: true, runFn: runPlaywrightSampleCheck },
       ];
 
     case 'polish':
       return [
         { id: 'polish-check', name: 'Polish Check', phase: 'polish', model: 'M1', prompt: polishCheckPrompt },
+        // Programmatic reviewers (no AI agent needed)
+        { id: 'invariant-check', name: 'Invariant Check', phase: 'polish', model: 'M1', prompt: () => '', programmatic: true, runFn: runInvariantCheck },
+        { id: 'regression-check', name: 'Regression Check', phase: 'polish', model: 'M1', prompt: () => '', programmatic: true, runFn: runRegressionCheck },
+        { id: 'playwright-sample', name: 'Playwright Sample', phase: 'polish', model: 'M1', prompt: () => '', programmatic: true, runFn: runPlaywrightSampleCheck },
+        // Per-page reviewers — check actual rendered pages for common issues
+        { id: 'links', name: 'Link Integrity', phase: 'polish', model: 'M2', prompt: linksReviewerPrompt, needsDevServer: true, perPage: true },
+        { id: 'images', name: 'Image Integrity', phase: 'polish', model: 'M1', prompt: imagesReviewerPrompt, needsDevServer: true, perPage: true },
+        { id: 'console', name: 'Console Errors', phase: 'polish', model: 'M1', prompt: consoleReviewerPrompt, needsDevServer: true, perPage: true },
+        // Source-level checks (no dev server needed)
+        { id: 'external-url-leakage', name: 'External URL Leakage', phase: 'polish', model: 'M2', prompt: externalUrlLeakagePrompt },
+        { id: 'responsive', name: 'Responsive Design', phase: 'polish', model: 'M2', prompt: responsiveReviewerPrompt, needsDevServer: true, perPage: true },
       ];
 
     default:

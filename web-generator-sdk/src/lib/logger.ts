@@ -168,8 +168,9 @@ class InteractiveLogger implements PipelineLogger {
     // Start spinner animation
     if (this.spinnerInterval) clearInterval(this.spinnerInterval);
     this.spinnerInterval = setInterval(() => {
+      if (!this.currentStep) return;
       this.spinnerFrame = (this.spinnerFrame + 1) % SPINNER_FRAMES.length;
-      this.currentStep!.duration = Date.now() - this.startTime;
+      this.currentStep.duration = Date.now() - this.startTime;
       this.render();
     }, 100);
 

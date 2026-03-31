@@ -35,6 +35,8 @@ export interface StepContext {
   templateDir: string;
   scraperOutput: ScraperOutput;
   referenceUrl?: string;
+  /** Origin URL of the source site (e.g., "https://example.com") */
+  sourceOrigin?: string;
   env: Record<string, string>;
   logger?: PipelineLogger;
   /** Prior reviewer rejection feedback, available on retry iterations */
@@ -46,6 +48,9 @@ export interface Step {
   name: string;
   description: string;
   envOverride?: StepEnvOverride;
+  /** If true, this step is deterministic (same input → same output).
+   *  On retry, deterministic steps are skipped and their output is reused. */
+  deterministic?: boolean;
   run(workingDir: string, ctx: StepContext): Promise<StepStatus>;
 }
 

@@ -16,7 +16,15 @@ import type { StepEnvOverride } from './steps/step.js';
 
 export async function loadEnvProfile(profileName: string): Promise<Record<string, string>> {
   const envPath = join(process.cwd(), `.env.${profileName}`);
-  const content = await readFile(envPath, 'utf-8');
+  let content: string;
+  try {
+    content = await readFile(envPath, 'utf-8');
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code === 'ENOENT') {
+      throw new Error(`.env.${profileName} not found at ${envPath}`);
+    }
+    throw e;
+  }
 
   const env: Record<string, string> = {};
   for (const line of content.split('\n')) {

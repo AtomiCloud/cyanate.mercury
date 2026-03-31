@@ -39,6 +39,10 @@ export interface ReviewerDef {
   needsDevServer?: boolean;
   /** Whether this is a per-page reviewer (spawns one per page) */
   perPage?: boolean;
+  /** If true, this reviewer runs as a programmatic function (no AI agent call) */
+  programmatic?: boolean;
+  /** Programmatic reviewer function. Returns PASS/REJECT verdict. */
+  runFn?: (ctx: ReviewerContext) => Promise<ReviewVerdict>;
 }
 
 export interface ReviewerContext {
@@ -56,6 +60,14 @@ export interface ReviewerContext {
   phaseName: string;
   /** Reference URL */
   referenceUrl?: string;
+  /** Origin URL of the source site (e.g., "https://example.com") */
+  sourceOrigin?: string;
+  /** Path to the previous step's snapshot directory */
+  snapshotPath?: string;
+  /** Run directory (for reading/writing snapshots) */
+  runDir?: string;
+  /** URL of a running preview server (e.g., "http://localhost:4321") */
+  devServerUrl?: string;
   /** Environment variables */
   env: Record<string, string>;
   /** Pages to check (for per-page reviewers) */
@@ -124,7 +136,12 @@ async function runReviewer(
   await semaphore.acquire();
 
   try {
-    const prompt = reviewer.prompt(ctx);
+    // Give each reviewer its own evidence subdirectory to avoid write races
+    const reviewerEvidenceDir = join(ctx.evidenceDir, reviewer.id);
+    await mkdir(reviewerEvidenceDir, { recursive: true });
+    const reviewerCtx = { ...ctx, evidenceDir: reviewerEvidenceDir };
+
+    const prompt = reviewer.prompt(reviewerCtx);
 
     // Inject model selection via ANTHROPIC_MODEL env var
     const reviewerEnv = {
@@ -227,6 +244,55 @@ async function runPerPageReviewer(
 }
 
 /**
+ * Run a single programmatic reviewer (no AI agent call).
+ */
+async function runProgrammaticReviewer(
+  reviewer: ReviewerDef,
+  ctx: ReviewerContext,
+): Promise<ReviewResult> {
+  const startTime = Date.now();
+
+  try {
+    const verdict = await reviewer.runFn!(ctx);
+
+    // Write verdict file to reviews/
+    await writeFile(
+      join(ctx.reviewsDir, `reviewer-${reviewer.id}.md`),
+      formatVerdictFile(reviewer, verdict),
+      'utf-8',
+    );
+
+    return {
+      reviewerId: reviewer.id,
+      passed: verdict.verdict === 'PASS',
+      verdict,
+      duration: Date.now() - startTime,
+    };
+  } catch (err) {
+    const errorVerdict: ReviewVerdict = {
+      reviewerId: reviewer.id,
+      verdict: 'REJECT',
+      evidence: 'Programmatic reviewer crashed',
+      findings: `Error: ${err instanceof Error ? err.message : String(err)}`,
+      rejectionContext: `Reviewer ${reviewer.id} failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+
+    await writeFile(
+      join(ctx.reviewsDir, `reviewer-${reviewer.id}.md`),
+      formatVerdictFile(reviewer, errorVerdict),
+      'utf-8',
+    ).catch(() => {});
+
+    return {
+      reviewerId: reviewer.id,
+      passed: false,
+      verdict: errorVerdict,
+      duration: Date.now() - startTime,
+    };
+  }
+}
+
+/**
  * Run all reviewers for a phase in parallel (with semaphore).
  * Returns the combined result and whether all passed.
  */
@@ -239,6 +305,9 @@ export async function runReviewers(
   const results: ReviewResult[] = [];
 
   const promises = reviewers.map(async (reviewer) => {
+    if (reviewer.programmatic && reviewer.runFn) {
+      return runProgrammaticReviewer(reviewer, ctx);
+    }
     if (reviewer.perPage) {
       return runPerPageReviewer(reviewer, ctx, semaphore);
     }
@@ -279,12 +348,23 @@ export async function readRejectionContexts(reviewsDir: string): Promise<string>
     try {
       const content = await readFile(join(reviewsDir, file), 'utf-8');
       if (content.includes('## Verdict: REJECT')) {
-        rejections.push(content);
+        // Extract only the rejection context section, not the full report
+        // This prevents exponential growth when rejection contexts are nested
+        const ctxMatch = content.match(/## Rejection Context[^\n]*\n([\s\S]*?)(?=\n## |\n---|\s*$)/);
+        const reviewerIdMatch = content.match(/^# Review: (.+)/m);
+        const reviewerId = reviewerIdMatch ? reviewerIdMatch[1] : file;
+        const ctx = ctxMatch ? ctxMatch[1].trim() : 'Rejected (no context provided)';
+        rejections.push(`**${reviewerId}**: ${ctx}`);
       }
     } catch { /* skip */ }
   }
 
-  return rejections.join('\n\n---\n\n');
+  const combined = rejections.join('\n\n');
+  // Cap at ~4000 chars to prevent prompt bloat on repeated retries
+  if (combined.length > 4000) {
+    return combined.slice(0, 3950) + '\n\n... (truncated, see reviews/ for full details)';
+  }
+  return combined;
 }
 
 /**
@@ -299,8 +379,14 @@ export async function cleanupReviews(reviewsDir: string): Promise<void> {
 // --- Verdict parsing ---
 
 function parseVerdict(reviewerId: string, output: string): ReviewVerdict {
-  const passed = output.includes('VERDICT: PASS') || output.includes('Verdict: PASS');
-  const rejected = output.includes('VERDICT: REJECT') || output.includes('Verdict: REJECT');
+  // Case-insensitive match for common verdict formats:
+  //   VERDICT: PASS, Verdict: PASS, verdict: pass, PASS, ALL CHECKS PASSED, etc.
+  const normalized = output.toUpperCase();
+  const rejected = normalized.includes('VERDICT: REJECT') || normalized.includes('VERDICT:REJECT');
+  const passed = !rejected && (
+    normalized.includes('VERDICT: PASS') || normalized.includes('VERDICT:PASS')
+    || normalized.includes('ALL CHECKS PASSED')
+  );
 
   return {
     reviewerId,

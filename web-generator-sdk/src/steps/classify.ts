@@ -79,6 +79,8 @@ For each listing/filtering page:
 - route: the URL pattern
 - queries: array of { collection, group_by?, filter_by_param? }
 - paginated: boolean
+- searchable: boolean (true for any listing with > 10 items)
+- search_fields: array of content field names to search (e.g., ["title", "body", "specialty"])
 
 ### 4. static_pages
 Single-instance pages:
