@@ -6,7 +6,7 @@ import { readdir, mkdir, copyFile, stat } from 'fs/promises';
 import { join } from 'path';
 
 const SKIP_ENTRIES = new Set([
-  'node_modules', 'dist', '.astro',
+  'dist', '.astro', 'node_modules',
   'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb',
   'status.json',
 ]);

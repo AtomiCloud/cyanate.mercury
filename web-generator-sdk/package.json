@@ -6,6 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "bun src/index.ts",
+    "llm-watch": "bun scripts/llm-watch.ts",
     "start": "bun src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --declaration --outDir dist"

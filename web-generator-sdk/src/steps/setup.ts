@@ -27,14 +27,14 @@ export const setupStep: Step = {
     } catch { /* skills dir may not exist */ }
 
     try {
-      execSync('npm install', { cwd: workingDir, timeout: 120000, stdio: 'pipe' });
+      execSync('bun install', { cwd: workingDir, timeout: 120000, stdio: 'pipe' });
     } catch (e) {
       return {
         status: 'failed',
         startedAt: new Date(startTime).toISOString(),
         finishedAt: new Date().toISOString(),
         duration: Date.now() - startTime,
-        error: `npm install failed: ${e instanceof Error ? e.message : String(e)}`,
+        error: `bun install failed: ${e instanceof Error ? e.message : String(e)}`,
       };
     }
 

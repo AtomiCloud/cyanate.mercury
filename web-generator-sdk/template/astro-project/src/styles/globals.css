@@ -1,76 +1,113 @@
 @import "tailwindcss";
 
-/* CSS Variables for theming - using OKLCH color format */
-/* These are placeholder values that will be replaced during generation */
+/* CSS Variables for theming - Phase 4: COLOR (OKLCH color system) */
+/* Color distribution: 60% dominant, 30% secondary, 10% accent */
+/* Darkness: 0.70 → dark theme primary, light mode secondary */
+
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.15 0.02 270);
+  /* Light mode (secondary theme) - lighter backgrounds, darker text */
+  --background: oklch(98% 0 0);
+  --foreground: oklch(15% 0 0);
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.02 270);
+  --card: oklch(100% 0 0);
+  --card-foreground: oklch(15% 0 0);
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.02 270);
+  --popover: oklch(100% 0 0);
+  --popover-foreground: oklch(15% 0 0);
 
-  --primary: oklch(0.5 0.15 270);
-  --primary-foreground: oklch(0.98 0 0);
+  --primary: oklch(100% 0 0);
+  --primary-foreground: oklch(10% 0 0);
 
-  --secondary: oklch(0.95 0.01 270);
-  --secondary-foreground: oklch(0.2 0.02 270);
+  --secondary: oklch(92% 0 0);
+  --secondary-foreground: oklch(15% 0 0);
 
-  --muted: oklch(0.95 0.01 270);
-  --muted-foreground: oklch(0.5 0.02 270);
+  --muted: oklch(96% 0 0);
+  --muted-foreground: oklch(50% 0 0);
 
-  --accent: oklch(0.95 0.01 270);
-  --accent-foreground: oklch(0.2 0.02 270);
+  /* Accent color - purple from design tokens (darkened for WCAG compliance) */
+  --accent: oklch(38% 0.14 280);
+  --accent-foreground: oklch(98% 0 0);
 
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.98 0 0);
+  /* Destructive - red */
+  --destructive: oklch(50% 0.15 25);
+  --destructive-foreground: oklch(98% 0 0);
 
-  --border: oklch(0.9 0.01 270);
-  --input: oklch(0.9 0.01 270);
-  --ring: oklch(0.5 0.15 270);
+  /* Borders - subtle for light mode */
+  --border: oklch(88% 0 0);
+  --input: oklch(88% 0 0);
+  --ring: oklch(38% 0.14 280);
 
+  /* Design tokens */
   --radius: 0.5rem;
+
+  /* Gradient colors - light variants */
+  --gradient-hero-start: oklch(98% 0.01 270);
+  --gradient-hero-end: oklch(96% 0.02 240);
+  --gradient-subtle-start: oklch(70% 0.05 280);
+  --gradient-subtle-end: oklch(60% 0.08 260);
+  --gradient-mesh-center: oklch(95% 0.03 280);
+  --gradient-mesh-outer: oklch(100% 0 0);
+
+  /* Surface colors */
+  --surface-glass-panel: rgba(255, 255, 255, 0.75);
+  --surface-glass-card: rgba(255, 255, 255, 0.6);
+  --surface-glass-header: rgba(255, 255, 255, 0.85);
 }
 
 .dark {
-  --background: oklch(0.15 0.02 270);
-  --foreground: oklch(0.95 0.01 270);
+  /* Dark mode (primary theme) - darker backgrounds, lighter text */
+  --background: oklch(10% 0 0);
+  --foreground: oklch(100% 0 0);
 
-  --card: oklch(0.15 0.02 270);
-  --card-foreground: oklch(0.95 0.01 270);
+  --card: oklch(12% 0 0);
+  --card-foreground: oklch(100% 0 0);
 
-  --popover: oklch(0.15 0.02 270);
-  --popover-foreground: oklch(0.95 0.01 270);
+  --popover: oklch(12% 0 0);
+  --popover-foreground: oklch(100% 0 0);
 
-  --primary: oklch(0.6 0.15 270);
-  --primary-foreground: oklch(0.98 0 0);
+  --primary: oklch(100% 0 0);
+  --primary-foreground: oklch(10% 0 0);
 
-  --secondary: oklch(0.2 0.02 270);
-  --secondary-foreground: oklch(0.95 0.01 270);
+  --secondary: oklch(90% 0 0);
+  --secondary-foreground: oklch(10% 0 0);
 
-  --muted: oklch(0.2 0.02 270);
-  --muted-foreground: oklch(0.7 0.02 270);
+  --muted: oklch(12% 0 0);
+  --muted-foreground: oklch(60% 0 0);
 
-  --accent: oklch(0.2 0.02 270);
-  --accent-foreground: oklch(0.95 0.01 270);
+  /* Accent color - purple from design tokens */
+  --accent: oklch(55% 0.1 280);
+  --accent-foreground: oklch(10% 0 0);
 
-  --destructive: oklch(0.6 0.2 25);
-  --destructive-foreground: oklch(0.98 0 0);
+  /* Destructive - red */
+  --destructive: oklch(50% 0.15 25);
+  --destructive-foreground: oklch(98% 0 0);
 
-  --border: oklch(0.25 0.02 270);
-  --input: oklch(0.25 0.02 270);
-  --ring: oklch(0.6 0.15 270);
+  /* Borders - subtle for dark mode */
+  --border: oklch(20% 0 0);
+  --input: oklch(20% 0 0);
+  --ring: oklch(55% 0.1 280);
+
+  /* Gradient colors - dark variants */
+  --gradient-hero-start: oklch(12% 0.02 270);
+  --gradient-hero-end: oklch(8% 0.03 260);
+  --gradient-subtle-start: oklch(70% 0.05 280);
+  --gradient-subtle-end: oklch(60% 0.08 260);
+  --gradient-mesh-center: oklch(20% 0.08 280);
+  --gradient-mesh-outer: oklch(10% 0 0);
+
+  /* Surface colors for dark mode */
+  --surface-glass-panel: rgba(20, 20, 20, 0.75);
+  --surface-glass-card: rgba(30, 30, 30, 0.6);
+  --surface-glass-header: rgba(10, 10, 10, 0.8);
 }
 
 /* Base styles */
 * {
-  border-color: hsl(var(--border));
+  border-color: var(--border);
 }
 
 body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background-color: var(--background);
+  color: var(--foreground);
   font-family: system-ui, -apple-system, sans-serif;
 }

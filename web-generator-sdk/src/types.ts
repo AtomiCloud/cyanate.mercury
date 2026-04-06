@@ -187,25 +187,109 @@ export interface Registry {
     source_pagetype: string;
     slug_field: string;
     listable_by: string[];
-    filterable_by: string;
+    filterable_by?: string | string[] | Array<Record<string, unknown>>;
+    search_fields?: string[];
+    slug_pattern?: string;
+    slug_extract?: number | string;
+    ordered?: boolean;
   }>;
   listings: Record<string, {
     route: string;
     queries: Array<{
-      collection: string;
+      collection?: string;
       group_by?: string;
       filter_by_param?: string;
+      filter?: string;
+      [key: string]: unknown;
     }>;
     paginated: boolean;
+    searchable?: boolean;
+    search_fields?: string[];
   }>;
   static_pages: Array<{
     pagetype: string;
     route: string;
+    layout?: string;
   }>;
-  navigation: {
+  navigation?: Record<string, unknown>;
+  interactive_patterns?: InteractionPattern[];
+}
+
+export interface InteractionPattern {
+  id: string;
+  type: 'fragment' | 'modal' | 'accordion' | 'tabs' | 'search' | 'filter' | 'form' | 'popup' | 'other';
+  trigger?: string;
+  target?: string;
+  pageType?: string;
+  route?: string;
+  description: string;
+}
+
+export interface InteractionManifest {
+  patterns: InteractionPattern[];
+  pages: Array<{
+    route: string;
+    ids: string[];
+    triggers: string[];
+  }>;
+}
+
+// --- Content Reduction types ---
+
+export type DynamicBindingType =
+  | 'collection_query'
+  | 'prev_next'
+  | 'sidebar_listing'
+  | 'global';
+
+export interface DynamicBinding {
+  type: DynamicBindingType;
+  /** Top-level field name this replaces in the page content */
+  field: string;
+  /** Collection name from registry (for collection_query, prev_next, sidebar_listing) */
+  collection?: string;
+  /** Display format hint: carousel, grid, list, cards, categorized_list */
+  display?: string;
+  /** Max items to show */
+  limit?: number;
+  /** Field to group results by (for sidebar_listing) */
+  group_by?: string;
+}
+
+export interface ReductionSpec {
+  /** Fields to keep as static content, with flattening instructions */
+  static_fields: Record<string, {
     source: string;
-    structure: string;
-  };
+    flatten_to?: 'object' | 'string' | 'array';
+  }>;
+  /** Dynamic bindings to declare */
+  dynamic_bindings: DynamicBinding[];
+  /** Fields to drop entirely, with reasons */
+  drop_fields: Array<{ field: string; reason: string }> | string[];
+}
+
+export interface ReducedPageContent {
+  pagetype: string;
+  slug: string;
+  route: string;
+  static_content: Record<string, unknown>;
+  dynamic_bindings: DynamicBinding[];
+}
+
+export interface BindingsManifest {
+  version: 1;
+  generated_at: string;
+  /** Dynamic bindings per page, keyed by "{pagetype}/{slug}" */
+  pages: Record<string, DynamicBinding[]>;
+  /** Summary of which collections are queried and by whom */
+  collection_queries: Array<{
+    collection: string;
+    used_by: Array<{ pagetype: string; field: string; display?: string }>;
+  }>;
+  /** Collection names that need prev/next navigation */
+  prev_next_collections: string[];
+  /** Field names identified as cross-cutting globals */
+  global_fields: string[];
 }
 
 // --- Phase 6: Quality ---
@@ -255,6 +339,8 @@ export interface CuiConfig {
   profile: string;
   /** Env profile for reviewer agents (e.g., "zai" -> .env.zai). Falls back to `profile` if not set. */
   reviewerProfile?: string;
+  /** Model ID for vision-capable reviewers (screenshot-based visual QA). Falls back to ANTHROPIC_DEFAULT_SONNET_MODEL if not set. */
+  visionModel?: string;
   /** Per-step overrides keyed by step ID */
   steps?: Record<string, StepConfigOverride>;
 }
@@ -263,6 +349,8 @@ export interface StepConfigOverride {
   profile?: string;
   env?: Record<string, string>;
   skip?: boolean;
+  /** Max concurrent page agents for layout step (default: 5, set to 1 for sequential) */
+  maxConcurrentPageAgents?: number;
 }
 
 // --- Run metadata ---

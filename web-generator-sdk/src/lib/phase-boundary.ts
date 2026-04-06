@@ -48,9 +48,49 @@ const PHASE_RULES: PhaseOwnership[] = [
       /\bline-height\b/,
       /\bcolor\s*:/,
       /\bbackground-color\b/,
-      /\btransition\b/,
-      /\banimation\b/,
+      /\bborder-color\b/,
+      /\boutline-color\b/,
+      /\boklch\(/,
+      /\bhsl\(/,
+      /\brgb\(/,
+      /\b#[0-9a-fA-F]{3,8}\b/,
+      /\btransition\s*:/,
+      /\banimation\s*:/,
       /\bonmouse\w+\s*=/,
+    ],
+  },
+  {
+    phase: 'mobile',
+    owns: 'Small-screen stacking, overflow fixes, mobile navigation and interaction ergonomics',
+    allowedPatterns: [
+      /\.astro$/,
+      /\.css$/,
+      /\.tsx$/,
+    ],
+    forbiddenAdditions: [
+      // Typography (belongs to design phase)
+      /\bfont-family\b/,
+      /\bfont-size\b/,
+      /\bfont-weight\b/,
+      /\bfont-style\s*:/,
+      /\bletter-spacing\b/,
+      /\bline-height\b/,
+      // Colors (belongs to color phase)
+      /\bcolor\s*:/,
+      /\bbackground-color\b/,
+      /\bborder-color\b/,
+      /\bfill\s*:/,
+      /\bstroke\s*:/,
+      /\boklch\(/,
+      /\bhsl\(/,
+      /\brgb\(/,
+      /\b#[0-9a-fA-F]{3,8}\b/,
+      // Motion (belongs to motion phase)
+      // Note: translateX/Y allowed for mobile drawer positioning (off-screen hide/show)
+      /\btransition\s*:/,
+      /\banimation\s*:/,
+      // Forbid animation transforms but allow translateX/Y for drawer off-screen positioning
+      /\btransform\s*:\s*(?!\s*translateX|\s*translateY)/,
     ],
   },
   {

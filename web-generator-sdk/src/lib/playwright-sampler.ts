@@ -9,7 +9,7 @@
  * horizontal overflow, nav presence, footer presence, image loading.
  */
 
-import { readFile, readdir, stat } from 'fs/promises';
+import { readFile, readdir, stat, mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { chromium, type Browser, type Page, type ConsoleMessage } from 'playwright';
 import type { Registry } from '../types.js';
@@ -27,6 +27,10 @@ export interface SamplerOptions {
   maxSamplesPerType?: number;
   /** Timeout per page navigation in ms (default 15 000) */
   pageTimeout?: number;
+  /** Which viewports to check (default: both mobile and desktop) */
+  viewports?: Array<'mobile' | 'desktop'>;
+  /** Directory to save screenshots and a11y snapshots. If set, screenshots are captured for every page check. */
+  screenshotDir?: string;
 }
 
 export interface PageCheck {
@@ -43,6 +47,10 @@ export interface PageCheck {
   hasFooter: boolean;
   brokenImages: string[];
   passed: boolean;
+  /** Paths to captured screenshots (empty if screenshotDir not provided) */
+  screenshots: { fold?: string; full?: string };
+  /** Path to accessibility snapshot JSON (empty if screenshotDir not provided) */
+  a11ySnapshot?: string;
 }
 
 export interface SamplerReport {
@@ -86,13 +94,18 @@ async function discoverSamples(
     } catch { /* try next */ }
   }
 
-  // 1. Static pages (always include all — they're few)
+  // 1. Static pages — always include homepage, cap the rest at maxPerType
   if (registry?.static_pages) {
+    const home = registry.static_pages.find(sp => sp.route === '/');
+    if (home) samples.push({ url: '/', pageType: home.pagetype });
+    let added = 0;
     for (const sp of registry.static_pages) {
+      if (sp.route === '/') continue;
+      if (added >= maxPerType) break;
       samples.push({ url: sp.route || '/', pageType: sp.pagetype });
+      added++;
     }
   } else {
-    // Fallback: at least check the homepage
     samples.push({ url: '/', pageType: 'landing' });
   }
 
@@ -206,6 +219,7 @@ async function checkPage(
   viewport: 'mobile' | 'desktop',
   baseUrl: string,
   timeout: number,
+  screenshotDir?: string,
 ): Promise<PageCheck> {
   const consoleErrors: string[] = [];
   const onConsole = (msg: ConsoleMessage) => {
@@ -232,17 +246,19 @@ async function checkPage(
       url, pageType, viewport, status: null,
       hasContent: false, headingHierarchyOk: false, headingIssues: ['Navigation timeout'],
       consoleErrors, hasOverflow: false, hasNav: false, hasFooter: false,
-      brokenImages: [], passed: false,
+      brokenImages: [], passed: false, screenshots: {},
     };
   }
 
   // Run all checks in a single evaluate call for efficiency
   const checks = await page.evaluate(() => {
     const body = document.body;
-    const bodyText = (body.innerText || '').trim();
+    const main = document.querySelector('main');
+    const contentRoot = main ?? body;
+    const bodyText = (contentRoot.textContent || '').trim();
 
     // Heading hierarchy
-    const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+    const headings = Array.from(contentRoot.querySelectorAll('h1, h2, h3, h4, h5, h6'));
     const levels = headings.map(h => parseInt(h.tagName[1], 10));
     const headingIssues: string[] = [];
     const h1Count = levels.filter(l => l === 1).length;
@@ -284,6 +300,34 @@ async function checkPage(
 
   page.off('console', onConsole);
 
+  // Capture screenshots and accessibility snapshot if screenshotDir is set
+  const screenshots: { fold?: string; full?: string } = {};
+  let a11ySnapshot: string | undefined;
+  if (screenshotDir) {
+    try {
+      const slug = url.replace(/[^a-zA-Z0-9]/g, '-').replace(/^-|-$/g, '') || 'index';
+      const prefix = `${pageType}-${slug}-${viewport}`;
+      const typeDir = join(screenshotDir, pageType);
+      await mkdir(typeDir, { recursive: true });
+
+      const foldPath = join(typeDir, `${prefix}-fold.jpeg`);
+      await page.screenshot({ path: foldPath, type: 'jpeg', quality: 65 });
+      screenshots.fold = foldPath;
+
+      const fullPath = join(typeDir, `${prefix}-full.jpeg`);
+      await page.screenshot({ path: fullPath, type: 'jpeg', quality: 65, fullPage: true });
+      screenshots.full = fullPath;
+
+      // Accessibility snapshot via ARIA snapshot (Playwright 1.49+)
+      const a11yText = await page.locator('body').ariaSnapshot();
+      if (a11yText) {
+        const a11yPath = join(typeDir, `${prefix}-a11y.txt`);
+        await writeFile(a11yPath, a11yText, 'utf-8');
+        a11ySnapshot = a11yPath;
+      }
+    } catch { /* screenshot capture is best-effort */ }
+  }
+
   const passed =
     status === 200 &&
     checks.hasContent &&
@@ -308,6 +352,8 @@ async function checkPage(
     hasFooter: checks.hasFooter,
     brokenImages: checks.brokenImages,
     passed,
+    screenshots,
+    a11ySnapshot,
   };
 }
 
@@ -319,13 +365,19 @@ async function checkPage(
  * Run the Playwright page-type sampler.
  *
  * Expects the site to already be served at `opts.baseUrl` (e.g. via
- * `npx astro preview` or a static file server on dist/).
+ * `bun x astro preview` or a static file server on dist/).
  */
 export async function runPlaywrightSampler(
   opts: SamplerOptions,
 ): Promise<SamplerReport> {
   const maxPerType = opts.maxSamplesPerType ?? 3;
   const timeout = opts.pageTimeout ?? 15_000;
+  const viewports = opts.viewports ?? ['mobile', 'desktop'];
+  const screenshotDir = opts.screenshotDir;
+
+  if (screenshotDir) {
+    await mkdir(screenshotDir, { recursive: true });
+  }
 
   const samples = await discoverSamples(opts.siteDir, maxPerType);
 
@@ -337,7 +389,7 @@ export async function runPlaywrightSampler(
     const page = await context.newPage();
 
     for (const sample of samples) {
-      for (const vp of ['mobile', 'desktop'] as const) {
+      for (const vp of viewports) {
         const result = await checkPage(
           page,
           sample.url,
@@ -345,6 +397,7 @@ export async function runPlaywrightSampler(
           vp,
           opts.baseUrl,
           timeout,
+          screenshotDir,
         );
         checks.push(result);
       }
@@ -365,6 +418,251 @@ export async function runPlaywrightSampler(
     failed: checks.length - passed,
     checks,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Interaction tests
+// ---------------------------------------------------------------------------
+
+export interface InteractionTestResult {
+  test: string;
+  page: string;
+  viewport: 'mobile' | 'desktop';
+  passed: boolean;
+  details: string;
+  screenshotBefore?: string;
+  screenshotAfter?: string;
+}
+
+export interface InteractionTestReport {
+  timestamp: string;
+  tests: InteractionTestResult[];
+  passed: number;
+  failed: number;
+}
+
+/**
+ * Run automated interaction tests on the generated site.
+ *
+ * Tests interactive elements: mobile nav toggle, hover states, clickable links.
+ * Uses Playwright to exercise interactions and capture before/after screenshots.
+ */
+export async function runInteractionTests(opts: {
+  baseUrl: string;
+  siteDir: string;
+  outputDir: string;
+  phases?: string[];
+}): Promise<InteractionTestReport> {
+  const results: InteractionTestResult[] = [];
+  await mkdir(opts.outputDir, { recursive: true });
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    // Test 1: Mobile nav toggle
+    await page.setViewportSize(VIEWPORTS.mobile);
+    try {
+      await page.goto(new URL('/', opts.baseUrl).href, { waitUntil: 'networkidle', timeout: 15000 });
+
+      const beforePath = join(opts.outputDir, 'mobile-nav-before.png');
+      await page.screenshot({ path: beforePath });
+
+      // Find hamburger / mobile menu trigger with broad selectors
+      const menuButton = await page.$([
+        'button[aria-label*="menu" i]',
+        'button[aria-label*="nav" i]',
+        'button[aria-label*="Menu"]',
+        '[data-mobile-nav-toggle]',
+        'button.hamburger',
+        'button.mobile-menu',
+      ].join(', '));
+
+      if (menuButton && await menuButton.isVisible()) {
+        await menuButton.click();
+        await page.waitForTimeout(600);
+
+        const afterPath = join(opts.outputDir, 'mobile-nav-after.png');
+        await page.screenshot({ path: afterPath });
+
+        // Check if a nav/drawer became visible
+        const visibleNav = await page.evaluate(() => {
+          const navEls = document.querySelectorAll('nav, [role="navigation"], .mobile-nav, .drawer, .mobile-menu');
+          for (const el of navEls) {
+            const style = getComputedStyle(el);
+            const rect = el.getBoundingClientRect();
+            if (style.display !== 'none' && style.visibility !== 'hidden' &&
+                parseFloat(style.opacity) > 0 && rect.height > 50) {
+              return true;
+            }
+          }
+          return false;
+        });
+
+        results.push({
+          test: 'Mobile nav toggle',
+          page: '/',
+          viewport: 'mobile',
+          passed: visibleNav,
+          details: visibleNav
+            ? 'Nav element became visible after clicking menu button'
+            : 'Nav element did NOT become visible after clicking menu button — toggle is broken',
+          screenshotBefore: beforePath,
+          screenshotAfter: afterPath,
+        });
+      } else {
+        results.push({
+          test: 'Mobile nav toggle',
+          page: '/',
+          viewport: 'mobile',
+          passed: true,
+          details: 'No mobile menu button found (may not apply to this site)',
+        });
+      }
+    } catch (err) {
+      results.push({
+        test: 'Mobile nav toggle',
+        page: '/',
+        viewport: 'mobile',
+        passed: false,
+        details: `Test crashed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+
+    // Test 2: Hover states on interactive elements (desktop)
+    await page.setViewportSize(VIEWPORTS.desktop);
+    try {
+      await page.goto(new URL('/', opts.baseUrl).href, { waitUntil: 'networkidle', timeout: 15000 });
+
+      // Find card-like interactive elements
+      const cards = await page.$$('a:has(> div), .card, [class*="card"], a[href]:has(img)');
+      const testCard = cards.length > 0 ? cards[0] : null;
+
+      if (testCard && await testCard.isVisible()) {
+        // Get initial styles
+        const beforeStyles = await testCard.evaluate((el) => {
+          const s = getComputedStyle(el);
+          return { transform: s.transform, boxShadow: s.boxShadow, opacity: s.opacity, backgroundColor: s.backgroundColor };
+        });
+
+        const beforePath = join(opts.outputDir, 'hover-before.png');
+        await page.screenshot({ path: beforePath });
+
+        await testCard.hover();
+        await page.waitForTimeout(400);
+
+        const afterPath = join(opts.outputDir, 'hover-after.png');
+        await page.screenshot({ path: afterPath });
+
+        const afterStyles = await testCard.evaluate((el) => {
+          const s = getComputedStyle(el);
+          return { transform: s.transform, boxShadow: s.boxShadow, opacity: s.opacity, backgroundColor: s.backgroundColor };
+        });
+
+        const styleChanged = beforeStyles.transform !== afterStyles.transform
+          || beforeStyles.boxShadow !== afterStyles.boxShadow
+          || beforeStyles.opacity !== afterStyles.opacity
+          || beforeStyles.backgroundColor !== afterStyles.backgroundColor;
+
+        results.push({
+          test: 'Hover state on interactive card',
+          page: '/',
+          viewport: 'desktop',
+          passed: styleChanged,
+          details: styleChanged
+            ? 'Card element changed visual state on hover'
+            : 'Card element did NOT change on hover — no visible hover feedback',
+          screenshotBefore: beforePath,
+          screenshotAfter: afterPath,
+        });
+      } else {
+        results.push({
+          test: 'Hover state on interactive card',
+          page: '/',
+          viewport: 'desktop',
+          passed: true,
+          details: 'No card-like interactive elements found on homepage',
+        });
+      }
+    } catch (err) {
+      results.push({
+        test: 'Hover state on interactive card',
+        page: '/',
+        viewport: 'desktop',
+        passed: false,
+        details: `Test crashed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+
+    // Test 3: Nav link validity — click each nav link and verify HTTP 200
+    await page.setViewportSize(VIEWPORTS.desktop);
+    try {
+      await page.goto(new URL('/', opts.baseUrl).href, { waitUntil: 'networkidle', timeout: 15000 });
+
+      const navLinks = await page.evaluate((base) => {
+        const links = Array.from(document.querySelectorAll('nav a[href], header a[href]'));
+        return links
+          .map(a => (a as HTMLAnchorElement).getAttribute('href'))
+          .filter((href): href is string => !!href && href.startsWith('/') && !href.startsWith('//'))
+          .filter((href, i, arr) => arr.indexOf(href) === i) // dedupe
+          .slice(0, 10); // cap at 10
+      }, opts.baseUrl);
+
+      let brokenLinks = 0;
+      const broken: string[] = [];
+      for (const href of navLinks) {
+        try {
+          const resp = await page.goto(new URL(href, opts.baseUrl).href, { waitUntil: 'domcontentloaded', timeout: 10000 });
+          if (!resp || resp.status() >= 400) {
+            brokenLinks++;
+            broken.push(`${href} → HTTP ${resp?.status() ?? 'timeout'}`);
+          }
+        } catch {
+          brokenLinks++;
+          broken.push(`${href} → timeout`);
+        }
+      }
+
+      results.push({
+        test: 'Nav link validity',
+        page: '/',
+        viewport: 'desktop',
+        passed: brokenLinks === 0,
+        details: brokenLinks === 0
+          ? `All ${navLinks.length} nav links returned HTTP 200`
+          : `${brokenLinks}/${navLinks.length} nav links broken: ${broken.join(', ')}`,
+      });
+    } catch (err) {
+      results.push({
+        test: 'Nav link validity',
+        page: '/',
+        viewport: 'desktop',
+        passed: false,
+        details: `Test crashed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+
+    await context.close();
+  } finally {
+    await browser.close();
+  }
+
+  const passed = results.filter(r => r.passed).length;
+  const report: InteractionTestReport = {
+    timestamp: new Date().toISOString(),
+    tests: results,
+    passed,
+    failed: results.length - passed,
+  };
+
+  await writeFile(
+    join(opts.outputDir, 'interaction-tests.json'),
+    JSON.stringify(report, null, 2),
+    'utf-8',
+  );
+
+  return report;
 }
 
 /**

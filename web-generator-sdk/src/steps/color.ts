@@ -92,9 +92,9 @@ Layout (Phase 2) and design (Phase 3) are physically impossible to regress if yo
 - Test on both light and dark themes
 
 ### Validation:
-1. Run: npm run typecheck
-2. Run: npx astro check
-3. Run: npm run build
+1. Run: bun run typecheck
+2. Run: bun x astro check
+3. Run: bun run build
 
 If all checks pass, output "COLOR_PHASE_PASSED".`;
 
@@ -104,6 +104,7 @@ If all checks pass, output "COLOR_PHASE_PASSED".`;
       env: ctx.env,
       stepName: ctx.name,
       logger: ctx.logger,
+      maxTurns: 100,
     });
 
     const passed = result.includes('COLOR_PHASE_PASSED');

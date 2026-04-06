@@ -8,6 +8,7 @@
 
 import { readdir, readFile, stat } from 'fs/promises';
 import { join, extname, relative } from 'path';
+import type { Registry } from '../types.js';
 
 // --- Types ---
 
@@ -101,10 +102,18 @@ function extractSrcs(content: string): Array<{ src: string; line: number }> {
   return results;
 }
 
-/** Build a set of known routes from the Astro project structure */
-async function buildKnownRoutes(srcDir: string): Promise<Set<string>> {
+/** Build a set of known routes from the Astro project structure and seeded registry/content */
+async function buildKnownRoutes(srcDir: string): Promise<{ routes: Set<string>; dynamicPatterns: RegExp[] }> {
   const routes = new Set<string>();
+  const dynamicPatterns: RegExp[] = [];
   const pagesDir = join(srcDir, 'src', 'pages');
+
+  const addRoute = (route: string | undefined) => {
+    if (!route) return;
+    const normalized = route === '/' ? '/' : route.replace(/\/+$/, '') || '/';
+    routes.add(normalized);
+    if (normalized !== '/') routes.add(`${normalized}/`);
+  };
 
   try {
     const pageFiles = await walkFiles(pagesDir, ['.astro', '.md', '.mdx']);
@@ -113,21 +122,78 @@ async function buildKnownRoutes(srcDir: string): Promise<Set<string>> {
       const ext = extname(relPath);
       let route = '/' + relPath.slice(0, -(ext.length));
 
-      // Dynamic routes: [slug] → we can't resolve these statically, skip
-      if (route.includes('[') && route.includes(']')) continue
+      // Dynamic routes: [slug] → build regex pattern + derive concrete routes from content/registry
+      if (route.includes('[') && route.includes(']')) {
+        // Convert /doctor-category/[specialty]/index → /doctor-category/[^/]+
+        let pattern = route.replace(/\/index$/, '');
+        pattern = pattern.replace(/\[\.{3}\w+\]/g, '.+'); // [...slug] → .+
+        pattern = pattern.replace(/\[\w+\]/g, '[^/]+'); // [slug] → [^/]+
+        dynamicPatterns.push(new RegExp(`^${pattern}$`));
+        continue;
+      }
 
-      // index.astro → /
       if (route.endsWith('/index')) {
         route = route.slice(0, -('/index'.length)) || '/';
       }
 
-      routes.add(route);
+      addRoute(route);
     }
   } catch {
     // pages dir might not exist yet
   }
 
-  return routes;
+  try {
+    const registry = JSON.parse(await readFile(join(srcDir, 'output/reduced/registry.json'), 'utf-8')) as Registry;
+
+    for (const staticPage of registry.static_pages || []) {
+      addRoute(staticPage.route);
+    }
+
+    for (const listing of Object.values(registry.listings || {})) {
+      if (!listing.route.includes('[') && !listing.route.includes(':')) {
+        addRoute(listing.route);
+      }
+    }
+  } catch {
+    // registry might not exist yet
+  }
+
+  try {
+    const staticPages = JSON.parse(await readFile(join(srcDir, 'src/data/static-pages.json'), 'utf-8')) as Array<{ route?: string }>;
+    for (const page of staticPages) {
+      addRoute(page.route);
+    }
+  } catch {
+    // static pages data might not exist yet
+  }
+
+  try {
+    const contentDir = join(srcDir, 'src', 'content');
+    const collections = await readdir(contentDir, { withFileTypes: true });
+    for (const entry of collections) {
+      if (!entry.isDirectory()) continue;
+      const collectionDir = join(contentDir, entry.name);
+      const files = await readdir(collectionDir, { withFileTypes: true });
+      for (const file of files) {
+        if (!file.isFile() || !file.name.endsWith('.json')) continue;
+        const slug = file.name.replace(/\.json$/, '');
+        const routes = entry.name === 'blog_posts'
+          ? [`/blog/${slug}`]
+          : entry.name === 'doctors'
+            ? [`/doctors/${slug}`, `/doctor/${slug}`]  // accept both singular and plural
+            : entry.name === 'legal_pages'
+              ? [`/legal/${slug}`]
+              : entry.name === 'pages'
+                ? [`/${slug}`]
+                : [`/${entry.name}/${slug}`];
+        for (const r of routes) addRoute(r);
+      }
+    }
+  } catch {
+    // content collections might not exist yet
+  }
+
+  return { routes, dynamicPatterns };
 }
 
 /** Read JSON data files and extract href values */
@@ -155,8 +221,8 @@ async function readDataHrefs(srcDir: string): Promise<Array<{ file: string; href
 
 function extractJsonHrefs(obj: unknown, file: string, results: Array<{ file: string; href: string }>): void {
   if (typeof obj === 'string') {
-    // Check if it looks like a URL/path
-    if (obj.startsWith('/') || obj.startsWith('http') || obj.startsWith('#')) {
+    // Check if it looks like a navigational URL/path; ignore obvious asset paths.
+    if ((obj.startsWith('/') || obj.startsWith('http') || obj.startsWith('#')) && !isAssetPath(obj)) {
       results.push({ file, href: obj });
     }
   } else if (Array.isArray(obj)) {
@@ -170,34 +236,57 @@ function extractJsonHrefs(obj: unknown, file: string, results: Array<{ file: str
 
 // --- Individual checks ---
 
-async function checkBrokenInternalLinks(srcDir: string): Promise<InvariantError[]> {
-  const errors: InvariantError[] = [];
-  const knownRoutes = await buildKnownRoutes(srcDir);
-  const dataHrefs = await readDataHrefs(srcDir);
+function isAssetPath(path: string): boolean {
+  const cleanPath = path.split('?')[0].split('#')[0].toLowerCase();
+  return cleanPath.startsWith('/images/')
+    || cleanPath.startsWith('/assets/')
+    || cleanPath.startsWith('/favicon.')
+    || /\.(png|jpe?g|gif|webp|svg|avif|ico|css|js|map|woff2?|ttf|otf|mp4|webm|pdf)$/i.test(cleanPath);
+}
 
-  // Check data JSON files for broken internal links
-  for (const { file, href } of dataHrefs) {
-    if (href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) continue;
-    if (href === '/' || href === '') continue;
-
-    // Strip query params and hash
-    const cleanPath = href.split('?')[0].split('#')[0];
-    // Handle trailing slash
-    const withSlash = cleanPath.endsWith('/') ? cleanPath : cleanPath + '/';
-    const withoutSlash = cleanPath.endsWith('/') ? cleanPath.slice(0, -1) : cleanPath;
-
-    if (!knownRoutes.has(cleanPath) && !knownRoutes.has(withSlash) && !knownRoutes.has(withoutSlash)) {
-      errors.push({
-        file,
-        check: 'broken-internal-links',
-        message: `Link "${href}" does not match any known route`,
-        severity: 'error',
-      });
+function isKnownInternalRoute(href: string, knownRoutes: Set<string>, dynamicPatterns?: RegExp[]): boolean {
+  const cleanPath = href.split('?')[0].split('#')[0];
+  const withSlash = cleanPath.endsWith('/') ? cleanPath : cleanPath + '/';
+  const withoutSlash = cleanPath.endsWith('/') ? cleanPath.slice(0, -1) : cleanPath;
+  if (knownRoutes.has(cleanPath) || knownRoutes.has(withSlash) || knownRoutes.has(withoutSlash)) return true;
+  // Check against dynamic route patterns (e.g. /doctor-category/[specialty]/ matches /doctor-category/all-doctors/)
+  if (dynamicPatterns) {
+    for (const pattern of dynamicPatterns) {
+      if (pattern.test(withoutSlash) || pattern.test(withSlash)) return true;
     }
   }
+  return false;
+}
 
-  // Check .astro source files for broken internal links
+async function checkBrokenInternalLinksInData(srcDir: string): Promise<InvariantError[]> {
+  const errors: InvariantError[] = [];
+  const { routes: knownRoutes, dynamicPatterns } = await buildKnownRoutes(srcDir);
+  const dataHrefs = await readDataHrefs(srcDir);
+
+  for (const { file, href } of dataHrefs) {
+    if (href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) continue;
+    if (isAssetPath(href)) continue;
+    if (href === '/' || href === '') continue;
+    if (isKnownInternalRoute(href, knownRoutes, dynamicPatterns)) continue;
+    // Fallback: try with /blog/ prefix (data sometimes omits it for blog post slugs)
+    if (isKnownInternalRoute(`/blog${href}`, knownRoutes, dynamicPatterns)) continue;
+
+    errors.push({
+      file,
+      check: 'broken-internal-links-data',
+      message: `Link "${href}" does not match any known route`,
+      severity: 'error',
+    });
+  }
+
+  return errors;
+}
+
+async function checkBrokenInternalLinksInAstro(srcDir: string): Promise<InvariantError[]> {
+  const errors: InvariantError[] = [];
+  const { routes: knownRoutes, dynamicPatterns } = await buildKnownRoutes(srcDir);
   const astroFiles = await walkFiles(join(srcDir, 'src'), ['.astro']);
+
   for (const file of astroFiles) {
     const content = await readFile(file, 'utf-8');
     const hrefs = extractHrefs(content);
@@ -205,24 +294,20 @@ async function checkBrokenInternalLinks(srcDir: string): Promise<InvariantError[
 
     for (const { href, line } of hrefs) {
       if (href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) continue;
+      if (isAssetPath(href)) continue;
       if (href === '/' || href === '' || href.startsWith('{')) continue;
 
       const cleanPath = href.split('?')[0].split('#')[0];
-      const withSlash = cleanPath.endsWith('/') ? cleanPath : cleanPath + '/';
-      const withoutSlash = cleanPath.endsWith('/') ? cleanPath.slice(0, -1) : cleanPath;
-
-      // Skip dynamic route segments
       if (cleanPath.includes('[')) continue;
+      if (isKnownInternalRoute(href, knownRoutes, dynamicPatterns)) continue;
 
-      if (!knownRoutes.has(cleanPath) && !knownRoutes.has(withSlash) && !knownRoutes.has(withoutSlash)) {
-        errors.push({
-          file: relFile,
-          line,
-          check: 'broken-internal-links',
-          message: `Link "${href}" does not match any known route`,
-          severity: 'error',
-        });
-      }
+      errors.push({
+        file: relFile,
+        line,
+        check: 'broken-internal-links-astro',
+        message: `Link "${href}" does not match any known route`,
+        severity: 'error',
+      });
     }
   }
 
@@ -232,6 +317,19 @@ async function checkBrokenInternalLinks(srcDir: string): Promise<InvariantError[
 async function checkDeadHashLinks(srcDir: string): Promise<InvariantError[]> {
   const errors: InvariantError[] = [];
   const astroFiles = await walkFiles(join(srcDir, 'src'), ['.astro']);
+  const projectIds = new Set<string>();
+
+  for (const file of astroFiles) {
+    const content = await readFile(file, 'utf-8');
+    for (const id of extractIds(content)) {
+      projectIds.add(id);
+      try {
+        projectIds.add(decodeURIComponent(id));
+      } catch {
+        // ignore malformed URI sequences
+      }
+    }
+  }
 
   for (const file of astroFiles) {
     const content = await readFile(file, 'utf-8');
@@ -243,15 +341,19 @@ async function checkDeadHashLinks(srcDir: string): Promise<InvariantError[]> {
       if (!href.startsWith('#') || href === '#' || href === '#top') continue;
 
       const targetId = href.slice(1);
-      // Decode URI-encoded hashes (e.g., #elementor-action%3A...)
-      const decodedId = decodeURIComponent(targetId);
+      let decodedId = targetId;
+      try {
+        decodedId = decodeURIComponent(targetId);
+      } catch {
+        decodedId = targetId;
+      }
 
-      if (!ids.has(targetId) && !ids.has(decodedId)) {
+      if (!ids.has(targetId) && !ids.has(decodedId) && !projectIds.has(targetId) && !projectIds.has(decodedId)) {
         errors.push({
           file: relFile,
           line,
           check: 'dead-hash-links',
-          message: `Hash link "${href}" — no element with id="${targetId}" found in this file`,
+          message: `Hash link "${href}" — no element with id="${targetId}" found in the project`,
           severity: 'error',
         });
       }
@@ -455,6 +557,104 @@ async function checkPageCount(srcDir: string, previousPageCount?: number): Promi
   return errors;
 }
 
+async function checkContentCollectionCompleteness(srcDir: string): Promise<InvariantError[]> {
+  const errors: InvariantError[] = [];
+  const contentDir = join(srcDir, 'src', 'content');
+
+  try {
+    const collections = await readdir(contentDir, { withFileTypes: true });
+    for (const entry of collections) {
+      if (!entry.isDirectory()) continue;
+      const collectionDir = join(contentDir, entry.name);
+      const files = await readdir(collectionDir, { withFileTypes: true });
+      for (const file of files) {
+        if (!file.isFile() || !file.name.endsWith('.json')) continue;
+        try {
+          const raw = await readFile(join(collectionDir, file.name), 'utf-8');
+          const data = JSON.parse(raw);
+          if (typeof data !== 'object' || data === null || Array.isArray(data)) continue;
+
+          let substantiveCount = 0;
+          for (const val of Object.values(data as Record<string, unknown>)) {
+            if (typeof val === 'string' && val.length > 20) {
+              substantiveCount++;
+            } else if (Array.isArray(val) && val.length > 0) {
+              substantiveCount++;
+            } else if (val && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 1) {
+              substantiveCount++;
+            }
+          }
+
+          if (substantiveCount < 2) {
+            errors.push({
+              file: relative(srcDir, join(collectionDir, file.name)),
+              check: 'content-collection-completeness',
+              message: `Content collection entry "${file.name}" is a stub (${substantiveCount} substantive field(s))`,
+              severity: 'error',
+            });
+          }
+        } catch {
+          // skip unparseable files
+        }
+      }
+    }
+  } catch {
+    // content dir might not exist yet
+  }
+
+  return errors;
+}
+
+async function checkNavRouteAlignment(srcDir: string): Promise<InvariantError[]> {
+  const errors: InvariantError[] = [];
+  const navPath = join(srcDir, 'src', 'data', 'navigation.json');
+
+  let navData: unknown;
+  try {
+    navData = JSON.parse(await readFile(navPath, 'utf-8'));
+  } catch {
+    // navigation.json doesn't exist or is unparseable — nothing to check
+    return errors;
+  }
+
+  const { routes: knownRoutes, dynamicPatterns } = await buildKnownRoutes(srcDir);
+
+  // Extract all url fields from the navigation tree
+  const navUrls: string[] = [];
+  function extractUrls(obj: unknown): void {
+    if (Array.isArray(obj)) {
+      for (const item of obj) extractUrls(item);
+    } else if (obj && typeof obj === 'object') {
+      const record = obj as Record<string, unknown>;
+      if (typeof record.url === 'string') {
+        navUrls.push(record.url);
+      }
+      for (const val of Object.values(record)) {
+        if (typeof val === 'object' && val !== null) extractUrls(val);
+      }
+    }
+  }
+  extractUrls(navData);
+
+  for (const url of navUrls) {
+    // Skip external, anchors, empty, root
+    if (url.startsWith('http') || url.startsWith('#') || url.startsWith('mailto:') || url.startsWith('tel:')) continue;
+    if (url === '/' || url === '') continue;
+    if (isAssetPath(url)) continue;
+
+    if (!isKnownInternalRoute(url, knownRoutes, dynamicPatterns)) {
+      errors.push({
+        file: relative(srcDir, navPath),
+        check: 'nav-route-alignment',
+        message: `Navigation URL "${url}" does not match any known route`,
+        severity: 'error',
+      });
+    }
+  }
+
+  return errors;
+}
+
 async function checkExternalLinks(srcDir: string): Promise<InvariantError[]> {
   const warnings: InvariantError[] = [];
   const allFiles = await walkFiles(join(srcDir, 'src'), ['.astro', '.json']);
@@ -509,16 +709,19 @@ async function checkExternalLinks(srcDir: string): Promise<InvariantError[]> {
  * literally cannot fix the issue.
  */
 const PHASE_CHECKS: Record<string, string[]> = {
-  // Phases that only touch layout/CSS — skip data-level checks
-  layout: ['dead-hash-links', 'empty-pages', 'broken-images', 'page-count'],
-  design: ['dead-hash-links', 'empty-pages', 'broken-images', 'page-count'],
-  color: ['dead-hash-links', 'empty-pages', 'broken-images', 'page-count'],
-  motion: ['dead-hash-links', 'empty-pages', 'broken-images', 'page-count'],
+  // Early UI phases only own CSS/HTML — they cannot fix data files from the seed step.
+  // content-collection-completeness and nav-route-alignment are data-level checks
+  // that only the seed step can address; running them here causes infinite retry loops.
+  layout: ['broken-internal-links-astro', 'empty-pages', 'broken-images', 'page-count'],
+  mobile: ['broken-internal-links-astro', 'empty-pages', 'broken-images', 'page-count'],
+  design: ['empty-pages', 'broken-images', 'page-count'],
+  color: ['empty-pages', 'broken-images', 'page-count'],
+  motion: ['empty-pages', 'broken-images', 'page-count'],
   // Polish phase is the final gate — run everything
   polish: [
-    'broken-internal-links', 'dead-hash-links', 'empty-pages',
+    'broken-internal-links-astro', 'broken-internal-links-data', 'dead-hash-links', 'empty-pages',
     'source-origin-leakage', 'broken-images', 'interactive-elements',
-    'page-count', 'external-links',
+    'page-count', 'external-links', 'content-collection-completeness', 'nav-route-alignment',
   ],
 };
 
@@ -529,7 +732,8 @@ export async function runAllInvariants(options: InvariantOptions): Promise<Invar
   const allWarnings: InvariantError[] = [];
 
   const checks: Array<{ name: string; run: () => Promise<InvariantError[]> }> = [
-    { name: 'broken-internal-links', run: () => checkBrokenInternalLinks(srcDir) },
+    { name: 'broken-internal-links-astro', run: () => checkBrokenInternalLinksInAstro(srcDir) },
+    { name: 'broken-internal-links-data', run: () => checkBrokenInternalLinksInData(srcDir) },
     { name: 'dead-hash-links', run: () => checkDeadHashLinks(srcDir) },
     { name: 'empty-pages', run: () => checkEmptyPages(srcDir) },
     { name: 'source-origin-leakage', run: () => checkSourceOriginLeakage(srcDir, sourceOrigin) },
@@ -537,6 +741,8 @@ export async function runAllInvariants(options: InvariantOptions): Promise<Invar
     { name: 'interactive-elements', run: () => checkInteractiveElements(srcDir) },
     { name: 'page-count', run: () => checkPageCount(srcDir, previousPageCount) },
     { name: 'external-links', run: () => checkExternalLinks(srcDir) },
+    { name: 'content-collection-completeness', run: () => checkContentCollectionCompleteness(srcDir) },
+    { name: 'nav-route-alignment', run: () => checkNavRouteAlignment(srcDir) },
   ];
 
   // Determine which checks to run: explicit onlyChecks > phase-based > all

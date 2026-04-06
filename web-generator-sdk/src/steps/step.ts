@@ -6,7 +6,7 @@
  * Each phase has an approval gate that must pass before proceeding.
  */
 
-import type { ScraperOutput } from '../types.js';
+import type { InteractionManifest, ScraperOutput, StepConfigOverride } from '../types.js';
 import type { PipelineLogger } from '../lib/logger.js';
 
 export interface StepEnvOverride {
@@ -40,6 +40,19 @@ export interface StepContext {
   env: Record<string, string>;
   logger?: PipelineLogger;
   /** Prior reviewer rejection feedback, available on retry iterations */
+  rejectionContext?: string;
+  interactionManifest?: InteractionManifest;
+  /** Step-specific config overrides from cui.json */
+  stepConfig?: StepConfigOverride;
+}
+
+export type CheckStage = 'contract' | 'regression' | 'runtime' | 'review' | 'advisory';
+
+export interface CheckStatus {
+  status: 'completed' | 'failed';
+  stage: CheckStage;
+  reportPath?: string;
+  summary: string;
   rejectionContext?: string;
 }
 
@@ -78,6 +91,7 @@ export type PhaseId =
   | 'analyze'
   | 'structure'
   | 'layout'
+  | 'mobile'
   | 'design'
   | 'color'
   | 'motion'
@@ -94,8 +108,8 @@ export interface PhaseGate {
   steps: Step[];
   /** Whether this phase has an iteration loop for validation + fix */
   maxRetries?: number;
-  /** Validation step that acts as the gate */
-  gateStep?: Step;
+  /** Whether runtime browser checks should run for this phase */
+  runRuntimeChecks?: boolean;
 }
 
 /** The v2 pipeline is an ordered list of phases */

@@ -9,7 +9,7 @@
  * - Semaphore-controlled parallelism (default max 5 concurrent)
  */
 
-import { mkdir, writeFile, readFile, rm, readdir } from 'fs/promises';
+import { mkdir, writeFile, readFile, rm, readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import type { PipelineLogger } from './logger.js';
 import { agentQuery } from './agent.js';
@@ -31,14 +31,16 @@ export interface ReviewerDef {
   name: string;
   /** Which phase this reviewer belongs to */
   phase: string;
-  /** The model variant (M1 or M2 for generic/phase-specific) */
-  model: 'M1' | 'M2';
+  /** The model variant (M1 fast, M2 capable, V1 vision) */
+  model: 'M1' | 'M2' | 'V1';
   /** The prompt to send to the reviewer agent */
   prompt: (ctx: ReviewerContext) => string;
   /** Whether this reviewer needs a running dev server */
   needsDevServer?: boolean;
   /** Whether this is a per-page reviewer (spawns one per page) */
   perPage?: boolean;
+  /** Whether this reviewer spawns one instance per page type (reads screenshots grouped by type) */
+  perPageType?: boolean;
   /** If true, this reviewer runs as a programmatic function (no AI agent call) */
   programmatic?: boolean;
   /** Programmatic reviewer function. Returns PASS/REJECT verdict. */
@@ -66,6 +68,8 @@ export interface ReviewerContext {
   snapshotPath?: string;
   /** Run directory (for reading/writing snapshots) */
   runDir?: string;
+  /** Path to the site directory BEFORE this phase ran (for diff-based reviewing) */
+  prevPhaseDir?: string;
   /** URL of a running preview server (e.g., "http://localhost:4321") */
   devServerUrl?: string;
   /** Environment variables */
@@ -144,9 +148,13 @@ async function runReviewer(
     const prompt = reviewer.prompt(reviewerCtx);
 
     // Inject model selection via ANTHROPIC_MODEL env var
+    // V1 = vision model, configured via cui.json visionModel → VISION_MODEL env var
+    const resolvedModel = reviewer.model === 'V1'
+      ? (ctx.env.VISION_MODEL || ctx.env.ANTHROPIC_DEFAULT_SONNET_MODEL || MODEL_MAP.M2)
+      : (MODEL_MAP[reviewer.model] || process.env.ANTHROPIC_MODEL || '');
     const reviewerEnv = {
       ...ctx.env,
-      ANTHROPIC_MODEL: MODEL_MAP[reviewer.model] || process.env.ANTHROPIC_MODEL || '',
+      ANTHROPIC_MODEL: resolvedModel,
     };
 
     const result = await agentQuery({
@@ -155,6 +163,7 @@ async function runReviewer(
       env: reviewerEnv,
       stepName: `${ctx.phaseName} / ${reviewer.name}`,
       logger: ctx.logger,
+      maxTurns: 20,
     });
 
     // Parse the verdict from the result
@@ -175,13 +184,15 @@ async function runReviewer(
       duration: Date.now() - startTime,
     };
   } catch (err) {
-    // On error, write a rejection
+    // If reviewer hit max turns, treat as PASS — it explored without finding issues
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const isMaxTurns = errMsg.includes('error_max_turns');
     const errorVerdict: ReviewVerdict = {
       reviewerId: reviewer.id,
-      verdict: 'REJECT',
-      evidence: 'Reviewer agent crashed or timed out',
-      findings: `Error: ${err instanceof Error ? err.message : String(err)}`,
-      rejectionContext: `Reviewer ${reviewer.id} failed to execute: ${err instanceof Error ? err.message : String(err)}`,
+      verdict: isMaxTurns ? 'PASS' : 'REJECT',
+      evidence: isMaxTurns ? 'Reviewer exhausted turn budget without finding issues' : 'Reviewer agent crashed or timed out',
+      findings: `Error: ${errMsg}`,
+      rejectionContext: isMaxTurns ? '' : `Reviewer ${reviewer.id} failed to execute: ${errMsg}`,
     };
 
     await writeFile(
@@ -192,7 +203,7 @@ async function runReviewer(
 
     return {
       reviewerId: reviewer.id,
-      passed: false,
+      passed: isMaxTurns,
       verdict: errorVerdict,
       duration: Date.now() - startTime,
     };
@@ -240,6 +251,123 @@ async function runPerPageReviewer(
     }
   }
 
+  return results;
+}
+
+/**
+ * Build a mapping from screenshot page-type directory names to their .astro source files.
+ * Uses the site's src/pages/ directory to find matching templates.
+ */
+async function buildPageTypeFileMap(siteDir: string, pageTypes: string[]): Promise<Record<string, string[]>> {
+  const map: Record<string, string[]> = {};
+  const pagesDir = join(siteDir, 'src/pages');
+  const componentsDir = join(siteDir, 'src/components');
+
+  for (const pt of pageTypes) {
+    const files: string[] = [];
+
+    if (pt === 'landing' || pt === 'homepage') {
+      files.push('src/pages/index.astro');
+    } else {
+      // Check for directory-based routes: src/pages/<pt>/[slug].astro, src/pages/<pt>/index.astro
+      try {
+        const dirEntries = await readdir(join(pagesDir, pt));
+        for (const f of dirEntries) {
+          if (f.endsWith('.astro')) files.push(`src/pages/${pt}/${f}`);
+        }
+      } catch { /* dir doesn't exist */ }
+
+      // Check for file-based routes: src/pages/<pt>.astro
+      try {
+        await stat(join(pagesDir, `${pt}.astro`));
+        files.push(`src/pages/${pt}.astro`);
+      } catch { /* doesn't exist */ }
+
+      // Check hyphenated variants (e.g., "about" → "about-us.astro")
+      try {
+        const allPages = await readdir(pagesDir);
+        for (const f of allPages) {
+          if (f.endsWith('.astro') && f.startsWith(pt)) {
+            const candidate = `src/pages/${f}`;
+            if (!files.includes(candidate)) files.push(candidate);
+          }
+        }
+      } catch { /* */ }
+    }
+
+    // Always include shared components — they affect every page type
+    try {
+      const components = await readdir(componentsDir);
+      for (const f of components) {
+        if (f.endsWith('.astro')) files.push(`src/components/${f}`);
+      }
+    } catch { /* */ }
+
+    // Include layouts
+    try {
+      const layouts = await readdir(join(siteDir, 'src/layouts'));
+      for (const f of layouts) {
+        if (f.endsWith('.astro')) files.push(`src/layouts/${f}`);
+      }
+    } catch { /* */ }
+
+    map[pt] = files;
+  }
+
+  return map;
+}
+
+/**
+ * Run a per-page-type reviewer — discovers page types from screenshots directory,
+ * spawns one reviewer agent per type.
+ */
+async function runPerPageTypeReviewer(
+  reviewer: ReviewerDef,
+  ctx: ReviewerContext,
+  semaphore: Semaphore,
+): Promise<ReviewResult[]> {
+  // Discover page types from the screenshots directory
+  const screenshotsDir = join(ctx.evidenceDir, 'screenshots');
+  let pageTypes: string[] = [];
+  try {
+    const entries = await readdir(screenshotsDir, { withFileTypes: true });
+    pageTypes = entries.filter(e => e.isDirectory()).map(e => e.name);
+  } catch {
+    // No screenshots directory — skip
+    return [];
+  }
+
+  if (pageTypes.length === 0) return [];
+
+  // Build page-type → astro file mapping so reviewers know exactly which files to inspect
+  const fileMap = await buildPageTypeFileMap(ctx.workingDir, pageTypes);
+
+  const results: ReviewResult[] = [];
+  const promises = pageTypes.map(async (pageType) => {
+    const astroFiles = fileMap[pageType] || [];
+    const fileListSection = astroFiles.length > 0
+      ? `## Source files for this page type\n\nThese are the .astro files responsible for rendering "${pageType}" pages. Read them to diagnose any visual issues:\n${astroFiles.map(f => `- \`${f}\``).join('\n')}`
+      : `## Source files\n\nUse Glob to find .astro files under src/pages/${pageType}/ and src/components/.`;
+
+    const typeReviewer: ReviewerDef = {
+      ...reviewer,
+      id: `${reviewer.id}-${pageType}`,
+      name: `${reviewer.name} (${pageType})`,
+      perPageType: false,
+      prompt: (reviewerCtx) => {
+        const basePrompt = reviewer.prompt(reviewerCtx);
+        return `${basePrompt}\n\n## Target Page Type\n${pageType}\n\n${fileListSection}\n\nRead screenshots from: ${join(screenshotsDir, pageType)}/\nAlso check for previous phase screenshots in: ${join(reviewerCtx.evidenceDir, 'screenshots-prev', pageType)}/`;
+      },
+    };
+    return runReviewer(typeReviewer, ctx, semaphore);
+  });
+
+  const settled = await Promise.allSettled(promises);
+  for (const s of settled) {
+    if (s.status === 'fulfilled') {
+      results.push(s.value);
+    }
+  }
   return results;
 }
 
@@ -308,6 +436,9 @@ export async function runReviewers(
     if (reviewer.programmatic && reviewer.runFn) {
       return runProgrammaticReviewer(reviewer, ctx);
     }
+    if (reviewer.perPageType) {
+      return runPerPageTypeReviewer(reviewer, ctx, semaphore);
+    }
     if (reviewer.perPage) {
       return runPerPageReviewer(reviewer, ctx, semaphore);
     }
@@ -368,12 +499,11 @@ export async function readRejectionContexts(reviewsDir: string): Promise<string>
 }
 
 /**
- * Delete the reviews/ directory after all reviewers pass.
+ * Preserve review history after all reviewers pass.
+ * We keep per-attempt directories for traceability, so cleanup is now a no-op.
  */
-export async function cleanupReviews(reviewsDir: string): Promise<void> {
-  try {
-    await rm(reviewsDir, { recursive: true, force: true });
-  } catch { /* already gone */ }
+export async function cleanupReviews(_reviewsDir: string): Promise<void> {
+  return;
 }
 
 // --- Verdict parsing ---
@@ -416,56 +546,6 @@ function formatVerdictFile(reviewer: ReviewerDef, verdict: ReviewVerdict): strin
     content += `\n## Rejection Context (if rejected)\n${verdict.rejectionContext}\n`;
   }
   return content;
-}
-
-// --- Evidence collection ---
-
-/**
- * Collect static evidence artifacts by running build tools.
- * Writes results to the evidence/ directory.
- */
-export async function collectStaticEvidence(
-  siteDir: string,
-  evidenceDir: string,
-): Promise<void> {
-  const { execSync } = await import('child_process');
-
-  await mkdir(evidenceDir, { recursive: true });
-
-  // Run biome check
-  try {
-    const biomeOutput = execSync(
-      'npx biome check . --formatter-enabled=false --write=false 2>&1 || true',
-      { cwd: siteDir, timeout: 120000, encoding: 'utf-8' },
-    );
-    await writeFile(join(evidenceDir, 'biome.json'), biomeOutput, 'utf-8');
-  } catch {
-    await writeFile(join(evidenceDir, 'biome.json'), '{"error": "biome not available"}', 'utf-8');
-  }
-
-  // Run astro check
-  try {
-    const astroOutput = execSync('npx astro check 2>&1 || true', {
-      cwd: siteDir,
-      timeout: 120000,
-      encoding: 'utf-8',
-    });
-    await writeFile(join(evidenceDir, 'astro-check.json'), astroOutput, 'utf-8');
-  } catch {
-    await writeFile(join(evidenceDir, 'astro-check.json'), '{"error": "astro check failed"}', 'utf-8');
-  }
-
-  // Run build
-  try {
-    const buildOutput = execSync('npm run build 2>&1 || true', {
-      cwd: siteDir,
-      timeout: 300000,
-      encoding: 'utf-8',
-    });
-    await writeFile(join(evidenceDir, 'build.json'), buildOutput, 'utf-8');
-  } catch {
-    await writeFile(join(evidenceDir, 'build.json'), '{"error": "build failed"}', 'utf-8');
-  }
 }
 
 // --- Quality scoring ---

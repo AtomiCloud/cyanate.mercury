@@ -7,6 +7,13 @@
  */
 
 import { z } from 'zod';
+import type { InteractionManifest, ReducedMeta, Registry } from '../types.js';
+import {
+  formatSemanticIssues,
+  validateInteractionManifest,
+  validateReducedMetaSemantics,
+  validateRegistrySemantics,
+} from './semantics.js';
 
 // --- Registry Schema ---
 
@@ -60,7 +67,7 @@ export const RegistrySchema = z.object({
     z.record(z.string(), CollectionDefSchema),
     z.array(CollectionDefSchema.extend({ name: z.string().optional(), id: z.string().optional() })),
   ]),
-  static_pages: z.array(StaticPageSchema).min(1, 'Registry must have at least one static page'),
+  static_pages: z.array(StaticPageSchema).default([]),
   listings: z.record(z.string(), ListingDefSchema).optional().default({}),
   navigation: z.object({}).passthrough().optional(),
 }).passthrough();
@@ -95,16 +102,62 @@ export const DesignTokensSchema = z.object({
   visualIdentity: z.object({}).passthrough(),
 }).passthrough();
 
+export const InteractionPatternSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(['fragment', 'modal', 'accordion', 'tabs', 'search', 'filter', 'form', 'popup', 'other']),
+  trigger: z.string().optional(),
+  target: z.string().optional(),
+  pageType: z.string().optional(),
+  route: z.string().optional(),
+  description: z.string().min(1),
+}).passthrough();
+
+export const InteractionManifestSchema = z.object({
+  patterns: z.array(InteractionPatternSchema).default([]),
+  pages: z.array(z.object({
+    route: z.string().min(1),
+    ids: z.array(z.string()).default([]),
+    triggers: z.array(z.string()).default([]),
+  })).default([]),
+}).passthrough();
+
 // --- Validation helpers ---
 
 export function validateRegistry(data: unknown): z.infer<typeof RegistrySchema> {
   return RegistrySchema.parse(data);
 }
 
+export function validateRegistryWithMeta(data: unknown, meta: ReducedMeta): Registry {
+  const parsed = RegistrySchema.parse(data) as unknown as Registry;
+  const issues = validateRegistrySemantics(parsed, meta);
+  if (issues.length > 0) {
+    throw new Error(formatSemanticIssues('Registry semantic validation failed', issues));
+  }
+  return parsed;
+}
+
 export function validateReducedMeta(data: unknown): z.infer<typeof ReducedMetaSchema> {
   return ReducedMetaSchema.parse(data);
 }
 
+export function validateReducedMetaStrict(data: unknown): ReducedMeta {
+  const parsed = ReducedMetaSchema.parse(data) as unknown as ReducedMeta;
+  const issues = validateReducedMetaSemantics(parsed);
+  if (issues.length > 0) {
+    throw new Error(formatSemanticIssues('Reduced meta semantic validation failed', issues));
+  }
+  return parsed;
+}
+
 export function validateDesignTokens(data: unknown): z.infer<typeof DesignTokensSchema> {
   return DesignTokensSchema.parse(data);
+}
+
+export function validateInteractionManifestData(data: unknown, registry?: Registry): InteractionManifest {
+  const parsed = InteractionManifestSchema.parse(data) as unknown as InteractionManifest;
+  const issues = validateInteractionManifest(parsed, registry);
+  if (issues.length > 0) {
+    throw new Error(formatSemanticIssues('Interaction manifest validation failed', issues));
+  }
+  return parsed;
 }

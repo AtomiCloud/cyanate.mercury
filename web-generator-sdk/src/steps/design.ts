@@ -95,12 +95,12 @@ Override all color CSS variables to neutral grays:
 \`\`\`
 
 ### Install any needed Shadcn components:
-Use: npx shadcn add [component] for each component in the recipes (button, card, input, badge, etc.)
+Use: bunx --bun shadcn add [component] for each component in the recipes (button, card, input, badge, etc.)
 
 ### Validation:
-1. Run: npm run typecheck
-2. Run: npx astro check
-3. Run: npm run build
+1. Run: bun run typecheck
+2. Run: bun x astro check
+3. Run: bun run build
 
 If all checks pass, output "DESIGN_PHASE_PASSED".`;
 
@@ -110,6 +110,7 @@ If all checks pass, output "DESIGN_PHASE_PASSED".`;
       env: ctx.env,
       stepName: ctx.name,
       logger: ctx.logger,
+      maxTurns: 100,
     });
 
     const passed = result.includes('DESIGN_PHASE_PASSED');

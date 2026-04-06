@@ -40,7 +40,9 @@ export const reduceStep: Step = {
     const startTime = Date.now();
 
     const structure = ctx.scraperOutput.structure;
-    const schema = ctx.scraperOutput.schema;
+    const rawSchema = ctx.scraperOutput.schema;
+    // Schema may be wrapped in a `pages` key depending on scraper version
+    const schema: typeof rawSchema = (rawSchema as any).pages ?? rawSchema;
     const content = ctx.scraperOutput.content;
 
     const outputDir = join(workingDir, 'output/reduced');
@@ -54,9 +56,9 @@ export const reduceStep: Step = {
       grouped.set(page.pagetype, list);
     }
 
-    // Detect global keys (present in >90% of page types)
+    // Detect global keys (present in >50% of page types, or well-known global names)
     const pageTypes = Array.from(grouped.keys());
-    const threshold = Math.ceil(pageTypes.length * 0.9);
+    const threshold = Math.ceil(pageTypes.length * 0.5);
     const keyCounts = new Map<string, number>();
     for (const [pagetype] of grouped) {
       const schemaKeys = Object.keys(schema[pagetype]?.properties || {});
@@ -64,8 +66,10 @@ export const reduceStep: Step = {
         keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
       }
     }
+    // Well-known global field names — always treat as global if they appear in ANY page type
+    const WELL_KNOWN_GLOBALS = new Set(['header', 'footer', 'navigation', 'nav', 'floating_widgets', 'sidebar']);
     const globalKeys = Array.from(keyCounts.entries())
-      .filter(([, count]) => count >= threshold)
+      .filter(([key, count]) => count >= threshold || WELL_KNOWN_GLOBALS.has(key))
       .map(([key]) => key);
 
     // Build page type info

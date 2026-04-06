@@ -193,7 +193,7 @@ export async function readPreviousSnapshot(
   currentPhase: PhaseId,
   runDir: string,
 ): Promise<PhaseSnapshot | null> {
-  const phaseOrder: PhaseId[] = ['analyze', 'structure', 'layout', 'design', 'color', 'motion', 'polish'];
+  const phaseOrder: PhaseId[] = ['analyze', 'structure', 'layout', 'mobile', 'design', 'color', 'motion', 'polish'];
   const currentIdx = phaseOrder.indexOf(currentPhase);
   if (currentIdx <= 0) return null;
 

@@ -14,19 +14,23 @@ import type { SDKResultMessage, SDKAssistantMessage, SDKMessage, SDKToolProgress
 import { appendFile } from 'fs/promises';
 import { join } from 'path';
 import type { PipelineLogger } from './logger.js';
+import { rtkHookMatcher, rtkStats } from './rtk-hook.js';
 
 /** Frozen snapshot of process.env at module load time.
  *  Avoids race conditions when multiple agents read process.env concurrently. */
 const frozenProcessEnv: Record<string, string | undefined> = { ...process.env };
 
+const HEARTBEAT_TIMEOUT_MS = 900_000; // 15 min — high-context agents (5M+ tokens) can have long API waits
+
 const SYSTEM_PROMPT = `You are the Web Generator Orchestrator v2. Your role is to coordinate the phased generation of Astro.js projects from scraped website data.
 
 ## Pipeline Architecture v2
 
-The pipeline has 7 independent phases, each with its own validator:
+The pipeline has 8 independent phases, each with its own validator:
 - Phase 0: ANALYZE — style fingerprint, 7-layer design tokens, component recipes
 - Phase 1: STRUCTURE — reduce, classify, seed (content collections)
-- Phase 2: LAYOUT — grid/flex/spacing (gray-box, no color/typography)
+- Phase 2: LAYOUT — grid/flex/spacing (gray-box, desktop/tablet baseline only)
+- Phase 2b: MOBILE — small-screen stacking, overflow fixes, mobile navigation and interaction ergonomics
 - Phase 3: DESIGN — typography/components/surfaces (neutral grays only)
 - Phase 4: COLOR — color system, light+dark theme, WCAG contrast
 - Phase 5: MOTION — transitions, hover/focus states, scroll reveals, reduced-motion
@@ -39,7 +43,7 @@ The pipeline has 7 independent phases, each with its own validator:
 3. **Style-aware generation** — The style fingerprint drives all decisions: density, formality, motion, depth.
 4. **Content collections** — Multi-instance pages use Astro content collections with [slug] routing, not flat content.json queries.
 5. **OKLCH colors** — All color values use OKLCH format.
-6. **Shadcn components** — Install with: npx shadcn add [component]
+6. **Shadcn components** — Install with: bunx --bun shadcn add [component]
 
 ## Phase Constraints
 
@@ -51,7 +55,10 @@ When you receive a prompt specifying a phase, you MUST:
 
 ## Error Handling
 
-If any step fails, log the error and retry up to 3 times before giving up.`;
+Use focused fixes, not blind retries.
+- Diagnose the latest concrete failure before changing code again.
+- Do not install, remove, or upgrade dependencies unless the phase prompt explicitly requires it.
+- Once build/typecheck succeed for the current phase objective, stop making changes and report success.`;
 
 export interface AgentQueryOptions {
   prompt: string;
@@ -80,6 +87,10 @@ async function runQuery(
 ): Promise<string> {
   const startTime = Date.now();
 
+  // Reset RTK stats for this agent run
+  rtkStats.checked = 0;
+  rtkStats.rewritten = 0;
+
   const result = query({
     prompt,
     options: {
@@ -92,6 +103,9 @@ async function runQuery(
       maxTurns,
       env: env ? { ...frozenProcessEnv, ...env } : undefined,
       debugFile: join(cwd, 'agent-debug.log'),
+      hooks: {
+        PreToolUse: [rtkHookMatcher],
+      },
     },
   });
 
@@ -100,6 +114,7 @@ async function runQuery(
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let totalCost = 0;
+  let lastHeartbeatAt = Date.now();
 
   const eventLog = join(cwd, 'agent-events.jsonl');
   const logEvent = (event: Record<string, unknown>) => {
@@ -108,69 +123,110 @@ async function runQuery(
 
   // If no logger provided, use a minimal internal one for non-interactive
   const log = logger || createFallbackLogger(stepName, startTime);
+  const recordHeartbeat = () => {
+    lastHeartbeatAt = Date.now();
+  };
+  const iterator = result[Symbol.asyncIterator]();
 
-  for await (const message of result) {
-    const msg = message as SDKMessage;
+  const nextMessageWithTimeout = async () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        iterator.next(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            const idleMs = Date.now() - lastHeartbeatAt;
+            logEvent({ type: 'timeout', step: stepName, idleMs, timeoutMs: HEARTBEAT_TIMEOUT_MS });
+            reject(new Error(`${stepName} timed out: no heartbeat for ${formatHeartbeatDuration(idleMs)}`));
+          }, HEARTBEAT_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
 
-    if (msg.type === 'assistant') {
-      turnCount++;
-      const assistantMsg = message as SDKAssistantMessage;
-      const usage = assistantMsg.message?.usage;
-      if (usage) {
-        totalInputTokens += (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
-        totalOutputTokens += usage.output_tokens || 0;
-      }
-      log.updateTurn(turnCount, totalInputTokens, totalOutputTokens);
+  try {
+    while (true) {
+      const nextMessage = await nextMessageWithTimeout();
+      if (nextMessage.done) break;
 
-      // Extract tool calls from the assistant message content
-      const content = assistantMsg.message?.content;
-      const tools: string[] = [];
-      if (Array.isArray(content)) {
-        for (const block of content) {
-          if (block.type === 'tool_use') {
-            const tb = block as { name?: string; input?: Record<string, unknown> };
-            const snippet = tb.name === 'Bash'
-              ? (tb.input?.command as string || '').slice(0, 120)
-              : tb.name === 'Write' || tb.name === 'Edit'
-                ? (tb.input?.file_path as string || '')
-                : tb.name === 'Read'
+      const message = nextMessage.value;
+      const msg = message as SDKMessage;
+
+      if (msg.type === 'assistant') {
+        turnCount++;
+        const assistantMsg = message as SDKAssistantMessage;
+        const usage = assistantMsg.message?.usage;
+        if (usage) {
+          totalInputTokens += (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+          totalOutputTokens += usage.output_tokens || 0;
+        }
+        log.updateTurn(turnCount, totalInputTokens, totalOutputTokens);
+
+        const content = assistantMsg.message?.content;
+        const tools: string[] = [];
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'tool_use') {
+              const tb = block as { name?: string; input?: Record<string, unknown> };
+              const snippet = tb.name === 'Bash'
+                ? (tb.input?.command as string || '').slice(0, 120)
+                : tb.name === 'Write' || tb.name === 'Edit'
                   ? (tb.input?.file_path as string || '')
-                  : tb.name === 'Grep'
-                    ? (tb.input?.pattern as string || '')
-                    : '';
-            tools.push(snippet ? `${tb.name}(${snippet})` : (tb.name || 'unknown'));
+                  : tb.name === 'Read'
+                    ? (tb.input?.file_path as string || '')
+                    : tb.name === 'Grep'
+                      ? (tb.input?.pattern as string || '')
+                      : '';
+              tools.push(snippet ? `${tb.name}(${snippet})` : (tb.name || 'unknown'));
+            }
           }
         }
-      }
-      logEvent({ type: 'turn', turn: turnCount, tools, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, elapsed: Math.round((Date.now() - startTime) / 1000) });
-
-    } else if (msg.type === 'tool_use_summary') {
-      const toolMsg = msg as unknown as SDKToolUseSummaryMessage;
-      logEvent({ type: 'tool_done', summary: toolMsg.summary });
-
-    } else if (msg.type === 'tool_progress') {
-      const toolMsg = msg as unknown as SDKToolProgressMessage;
-      logEvent({ type: 'tool_progress', tool: toolMsg.tool_name, elapsed: toolMsg.elapsed_time_seconds });
-
-    } else if (msg.type === 'result') {
-      const resultMsg = message as SDKResultMessage;
-      if (resultMsg.subtype === 'success') {
-        output = resultMsg.result;
-        turnCount = resultMsg.num_turns || turnCount;
-        totalCost = resultMsg.total_cost_usd || 0;
-        if (totalInputTokens === 0 && resultMsg.usage) {
-          totalInputTokens = resultMsg.usage.input_tokens || 0;
-          totalOutputTokens = resultMsg.usage.output_tokens || 0;
+        logEvent({ type: 'turn', turn: turnCount, tools, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, elapsed: Math.round((Date.now() - startTime) / 1000) });
+        recordHeartbeat();
+      } else if (msg.type === 'tool_use_summary') {
+        const toolMsg = msg as unknown as SDKToolUseSummaryMessage;
+        logEvent({ type: 'tool_done', summary: toolMsg.summary });
+        recordHeartbeat();
+      } else if (msg.type === 'tool_progress') {
+        const toolMsg = msg as unknown as SDKToolProgressMessage;
+        logEvent({ type: 'tool_progress', tool: toolMsg.tool_name, elapsed: toolMsg.elapsed_time_seconds });
+        recordHeartbeat();
+      } else if (msg.type === 'result') {
+        const resultMsg = message as SDKResultMessage;
+        if (resultMsg.subtype === 'success') {
+          output = resultMsg.result;
+          turnCount = resultMsg.num_turns || turnCount;
+          totalCost = resultMsg.total_cost_usd || 0;
+          if (totalInputTokens === 0 && resultMsg.usage) {
+            totalInputTokens = resultMsg.usage.input_tokens || 0;
+            totalOutputTokens = resultMsg.usage.output_tokens || 0;
+          }
+          recordHeartbeat();
+        } else {
+          const errorMsg = (resultMsg as any).errors?.join('; ')
+            || (resultMsg as any).result
+            || `Unknown error (subtype: ${String(resultMsg.subtype)})`;
+          throw new Error(`${stepName} failed: ${errorMsg}`);
         }
-      } else {
-        const errorMsg = (resultMsg as any).errors?.join('; ') || 'Unknown error';
-        throw new Error(`${stepName} failed: ${errorMsg}`);
       }
     }
-  }
 
-  log.completeStep(totalCost);
-  return output;
+    logEvent({ type: 'rtk', checked: rtkStats.checked, rewritten: rtkStats.rewritten });
+    log.completeStep(totalCost);
+    return output;
+  } finally {
+    await iterator.return?.();
+  }
+}
+
+function formatHeartbeatDuration(ms: number): string {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return remainder === 0 ? `${minutes}m` : `${minutes}m ${remainder}s`;
 }
 
 function createFallbackLogger(stepName: string, startTime: number): PipelineLogger {

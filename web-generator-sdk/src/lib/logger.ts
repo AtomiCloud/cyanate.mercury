@@ -57,6 +57,10 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function formatCompactTurnCount(turns: number): string {
+  return turns === 1 ? 'turn 1' : `turns ${turns}`;
+}
+
 function pad(s: string, width: number, align: 'left' | 'right' = 'left'): string {
   const str = String(s);
   if (str.length >= width) return str.slice(0, width);
@@ -238,45 +242,47 @@ class InteractiveLogger implements PipelineLogger {
     const allSteps = [...this.steps];
     if (this.currentStep) allSteps.push(this.currentStep);
 
-    // 2 header lines (run id + column headers) + steps + status bar
-    const totalLines = 2 + allSteps.length + 1;
+    const runningExtraLines = this.currentStep ? 1 : 0;
+    const totalLines = 2 + allSteps.length + runningExtraLines + 1;
 
-    // Move cursor up to overwrite previous render
     if (this.linesUsed > 0) {
       process.stdout.write(C.moveUp(this.linesUsed));
     }
 
-    // Clear from cursor down
     process.stdout.write('\x1b[J');
 
-    // Run ID header
     if (this.runId) {
       process.stdout.write(`  ${C.bold}${C.dim}Run ${this.runId}${C.reset}\n`);
     } else {
       process.stdout.write('\n');
     }
 
-    // Column headers
     process.stdout.write(
-      `${C.bold}${C.dim}       NAME                      TURNS    TOKENS (IN/OUT)   COST       DURATION${C.reset}\n`,
+      `${C.bold}${C.dim}       NAME                                   STATUS / METRICS                        DURATION${C.reset}\n`,
     );
 
-    // Step rows
     for (let i = 0; i < allSteps.length; i++) {
       const step = allSteps[i];
       const icon = this.statusIcon(step);
       const color = this.statusColor(step);
       const ordinal = pad(`${i + 1}`, 2, 'right') + '.';
-      const name = pad(step.name, 26);
-      const turns = pad(`${step.turns} turn${step.turns !== 1 ? 's' : ''}`, 9);
-      const tokens = pad(`${formatTokens(step.inputTokens)} / ${formatTokens(step.outputTokens)}`, 18);
-      const cost = pad(formatCost(step.cost), 10);
+      const name = pad(step.name, 39);
       const duration = pad(formatDuration(step.duration), 10);
 
-      process.stdout.write(`  ${color}${ordinal} ${icon}${C.reset}  ${name}${turns}${tokens}${cost}${duration}\n`);
+      if (step.status === 'running') {
+        process.stdout.write(`  ${color}${ordinal} ${icon}${C.reset}  ${name}${pad('running', 38)}${duration}\n`);
+        const metrics = `${formatCompactTurnCount(step.turns)}   ${formatTokens(step.inputTokens)}/${formatTokens(step.outputTokens)}   ${formatCost(step.cost)}`;
+        process.stdout.write(`      ${C.dim}${metrics}${C.reset}\n`);
+      } else {
+        const status = step.status === 'completed'
+          ? `${formatCompactTurnCount(step.turns)}   ${formatTokens(step.inputTokens)}/${formatTokens(step.outputTokens)}   ${formatCost(step.cost)}`
+          : step.status === 'failed'
+            ? (step.error || 'failed').slice(0, 38)
+            : 'skipped';
+        process.stdout.write(`  ${color}${ordinal} ${icon}${C.reset}  ${name}${pad(status, 38)}${duration}\n`);
+      }
     }
 
-    // Status bar
     if (this.currentStep) {
       const elapsed = formatDuration(this.currentStep.duration);
       const spinner = SPINNER_FRAMES[this.spinnerFrame];

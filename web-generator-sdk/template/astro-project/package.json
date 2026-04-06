@@ -3,9 +3,6 @@
   "type": "module",
   "version": "0.0.1",
   "description": "Astro template for web-generator-sdk. Pre-configured with React, Tailwind CSS v4, and Shadcn.",
-  "engines": {
-    "node": ">=22.12.0"
-  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

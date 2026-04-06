@@ -18,7 +18,8 @@
  *   6: POLISH    — final validation, quality scoring
  */
 
-import { mkdir, writeFile, readFile, copyFile, stat, rm } from 'fs/promises';
+import { mkdir, writeFile, readFile, copyFile, stat } from 'fs/promises';
+import { execSync } from 'child_process';
 import { join, resolve } from 'path';
 import type { CuiConfig, RunMetadata, Registry } from '../types.js';
 import type { Step, StepContext, StepStatus, PipelinePhase, PhaseId } from '../steps/step.js';
@@ -29,17 +30,23 @@ import { loadScraperOutput } from '../lib/scraper.js';
 import { createPipelineLogger } from '../lib/logger.js';
 import type { PipelineLogger } from '../lib/logger.js';
 import { parseResumePath } from './resume.js';
-import { runReviewers, collectStaticEvidence, readRejectionContexts, cleanupReviews, copyPreviousPhaseScreenshots } from '../lib/reviewer.js';
+import { runReviewers, readRejectionContexts, cleanupReviews, copyPreviousPhaseScreenshots } from '../lib/reviewer.js';
 import type { ReviewerContext } from '../lib/reviewer.js';
 import { getReviewersForPhase } from '../lib/reviewer-matrix.js';
+import { runContractChecks, runRuntimeChecks, runPolishQualityChecks } from '../lib/checks.js';
 
 // v2 Phase step imports
 import { setupStep } from '../steps/setup.js';
 import { analyzeStep } from '../steps/analyze.js';
 import { reduceStep } from '../steps/reduce.js';
 import { classifyStep } from '../steps/classify.js';
-import { seedStep } from '../steps/seed.js';
+import { interactionDiscoveryStep } from '../steps/interaction-discovery.js';
+import { contentReductionStep } from '../steps/content-reduction.js';
+import { seedContentStep } from '../steps/seed-content.js';
+import { seedAssetsStep } from '../steps/seed-assets.js';
+import { seedContractsStep } from '../steps/seed-contracts.js';
 import { layoutStep } from '../steps/layout.js';
+import { mobileStep } from '../steps/mobile.js';
 import { designStep } from '../steps/design.js';
 import { colorStep } from '../steps/color.js';
 import { motionStep } from '../steps/motion.js';
@@ -62,59 +69,74 @@ export const PIPELINE: PipelinePhase[] = [
     name: 'Phase 0: Analyze',
     description: 'Extract style fingerprint, 7-layer design tokens, component recipes',
     steps: [analyzeStep],
-    maxRetries: 3,
+    maxRetries: 1,
   },
   {
     id: 'structure',
     name: 'Phase 1: Structure',
-    description: 'Reduce, classify, and seed content collections',
-    steps: [reduceStep, classifyStep, seedStep],
-    maxRetries: 3,
+    description: 'Reduce, classify, discover interactions, and seed content/assets/contracts',
+    steps: [reduceStep, classifyStep, interactionDiscoveryStep, contentReductionStep, seedContentStep, seedAssetsStep, seedContractsStep],
+    maxRetries: 1,
   },
   {
     id: 'layout',
     name: 'Phase 2: Layout',
-    description: 'Apply grid/flex layout, spacing, responsive breakpoints',
+    description: 'Apply grid/flex layout, spacing, shared structure, and desktop/tablet baseline',
     steps: [layoutStep],
-    maxRetries: 3,
+    maxRetries: 4,
+    runRuntimeChecks: true,
+  },
+  {
+    id: 'mobile',
+    name: 'Phase 2b: Mobile Friendliness',
+    description: 'Fix mobile navigation, small-screen stacking, and overflow',
+    steps: [mobileStep],
+    maxRetries: 2,
+    runRuntimeChecks: true,
   },
   {
     id: 'design',
     name: 'Phase 3: Design',
     description: 'Apply typography, component styling, surfaces',
     steps: [designStep],
-    maxRetries: 3,
+    maxRetries: 1,
   },
   {
     id: 'color',
     name: 'Phase 4: Color',
     description: 'Apply color system, theme variants, WCAG contrast',
     steps: [colorStep],
-    maxRetries: 3,
+    maxRetries: 1,
   },
   {
     id: 'motion',
     name: 'Phase 5: Motion',
-    description: 'Add transitions, hover/focus states, scroll reveals',
+    description: 'Add transitions, hover/focus states, scroll reveals, and interaction behavior',
     steps: [motionStep],
-    maxRetries: 3,
+    maxRetries: 1,
+    runRuntimeChecks: true,
   },
   {
     id: 'polish',
     name: 'Phase 6: Polish',
     description: 'Final validation, quality scoring, style fidelity',
     steps: [polishStep],
-    maxRetries: 3,
+    maxRetries: 1,
+    runRuntimeChecks: true,
   },
 ];
 
-/** Phases that produce a buildable Astro project (can run static checks) */
+/** Phases that produce a buildable Astro project (can run deterministic checks) */
 const PHASES_WITH_BUILDABLE_SITE: Set<PhaseId> = new Set([
-  'structure', 'layout', 'design', 'color', 'motion', 'polish',
+  'structure', 'layout', 'mobile', 'design', 'color', 'motion', 'polish',
+]);
+
+const PHASES_WITH_CONTRACT_CHECKS: Set<PhaseId> = new Set([
+  'layout', 'mobile', 'design', 'color', 'motion', 'polish',
 ]);
 
 /** Default max concurrent reviewers */
-const MAX_CONCURRENT_REVIEWERS = 5;
+const MAX_CONCURRENT_REVIEWERS = 30;
 
 /** Flatten all phases and their steps into an ordered list for resume support */
 function flattenPipeline(pipeline: PipelinePhase[]): Step[] {
@@ -169,30 +191,105 @@ async function writeStepMeta(stepDir: string, meta: StepMeta): Promise<void> {
  */
 async function createPhaseDirectories(stepDir: string): Promise<{ evidenceDir: string; reviewsDir: string }> {
   const evidenceDir = join(stepDir, 'evidence');
-  const reviewsDir = join(stepDir, 'reviews');
+  const reviewsRootDir = join(stepDir, 'reviews');
   await mkdir(evidenceDir, { recursive: true });
+  await mkdir(reviewsRootDir, { recursive: true });
+
+  let nextAttempt = 1;
+  try {
+    const { readdir } = await import('fs/promises');
+    const entries = await readdir(reviewsRootDir, { withFileTypes: true });
+    const attemptNums = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name.match(/^attempt-(\d+)$/))
+      .filter((match): match is RegExpMatchArray => Boolean(match))
+      .map((match) => Number.parseInt(match[1] || '0', 10))
+      .filter((num) => Number.isFinite(num));
+    nextAttempt = (attemptNums.length > 0 ? Math.max(...attemptNums) : 0) + 1;
+  } catch {
+    // ignore
+  }
+
+  const reviewsDir = join(reviewsRootDir, `attempt-${nextAttempt}`);
   await mkdir(reviewsDir, { recursive: true });
   return { evidenceDir, reviewsDir };
 }
 
-/**
- * Collect evidence for a phase step.
- * For phases with buildable sites, runs biome, astro check, and build.
- */
-async function collectEvidence(
-  siteDir: string,
-  evidenceDir: string,
-  phaseId: PhaseId,
-): Promise<void> {
-  // Check if this is actually an Astro project with dependencies installed
+async function hasBuildableSite(siteDir: string): Promise<boolean> {
   try {
     await stat(join(siteDir, 'package.json'));
     await stat(join(siteDir, 'node_modules'));
+    return true;
   } catch {
-    return; // Not a project directory or no node_modules — skip
+    return false;
+  }
+}
+
+async function ensureProjectDependencies(siteDir: string): Promise<void> {
+  try {
+    await stat(join(siteDir, 'package.json'));
+  } catch {
+    return;
+  }
+  try {
+    execSync('bun install', { cwd: siteDir, timeout: 120000, stdio: 'pipe' });
+  } catch {
+    // best effort; later build/type checks will surface actual failure details
+  }
+}
+
+async function runPhaseContractStage(
+  phaseId: PhaseId,
+  siteDir: string,
+  evidenceDir: string,
+  sourceOrigin: string | undefined,
+  prevPhaseDir: string | undefined,
+  runDir: string,
+): Promise<{ ok: boolean; rejectionContext?: string }> {
+  if (!PHASES_WITH_CONTRACT_CHECKS.has(phaseId)) {
+    return { ok: true };
   }
 
-  await collectStaticEvidence(siteDir, evidenceDir);
+  const status = await runContractChecks({
+    phaseId,
+    workingDir: siteDir,
+    evidenceDir,
+    sourceOrigin,
+    prevPhaseDir,
+    runDir,
+  });
+
+  return {
+    ok: status.status === 'completed',
+    rejectionContext: status.rejectionContext,
+  };
+}
+
+async function runPhaseRuntimeStage(
+  phase: PipelinePhase,
+  siteDir: string,
+  evidenceDir: string,
+): Promise<{ ok: boolean; rejectionContext?: string }> {
+  if (!phase.runRuntimeChecks) {
+    return { ok: true };
+  }
+
+  const status = phase.id === 'polish'
+    ? await runPolishQualityChecks({
+      workingDir: siteDir,
+      evidenceDir,
+      scratchDir: join(siteDir, 'scratch'),
+    })
+    : await runRuntimeChecks({
+      phaseId: phase.id,
+      workingDir: siteDir,
+      evidenceDir,
+    });
+
+  return {
+    ok: status.status === 'completed',
+    rejectionContext: status.rejectionContext,
+  };
 }
 
 /**
@@ -280,6 +377,7 @@ async function runReviewerGate(
   snapshotPath?: string,
   runDir?: string,
   devServerUrl?: string,
+  prevPhaseDir?: string,
 ): Promise<{ allPassed: boolean; rejectionCount: number }> {
   const reviewers = getReviewersForPhase(phaseId);
 
@@ -297,6 +395,7 @@ async function runReviewerGate(
     sourceOrigin,
     snapshotPath,
     runDir,
+    prevPhaseDir,
     devServerUrl,
     env,
     pages: pages.length > 0 ? pages : undefined,
@@ -478,6 +577,7 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
     sourceOrigin,
     env,
     logger,
+    stepConfig: config.steps?.[step.id],
   });
 
   // Phase 0 is special: run setup first, then analyze
@@ -539,6 +639,7 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
           // Copy the project into the new run directory so subsequent phases write there
           const newStepDir = join(runDir, match);
           await copyDirectory(srcStepDir, newStepDir);
+          await ensureProjectDependencies(newStepDir);
           siteDir = newStepDir;
           prevStepDir = newStepDir;
           const ordinalMatch = match.match(/^step-(\d+)-/);
@@ -567,6 +668,11 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
 
     // The step directory where evidence/ and reviews/ live (last step in phase)
     let phaseStepDir: string | undefined;
+    let phaseRejectionContext: string | undefined;
+    // Track whether the previous attempt's implementer succeeded — if so,
+    // retry copies from the previous attempt's output (incremental fix) instead
+    // of restoring to pre-phase state (full rebuild).
+    let prevAttemptImplementerPassed = false;
 
     for (let retry = 0; retry <= (phase.maxRetries || 1); retry++) {
       let implementerPassed = true;
@@ -581,6 +687,10 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
       let rejectionContext: string | undefined;
       if (retry > 0) {
         const contexts: string[] = [];
+
+        if (phaseRejectionContext) {
+          contexts.push(phaseRejectionContext);
+        }
 
         // Source 1: reviewer rejection context
         if (phaseStepDir) {
@@ -601,37 +711,46 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
           } catch { /* status.json may not exist */ }
         }
 
-        rejectionContext = contexts.join('\n\n') || undefined;
+        rejectionContext = contexts.filter(Boolean).join('\n\n') || undefined;
       }
 
-      // On retry, restore site to pre-phase state.
-      // Previous attempt's step dirs are PRESERVED (new ordinals each retry)
-      // so the full history is available for debugging.
+      // On retry, decide whether to do an incremental fix or full rebuild.
+      // If the previous attempt's implementer succeeded (rejection came from
+      // contract/runtime/reviewer checks), copy from the previous attempt's
+      // output so the agent discovers all files already exist and only fixes
+      // what the reviewer flagged. Otherwise, restore to pre-phase state.
       if (retry > 0 && prePhaseSiteDir) {
-        // All phases: preserve old step dirs, create new ones with fresh ordinals.
-        // For multi-step phases, deterministic steps that completed are reused (not re-run).
-        let restoreDir: string | null = prePhaseSiteDir;
-        if (phase.steps.length > 1) {
-          for (const step of phase.steps) {
-            if (!step.deterministic) break; // stop at first non-deterministic step
-            const ordinal = phaseStepOrdinals.get(step.id);
-            if (ordinal === undefined) break;
-            const stepDir = join(runDir, `step-${ordinal}-${step.id}`);
-            try {
-              const statusRaw = await readFile(join(stepDir, 'status.json'), 'utf-8');
-              const status = JSON.parse(statusRaw);
-              if (status.status === 'completed') {
-                restoreDir = stepDir;
-                skipOnRetry.add(step.id);
-                continue;
-              }
-            } catch { /* no status */ }
-            break; // step didn't complete — can't reuse anything after it
+        if (prevAttemptImplementerPassed && phaseStepDir) {
+          // Incremental retry: start from previous attempt's completed output.
+          // The agent will find all files in place and focus on reviewer fixes.
+          phaseStepOrdinals.clear();
+          prevStepDir = phaseStepDir;
+          siteDir = phaseStepDir;
+        } else {
+          // Full rebuild: implementer crashed, restore to pre-phase state.
+          let restoreDir: string | null = prePhaseSiteDir;
+          if (phase.steps.length > 1) {
+            for (const step of phase.steps) {
+              if (!step.deterministic) break;
+              const ordinal = phaseStepOrdinals.get(step.id);
+              if (ordinal === undefined) break;
+              const stepDir = join(runDir, `step-${ordinal}-${step.id}`);
+              try {
+                const statusRaw = await readFile(join(stepDir, 'status.json'), 'utf-8');
+                const status = JSON.parse(statusRaw);
+                if (status.status === 'completed') {
+                  restoreDir = stepDir;
+                  skipOnRetry.add(step.id);
+                  continue;
+                }
+              } catch { /* no status */ }
+              break;
+            }
           }
+          phaseStepOrdinals.clear();
+          prevStepDir = restoreDir;
+          siteDir = restoreDir;
         }
-        phaseStepOrdinals.clear();
-        prevStepDir = restoreDir;
-        siteDir = restoreDir;
       }
 
       for (const step of phase.steps) {
@@ -657,6 +776,7 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
         await mkdir(stepDir, { recursive: true });
         if (prevStepDir) {
           await copyDirectory(prevStepDir, stepDir);
+          await ensureProjectDependencies(stepDir);
         }
 
         // Copy scraper input for reference
@@ -718,6 +838,9 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
         }
       }
 
+      // Track for next retry: did the implementer succeed this time?
+      prevAttemptImplementerPassed = implementerPassed;
+
       if (!implementerPassed) {
         // Implementer failed — retry or give up
         if (retry < (phase.maxRetries || 1)) {
@@ -735,50 +858,85 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
         process.exit(1);
       }
 
-      // Implementer passed — now run the reviewer gate
+      // Implementer passed — now run deterministic stages, then the AI reviewer gate
 
       const currentSiteDir = (siteDir || prevStepDir || phaseStepDir)!;
 
       // Create evidence/ and reviews/ directories
       const { evidenceDir, reviewsDir } = await createPhaseDirectories(phaseStepDir!);
 
-      // Collect static evidence (biome, astro check, build output)
-      await collectEvidence(currentSiteDir, evidenceDir, phase.id);
+      const buildable = PHASES_WITH_BUILDABLE_SITE.has(phase.id) && await hasBuildableSite(currentSiteDir);
 
       // Copy previous phase screenshots for visual regression comparison
       if (prevPhaseEvidenceDir) {
         await copyPreviousPhaseScreenshots(prevPhaseEvidenceDir, evidenceDir);
       }
 
-      // Trigger a build before reviewers run so dist/ is ready for Playwright sampling
-      if (PHASES_WITH_BUILDABLE_SITE.has(phase.id)) {
-        try {
-          const { execSync } = await import('child_process');
-          logger.startStep(`${phase.name} — build`);
-          execSync('npm run build', {
-            cwd: currentSiteDir,
-            timeout: 300_000,
-            stdio: 'pipe',
-          });
+      if (buildable) {
+        logger.startStep(`${phase.name} — contract checks`);
+        const contractResult = await runPhaseContractStage(
+          phase.id,
+          currentSiteDir,
+          evidenceDir,
+          sourceOrigin,
+          prePhaseSiteDir || undefined,
+          runDir,
+        );
+        if (contractResult.ok) {
           logger.completeStep(0);
-        } catch {
-          logger.failStep('build failed (non-fatal)');
+        } else {
+          logger.failStep(contractResult.rejectionContext || 'Contract checks failed');
+          phaseRejectionContext = contractResult.rejectionContext || 'Contract checks failed';
+          if (retry < (phase.maxRetries || 1)) {
+            logger.startStep(`Retry ${phase.name} — contract checks failed (${retry + 1}/${phase.maxRetries})`);
+            logger.skipStep();
+            continue;
+          }
+          runMeta.status = 'failed';
+          runMeta.failedStep = `${phase.id}-contract`;
+          runMeta.finishedAt = new Date().toISOString();
+          await writeFile(join(runDir, 'run.json'), JSON.stringify(runMeta, null, 2), 'utf-8');
+          logger.destroy();
+          if (!interactive) console.error(`\n  Pipeline failed at: ${phase.name} (contract checks)`);
+          process.exit(1);
         }
       }
 
-      // Start preview server for Playwright-based reviewers
+      if (buildable && phase.runRuntimeChecks) {
+        logger.startStep(`${phase.name} — runtime checks`);
+        const runtimeResult = await runPhaseRuntimeStage(phase, currentSiteDir, evidenceDir);
+        if (runtimeResult.ok) {
+          logger.completeStep(0);
+        } else {
+          logger.failStep(runtimeResult.rejectionContext || 'Runtime checks failed');
+          phaseRejectionContext = runtimeResult.rejectionContext || 'Runtime checks failed';
+          if (retry < (phase.maxRetries || 1)) {
+            logger.startStep(`Retry ${phase.name} — runtime checks failed (${retry + 1}/${phase.maxRetries})`);
+            logger.skipStep();
+            continue;
+          }
+          runMeta.status = 'failed';
+          runMeta.failedStep = `${phase.id}-runtime`;
+          runMeta.finishedAt = new Date().toISOString();
+          await writeFile(join(runDir, 'run.json'), JSON.stringify(runMeta, null, 2), 'utf-8');
+          logger.destroy();
+          if (!interactive) console.error(`\n  Pipeline failed at: ${phase.name} (runtime checks)`);
+          process.exit(1);
+        }
+      }
+
+      // Start preview server for AI reviewers that need rendered pages
       let devServerUrl: string | undefined;
       let previewProcess: import('child_process').ChildProcess | undefined;
-      if (PHASES_WITH_BUILDABLE_SITE.has(phase.id)) {
+      if (buildable) {
         try {
           const { spawn } = await import('child_process');
-          previewProcess = spawn('npx', ['astro', 'preview', '--port', '0'], {
+          previewProcess = spawn('bun', ['x', 'astro', 'preview', '--port', '0'], {
             cwd: currentSiteDir,
             stdio: ['ignore', 'pipe', 'pipe'],
           });
           devServerUrl = await waitForServerUrl(previewProcess, 30_000);
         } catch {
-          // Preview failed — Playwright reviewers will be skipped
           if (previewProcess) { previewProcess.kill(); previewProcess = undefined; }
         }
       }
@@ -788,8 +946,11 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
       const lastStep = phase.steps[phase.steps.length - 1];
       const lastStepConfig = config.steps?.[lastStep.id];
       const reviewerEnv = await resolveStepEnv(reviewerProfile, lastStep.envOverride, lastStepConfig);
+      if (config.visionModel) {
+        reviewerEnv.VISION_MODEL = config.visionModel;
+      }
 
-      // Run reviewers — scratch lives in the site dir
+      // Run AI reviewers only after deterministic checks pass
       const reviewScratchDir = join(currentSiteDir, 'scratch');
       let reviewResult: { allPassed: boolean; rejectionCount: number };
       try {
@@ -808,9 +969,9 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
           prevSnapshotPath,
           runDir,
           devServerUrl,
+          prePhaseSiteDir || undefined,
         );
       } finally {
-        // Kill preview server after reviewers finish
         if (previewProcess) {
           previewProcess.kill();
           previewProcess = undefined;
@@ -818,7 +979,7 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
       }
 
       if (reviewResult.allPassed) {
-        // Mark the last step's metadata with reviewers passed
+        phaseRejectionContext = undefined;
         try {
           const metaPath = join(phaseStepDir!, 'step.json');
           const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
@@ -826,32 +987,28 @@ export async function runPipeline(config: CuiConfig, fromStep?: string, opts?: {
           await writeFile(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
         } catch { /* best effort */ }
 
-        // Track evidence dir for visual regression in next phase
+        await cleanupReviews(reviewsDir);
         prevPhaseEvidenceDir = evidenceDir;
 
-        // Create snapshot of the site after this phase passes
-        if (PHASES_WITH_BUILDABLE_SITE.has(phase.id)) {
+        if (buildable) {
           const snapshotDir = join(snapshotsDir, phase.id);
           try {
             await mkdir(snapshotsDir, { recursive: true });
             await copyDirectory(currentSiteDir, snapshotDir);
             prevSnapshotPath = snapshotDir;
-
-            // Also write a snapshot.json for programmatic regression checks
             const snapshot = await createSnapshot(phase.id as PhaseId, currentSiteDir, sourceOrigin);
             await writeSnapshot(snapshot, runDir);
           } catch { /* snapshot is best-effort */ }
         }
 
-        break; // Phase complete — move to next phase
+        break;
       }
 
-      // Reviewers rejected — loop back to implementer if retries remaining
+      phaseRejectionContext = await readRejectionContexts(reviewsDir) || `${reviewResult.rejectionCount} reviewer(s) rejected`;
       if (retry < (phase.maxRetries || 1)) {
         logger.startStep(`Retry ${phase.name} — ${reviewResult.rejectionCount} reviewer(s) rejected (${retry + 1}/${phase.maxRetries})`);
         logger.skipStep();
       } else {
-        // All retries exhausted
         runMeta.status = 'failed';
         runMeta.failedStep = `${phase.id}-reviewers`;
         runMeta.finishedAt = new Date().toISOString();
