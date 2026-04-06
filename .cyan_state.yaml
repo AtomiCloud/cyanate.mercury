@@ -1,0 +1,13 @@
+atomi/nix:
+  active: true
+  history:
+  - version: 3
+    time: 2026-04-06T20:38:18.129339Z
+    answers:
+      cyan/nix/basic:
+        type: String
+        value: yes
+      cyan/nix/llm:
+        type: String
+        value: yes
+    deterministic_states: {}
