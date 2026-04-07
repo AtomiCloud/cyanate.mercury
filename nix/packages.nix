@@ -23,6 +23,9 @@ let
     nix-unstable = (
       with pkgs-unstable;
       {
+        inherit
+          bun
+        ;
       }
     );
   };

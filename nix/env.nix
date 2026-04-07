@@ -10,6 +10,7 @@ with packages;
   ];
 
   main = [
+    bun
   ];
 
   system = [

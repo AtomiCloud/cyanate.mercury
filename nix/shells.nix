@@ -3,6 +3,8 @@ with env;
 {
   default = pkgs.mkShell {
     buildInputs = system ++ main ++ lint ++ dev;
-    inherit shellHook;
+    shellHook = shellHook + ''
+      export PATH="$PWD/node_modules/.bin:$PATH"
+    '';
   };
 }
