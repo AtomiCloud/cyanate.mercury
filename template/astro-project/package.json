@@ -10,7 +10,8 @@
 		"astro": "astro",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check .",
-		"knip": "knip"
+		"knip": "knip",
+		"check": "biome check . && tsc --noEmit && knip"
 	},
 	"dependencies": {
 		"@astrojs/react": "^5.0.0",
