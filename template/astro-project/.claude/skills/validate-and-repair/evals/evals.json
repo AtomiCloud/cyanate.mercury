@@ -1,0 +1,60 @@
+{
+  "skill_name": "validate-and-repair",
+  "evals": [
+    {
+      "id": 1,
+      "name": "validate-good-code",
+      "prompt": "Validate the Astro project at template/astro-project/. Run astro check, typecheck, and build. Output validation-report.json.",
+      "expected_output": "validation-report.json showing all files passed with no violations. All checks (astro check, typecheck, build) should pass.",
+      "assertions": [
+        {
+          "name": "report-created",
+          "check": "validation-report.json file exists"
+        },
+        {
+          "name": "valid-json",
+          "check": "validation-report.json is valid JSON"
+        },
+        {
+          "name": "has-files-array",
+          "check": "Report has 'files' array"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "fix-missing-layout-import",
+      "prompt": "Validate and fix this broken page: src/pages/index.astro exists but doesn't import Layout. Check the file, identify the error, and apply the auto-fix.",
+      "expected_output": "The error is identified (missing Layout import), the fix is applied (adding import Layout from '@/layouts/Layout.astro'), and the file now includes the import.",
+      "assertions": [
+        {
+          "name": "error-identified",
+          "check": "Validation report identifies 'missing-layout-import' error"
+        },
+        {
+          "name": "fix-applied",
+          "check": "File now imports Layout component"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "fix-arbitrary-color",
+      "prompt": "Validate and fix this file with arbitrary Tailwind color: src/pages/index.astro contains class='bg-[#3b82f6]'. Identify and fix the error.",
+      "expected_output": "The arbitrary color error is identified. The fix maps bg-[#3b82f6] to a semantic class like bg-primary.",
+      "assertions": [
+        {
+          "name": "error-identified",
+          "check": "Validation report identifies 'arbitrary-tailwind-color' error"
+        },
+        {
+          "name": "fix-applied",
+          "check": "File no longer contains bg-[#...] pattern"
+        }
+      ],
+      "files": []
+    }
+  ]
+}
