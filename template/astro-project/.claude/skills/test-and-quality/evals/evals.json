@@ -1,68 +1,68 @@
 {
-  "skill_name": "test-and-quality",
-  "evals": [
-    {
-      "id": 1,
-      "name": "functional-test",
-      "prompt": "Run functional tests on the Astro project at template/astro-project/. Start dev server, visit index page, check for console errors, verify page loads with content. Save test-report.json.",
-      "expected_output": "test-report.json with index page results showing: httpStatus 200, no consoleErrors, hasContent true, passed true.",
-      "assertions": [
-        {
-          "name": "report-created",
-          "check": "test-report.json file exists"
-        },
-        {
-          "name": "has-pages",
-          "check": "Report has 'pages' array with test results"
-        },
-        {
-          "name": "page-tested",
-          "check": "Index page was tested and has results"
-        }
-      ],
-      "files": []
-    },
-    {
-      "id": 2,
-      "name": "quality-evaluation",
-      "prompt": "Evaluate visual quality of the generated homepage at template/astro-project/src/pages/index.astro. Take screenshot and score each dimension (layoutConsistency, designTokenUsage, componentComposition, responsiveDesign, semanticHTML, visualAppeal). Save as quality-scores.json.",
-      "expected_output": "quality-scores.json with scores for each dimension (1-10 scale) and overallScore calculated. Should include feedback comments.",
-      "assertions": [
-        {
-          "name": "scores-file-created",
-          "check": "quality-scores.json file exists"
-        },
-        {
-          "name": "has-scores",
-          "check": "Report has 'scores' object with all 6 dimensions"
-        },
-        {
-          "name": "valid-score-range",
-          "check": "All scores are between 1 and 10"
-        },
-        {
-          "name": "has-overall",
-          "check": "Report has 'overallScore' calculated"
-        }
-      ],
-      "files": []
-    },
-    {
-      "id": 3,
-      "name": "responsive-check",
-      "prompt": "Test responsive design of the homepage. Check at mobile (375px), tablet (768px), and desktop (1920px) viewports. Report any issues in quality-scores.json under responsiveDesign score.",
-      "expected_output": "quality-scores.json with responsiveDesign score and comments about any responsive issues found.",
-      "assertions": [
-        {
-          "name": "responsive-scored",
-          "check": "responsiveDesign score is present (1-10)"
-        },
-        {
-          "name": "viewport-tested",
-          "check": "Feedback mentions testing at multiple viewports"
-        }
-      ],
-      "files": []
-    }
-  ]
+	"skill_name": "test-and-quality",
+	"evals": [
+		{
+			"id": 1,
+			"name": "functional-test",
+			"prompt": "Run functional tests on the Astro project at template/astro-project/. Start dev server, visit index page, check for console errors, verify page loads with content. Save test-report.json.",
+			"expected_output": "test-report.json with index page results showing: httpStatus 200, no consoleErrors, hasContent true, passed true.",
+			"assertions": [
+				{
+					"name": "report-created",
+					"check": "test-report.json file exists"
+				},
+				{
+					"name": "has-pages",
+					"check": "Report has 'pages' array with test results"
+				},
+				{
+					"name": "page-tested",
+					"check": "Index page was tested and has results"
+				}
+			],
+			"files": []
+		},
+		{
+			"id": 2,
+			"name": "quality-evaluation",
+			"prompt": "Evaluate visual quality of the generated homepage at template/astro-project/src/pages/index.astro. Take screenshot and score each dimension (layoutConsistency, designTokenUsage, componentComposition, responsiveDesign, semanticHTML, visualAppeal). Save as quality-scores.json.",
+			"expected_output": "quality-scores.json with scores for each dimension (1-10 scale) and overallScore calculated. Should include feedback comments.",
+			"assertions": [
+				{
+					"name": "scores-file-created",
+					"check": "quality-scores.json file exists"
+				},
+				{
+					"name": "has-scores",
+					"check": "Report has 'scores' object with all 6 dimensions"
+				},
+				{
+					"name": "valid-score-range",
+					"check": "All scores are between 1 and 10"
+				},
+				{
+					"name": "has-overall",
+					"check": "Report has 'overallScore' calculated"
+				}
+			],
+			"files": []
+		},
+		{
+			"id": 3,
+			"name": "responsive-check",
+			"prompt": "Test responsive design of the homepage. Check at mobile (375px), tablet (768px), and desktop (1920px) viewports. Report any issues in quality-scores.json under responsiveDesign score.",
+			"expected_output": "quality-scores.json with responsiveDesign score and comments about any responsive issues found.",
+			"assertions": [
+				{
+					"name": "responsive-scored",
+					"check": "responsiveDesign score is present (1-10)"
+				},
+				{
+					"name": "viewport-tested",
+					"check": "Feedback mentions testing at multiple viewports"
+				}
+			],
+			"files": []
+		}
+	]
 }

@@ -1,0 +1,16 @@
+{
+	"slug": "john-smith",
+	"name": "Dr. John Smith",
+	"title": "Neurologist",
+	"bio": "<p>Dr. John Smith is a board-certified neurologist with expertise in treating complex neurological conditions including MS and Parkinson's disease.</p>",
+	"portrait": "tests/cms-integration/fixtures/images/portrait-john.jpg",
+	"yearsExperience": 12,
+	"available": false,
+	"joinedDate": "2019-07-22T09:00:00Z",
+	"department": "neurology",
+	"education": {
+		"degree": "MD, PhD",
+		"institution": "Johns Hopkins University",
+		"year": 2008
+	}
+}

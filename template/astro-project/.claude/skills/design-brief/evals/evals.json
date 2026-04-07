@@ -1,76 +1,76 @@
 {
-  "skill_name": "design-brief",
-  "evals": [
-    {
-      "id": 1,
-      "name": "homepage-brief",
-      "prompt": "Generate a design brief for a homepage. Here is the structure.json (site has landing, about, contact pages). Here is schema.json (landing has heading, subheading, cta, features array). Here are content samples (3 landing pages). Design tokens: modern blue theme. Save as design-brief.json.",
-      "expected_output": "A design-brief.json with pages array containing at least a landing page type with sections (hero, features, cta), sharedComponents (Header, Footer), and designDirection.",
-      "assertions": [
-        {
-          "name": "output-file-created",
-          "check": "File design-brief.json exists"
-        },
-        {
-          "name": "valid-json",
-          "check": "design-brief.json is valid JSON"
-        },
-        {
-          "name": "has-pages",
-          "check": "design-brief.json has a 'pages' array"
-        },
-        {
-          "name": "has-shared-components",
-          "check": "design-brief.json has a 'sharedComponents' array"
-        },
-        {
-          "name": "page-has-sections",
-          "check": "At least one page in pages has a 'sections' array"
-        }
-      ],
-      "files": []
-    },
-    {
-      "id": 2,
-      "name": "blog-structure-brief",
-      "prompt": "Generate a design brief for a blog site. Structure shows blog-listing and blog-post page types. Schema: blog-listing has posts array with title, excerpt, date; blog-post has title, content, author, date. Create brief with appropriate sections for both page types.",
-      "expected_output": "A design-brief.json with blog-listing and blog-post pages. blog-listing should have posts grid section. blog-post should have content section. Shared components include Header, Footer.",
-      "assertions": [
-        {
-          "name": "output-file-created",
-          "check": "File design-brief.json exists"
-        },
-        {
-          "name": "has-blog-pages",
-          "check": "design-brief.json.pages contains entries with pageType 'blog-listing' or 'blog-post'"
-        },
-        {
-          "name": "sections-defined",
-          "check": "Each page has at least one section defined"
-        }
-      ],
-      "files": []
-    },
-    {
-      "id": 3,
-      "name": "ecommerce-brief",
-      "prompt": "Generate a design brief for an e-commerce product page. Schema: product has name, price, description, images, variants. Structure shows product detail page. Design tokens: purple accent, modern typography. Include sections for product info, gallery, and add to cart.",
-      "expected_output": "A design-brief.json with product page type containing hero/image section, product info section, possibly CTA section. Uses Card, Button components. Design direction mentions purple theme.",
-      "assertions": [
-        {
-          "name": "output-file-created",
-          "check": "File design-brief.json exists"
-        },
-        {
-          "name": "has-product-page",
-          "check": "design-brief.json.pages contains product-type page"
-        },
-        {
-          "name": "component-specified",
-          "check": "At least one section specifies Shadcn components like Button or Card"
-        }
-      ],
-      "files": []
-    }
-  ]
+	"skill_name": "design-brief",
+	"evals": [
+		{
+			"id": 1,
+			"name": "homepage-brief",
+			"prompt": "Generate a design brief for a homepage. Here is the structure.json (site has landing, about, contact pages). Here is schema.json (landing has heading, subheading, cta, features array). Here are content samples (3 landing pages). Design tokens: modern blue theme. Save as design-brief.json.",
+			"expected_output": "A design-brief.json with pages array containing at least a landing page type with sections (hero, features, cta), sharedComponents (Header, Footer), and designDirection.",
+			"assertions": [
+				{
+					"name": "output-file-created",
+					"check": "File design-brief.json exists"
+				},
+				{
+					"name": "valid-json",
+					"check": "design-brief.json is valid JSON"
+				},
+				{
+					"name": "has-pages",
+					"check": "design-brief.json has a 'pages' array"
+				},
+				{
+					"name": "has-shared-components",
+					"check": "design-brief.json has a 'sharedComponents' array"
+				},
+				{
+					"name": "page-has-sections",
+					"check": "At least one page in pages has a 'sections' array"
+				}
+			],
+			"files": []
+		},
+		{
+			"id": 2,
+			"name": "blog-structure-brief",
+			"prompt": "Generate a design brief for a blog site. Structure shows blog-listing and blog-post page types. Schema: blog-listing has posts array with title, excerpt, date; blog-post has title, content, author, date. Create brief with appropriate sections for both page types.",
+			"expected_output": "A design-brief.json with blog-listing and blog-post pages. blog-listing should have posts grid section. blog-post should have content section. Shared components include Header, Footer.",
+			"assertions": [
+				{
+					"name": "output-file-created",
+					"check": "File design-brief.json exists"
+				},
+				{
+					"name": "has-blog-pages",
+					"check": "design-brief.json.pages contains entries with pageType 'blog-listing' or 'blog-post'"
+				},
+				{
+					"name": "sections-defined",
+					"check": "Each page has at least one section defined"
+				}
+			],
+			"files": []
+		},
+		{
+			"id": 3,
+			"name": "ecommerce-brief",
+			"prompt": "Generate a design brief for an e-commerce product page. Schema: product has name, price, description, images, variants. Structure shows product detail page. Design tokens: purple accent, modern typography. Include sections for product info, gallery, and add to cart.",
+			"expected_output": "A design-brief.json with product page type containing hero/image section, product info section, possibly CTA section. Uses Card, Button components. Design direction mentions purple theme.",
+			"assertions": [
+				{
+					"name": "output-file-created",
+					"check": "File design-brief.json exists"
+				},
+				{
+					"name": "has-product-page",
+					"check": "design-brief.json.pages contains product-type page"
+				},
+				{
+					"name": "component-specified",
+					"check": "At least one section specifies Shadcn components like Button or Card"
+				}
+			],
+			"files": []
+		}
+	]
 }

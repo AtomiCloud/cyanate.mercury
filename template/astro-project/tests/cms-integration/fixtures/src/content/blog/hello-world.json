@@ -1,0 +1,22 @@
+{
+	"slug": "hello-world",
+	"title": "Understanding Heart Health: A Comprehensive Guide",
+	"excerpt": "Learn the basics of maintaining a healthy heart through diet, exercise, and regular checkups.",
+	"body": "<p>Heart disease remains one of the leading causes of death worldwide, but many cases are preventable through lifestyle changes.</p><p>In this guide, we explore evidence-based strategies for maintaining cardiovascular health.</p>",
+	"heroImage": "tests/cms-integration/fixtures/images/hero.jpg",
+	"publishedAt": "2024-01-15T10:00:00Z",
+	"featured": true,
+	"viewCount": 15420,
+	"status": "published",
+	"author": "jane-doe",
+	"tags": [
+		{ "name": "Heart Health", "slug": "heart-health" },
+		{ "name": "Prevention", "slug": "prevention" },
+		{ "name": "Wellness", "slug": "wellness" }
+	],
+	"metadata": {
+		"metaTitle": "Heart Health Guide | Medical Center",
+		"metaDescription": "A comprehensive guide to understanding and maintaining heart health through lifestyle changes and medical care.",
+		"ogImage": "tests/cms-integration/fixtures/images/hero.jpg"
+	}
+}

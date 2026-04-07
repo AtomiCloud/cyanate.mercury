@@ -22,3 +22,10 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# CMS config (contains API keys)
+cms.config.json
+
+# CMS integration tests
+tests/cms-integration/sonicjs-app/
+tests/cms-integration/tmp/

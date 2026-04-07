@@ -1,0 +1,9 @@
+{
+	"slug": "cardiac-catheterization",
+	"name": "Cardiac Catheterization",
+	"description": "<p>A minimally invasive procedure used to diagnose and treat cardiovascular conditions. A thin tube is guided through blood vessels to the heart.</p>",
+	"durationMinutes": 60,
+	"isOutpatient": true,
+	"recoveryNotes": "Patients should rest for 24 hours and avoid strenuous activity for one week.",
+	"image": "tests/cms-integration/fixtures/images/hero.jpg"
+}

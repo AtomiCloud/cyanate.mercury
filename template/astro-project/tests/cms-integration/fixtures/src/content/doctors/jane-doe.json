@@ -1,0 +1,16 @@
+{
+	"slug": "jane-doe",
+	"name": "Dr. Jane Doe",
+	"title": "Chief of Cardiology",
+	"bio": "<p>Dr. Jane Doe has been practicing medicine for over 15 years, specializing in interventional cardiology and heart failure management.</p>",
+	"portrait": "tests/cms-integration/fixtures/images/portrait-jane.jpg",
+	"yearsExperience": 15,
+	"available": true,
+	"joinedDate": "2018-03-15T09:00:00Z",
+	"department": "cardiology",
+	"education": {
+		"degree": "MD",
+		"institution": "Harvard Medical School",
+		"year": 2005
+	}
+}
