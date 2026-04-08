@@ -1,0 +1,33 @@
+{
+	"items": [
+		{
+			"label": "Services",
+			"url": "/services",
+			"children": [
+				{ "label": "Cardiology", "url": "/services/cardiology" },
+				{ "label": "Neurology", "url": "/services/neurology" },
+				{ "label": "Orthopedics", "url": "/services/orthopedics" }
+			]
+		},
+		{
+			"label": "Find a Doctor",
+			"url": "/doctors",
+			"children": []
+		},
+		{
+			"label": "About",
+			"url": "/about",
+			"children": [
+				{ "label": "Our Story", "url": "/about/story" },
+				{ "label": "Mission", "url": "/about/mission" }
+			]
+		},
+		{
+			"label": "Contact",
+			"url": "/contact",
+			"children": []
+		}
+	],
+	"ctaText": "Book Appointment",
+	"ctaUrl": "/appointments"
+}

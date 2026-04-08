@@ -1,0 +1,76 @@
+{
+	"skill_name": "extract-design-tokens",
+	"evals": [
+		{
+			"id": 1,
+			"name": "extract-from-vercel",
+			"prompt": "Extract design tokens from https://vercel.com. Write a Python Playwright script to visit the site and extract colors, typography, spacing, border radius, and shadows. Save the output as design-tokens.json.",
+			"expected_output": "A design-tokens.json file with extracted color values (hex/rgb), font families, font sizes, spacing values, border radius values, and shadow values from vercel.com. Colors should include primary, secondary, accent, background, foreground, muted, border, destructive.",
+			"assertions": [
+				{
+					"name": "output-file-created",
+					"check": "File design-tokens.json exists in the output directory"
+				},
+				{
+					"name": "valid-json",
+					"check": "design-tokens.json is valid JSON"
+				},
+				{
+					"name": "has-colors",
+					"check": "design-tokens.json contains a 'colors' object with at least 5 color properties"
+				},
+				{
+					"name": "has-typography",
+					"check": "design-tokens.json contains a 'typography' object with fontFamily"
+				}
+			],
+			"files": []
+		},
+		{
+			"id": 2,
+			"name": "default-tokens-no-url",
+			"prompt": "Generate default design tokens for a modern website. No reference URL provided. Save as design-tokens.json.",
+			"expected_output": "A design-tokens.json file with sensible default modern color palette (blues/grays), Inter/system fonts, standard spacing scale, border radius scale, and shadow scale.",
+			"assertions": [
+				{
+					"name": "output-file-created",
+					"check": "File design-tokens.json exists"
+				},
+				{
+					"name": "valid-json",
+					"check": "design-tokens.json is valid JSON"
+				},
+				{
+					"name": "has-primary-color",
+					"check": "design-tokens.json.colors.primary exists and is a valid hex or rgb color"
+				},
+				{
+					"name": "has-typography",
+					"check": "design-tokens.json.typography.fontFamily exists"
+				}
+			],
+			"files": []
+		},
+		{
+			"id": 3,
+			"name": "extract-dark-theme-site",
+			"prompt": "Extract design tokens from https://stripe.com. Focus on extracting their color palette including dark mode colors if detectable. Save as design-tokens.json.",
+			"expected_output": "A design-tokens.json file with Stripe's color palette (blues, purples) and typography. Should capture their distinctive brand colors.",
+			"assertions": [
+				{
+					"name": "output-file-created",
+					"check": "File design-tokens.json exists"
+				},
+				{
+					"name": "valid-json",
+					"check": "design-tokens.json is valid JSON"
+				},
+				{
+					"name": "has-brand-colors",
+					"check": "design-tokens.json.colors.primary exists and is in blue/purple range (not default gray)"
+				}
+			],
+			"files": []
+		}
+	]
+}

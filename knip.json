@@ -1,0 +1,13 @@
+{
+	"$schema": "https://unpkg.com/knip@5/schema.json",
+	"entry": [
+		"src/types.ts",
+		"src/steps/step.ts",
+		"src/lib/agent.ts",
+		"src/lib/logger.ts",
+		"src/lib/dep-selector.ts",
+		"src/engine/index.ts"
+	],
+	"project": ["src/**/*.ts"],
+	"ignoreDependencies": ["@playwright/test"]
+}

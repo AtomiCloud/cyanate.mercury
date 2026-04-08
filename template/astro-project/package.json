@@ -1,0 +1,47 @@
+{
+	"name": "template-astro-project",
+	"type": "module",
+	"version": "0.0.1",
+	"description": "Astro template for Mecury. Pre-configured with React, Tailwind CSS v4, and Shadcn.",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build && pagefind --site dist",
+		"build:astro": "astro build",
+		"build:search": "pagefind --site dist",
+		"preview": "astro preview",
+		"astro": "astro",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check src/ cms/ tests/",
+		"knip": "knip",
+		"check": "biome check src/ cms/ tests/ && tsc --noEmit && knip",
+		"cms": "tsx cms/cli.ts",
+		"cms:push": "tsx cms/cli.ts push",
+		"cms:pull": "tsx cms/cli.ts pull",
+		"cms:pull:build": "tsx cms/cli.ts pull && astro build && pagefind --site dist",
+		"test:cms:setup": "bash tests/cms-integration/setup.sh",
+		"test:cms": "tsx tests/cms-integration/run.ts"
+	},
+	"dependencies": {
+		"@astrojs/react": "^5.0.0",
+		"astro": "^6.0.3",
+		"class-variance-authority": "^0.7.1",
+		"clsx": "^2.1.1",
+		"lucide-react": "^0.511.0",
+		"react": "^19.2.4",
+		"react-dom": "^19.2.4",
+		"shadcn": "^2.6.0",
+		"tailwind-merge": "^3.3.0",
+		"tw-animate-css": "^1.3.4"
+	},
+	"devDependencies": {
+		"@astrojs/check": "^0.9.7",
+		"@biomejs/biome": "^2.4.10",
+		"@tailwindcss/postcss": "^4.2.1",
+		"@types/react": "^19.2.14",
+		"@types/react-dom": "^19.2.3",
+		"knip": "^5.86.0",
+		"pagefind": "^1.3.0",
+		"tsx": "^4.19.0",
+		"typescript": "^5.9.3"
+	}
+}

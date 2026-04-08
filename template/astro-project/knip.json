@@ -1,0 +1,13 @@
+{
+	"$schema": "https://unpkg.com/knip@5/schema.json",
+	"entry": ["src/**/*.astro", "src/**/*.ts"],
+	"project": ["src/**/*.ts", "src/**/*.astro"],
+	"ignoreDependencies": [
+		"@astrojs/check",
+		"@tailwindcss/postcss",
+		"class-variance-authority",
+		"lucide-react",
+		"shadcn",
+		"tw-animate-css"
+	]
+}

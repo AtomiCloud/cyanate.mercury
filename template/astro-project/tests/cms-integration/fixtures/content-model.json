@@ -1,0 +1,139 @@
+{
+	"collections": [
+		{
+			"name": "doctors",
+			"type": "collection",
+			"slugField": "slug",
+			"fields": [
+				{ "name": "slug", "type": "string", "required": true },
+				{ "name": "name", "type": "string", "required": true },
+				{ "name": "title", "type": "string", "required": false },
+				{ "name": "bio", "type": "richtext", "required": false },
+				{ "name": "portrait", "type": "image", "required": false },
+				{ "name": "yearsExperience", "type": "number", "required": false },
+				{ "name": "available", "type": "boolean", "required": false },
+				{ "name": "joinedDate", "type": "datetime", "required": false },
+				{
+					"name": "department",
+					"type": "select",
+					"required": false,
+					"options": ["cardiology", "neurology", "orthopedics", "pediatrics"]
+				},
+				{
+					"name": "education",
+					"type": "object",
+					"required": false,
+					"fields": [
+						{ "name": "degree", "type": "string", "required": true },
+						{ "name": "institution", "type": "string", "required": true },
+						{ "name": "year", "type": "number", "required": false }
+					]
+				}
+			]
+		},
+		{
+			"name": "blog",
+			"type": "collection",
+			"slugField": "slug",
+			"fields": [
+				{ "name": "slug", "type": "string", "required": true },
+				{ "name": "title", "type": "string", "required": true },
+				{ "name": "excerpt", "type": "string", "required": false },
+				{ "name": "body", "type": "richtext", "required": true },
+				{ "name": "heroImage", "type": "image", "required": false },
+				{ "name": "publishedAt", "type": "datetime", "required": true },
+				{ "name": "featured", "type": "boolean", "required": false },
+				{ "name": "viewCount", "type": "number", "required": false },
+				{
+					"name": "status",
+					"type": "select",
+					"required": false,
+					"options": ["draft", "published", "archived"]
+				},
+				{
+					"name": "author",
+					"type": "relationship",
+					"required": false,
+					"target": "doctors"
+				},
+				{
+					"name": "tags",
+					"type": "repeater",
+					"required": false,
+					"fields": [
+						{ "name": "name", "type": "string", "required": true },
+						{ "name": "slug", "type": "string", "required": true }
+					]
+				},
+				{
+					"name": "metadata",
+					"type": "object",
+					"required": false,
+					"fields": [
+						{ "name": "metaTitle", "type": "string", "required": false },
+						{ "name": "metaDescription", "type": "string", "required": false },
+						{ "name": "ogImage", "type": "image", "required": false }
+					]
+				}
+			]
+		},
+		{
+			"name": "procedures",
+			"type": "collection",
+			"slugField": "slug",
+			"fields": [
+				{ "name": "slug", "type": "string", "required": true },
+				{ "name": "name", "type": "string", "required": true },
+				{ "name": "description", "type": "richtext", "required": true },
+				{ "name": "durationMinutes", "type": "number", "required": false },
+				{ "name": "isOutpatient", "type": "boolean", "required": false },
+				{ "name": "recoveryNotes", "type": "string", "required": false },
+				{ "name": "image", "type": "image", "required": false }
+			]
+		},
+		{
+			"name": "about",
+			"type": "singleton",
+			"fields": [
+				{ "name": "mission", "type": "richtext", "required": false },
+				{ "name": "foundedYear", "type": "number", "required": false },
+				{ "name": "isAcceptingPatients", "type": "boolean", "required": false },
+				{ "name": "establishedDate", "type": "datetime", "required": false },
+				{ "name": "headline", "type": "string", "required": false },
+				{ "name": "heroImage", "type": "image", "required": false },
+				{
+					"name": "philosophy",
+					"type": "select",
+					"required": false,
+					"options": ["patient-first", "innovation", "community"]
+				}
+			]
+		},
+		{
+			"name": "navigation",
+			"type": "global",
+			"fields": [
+				{
+					"name": "items",
+					"type": "repeater",
+					"required": false,
+					"fields": [
+						{ "name": "label", "type": "string", "required": true },
+						{ "name": "url", "type": "string", "required": true },
+						{
+							"name": "children",
+							"type": "repeater",
+							"required": false,
+							"fields": [
+								{ "name": "label", "type": "string", "required": true },
+								{ "name": "url", "type": "string", "required": true }
+							]
+						}
+					]
+				},
+				{ "name": "ctaText", "type": "string", "required": false },
+				{ "name": "ctaUrl", "type": "string", "required": false }
+			]
+		}
+	]
+}

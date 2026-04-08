@@ -1,0 +1,16 @@
+{
+	"entries": [
+		{
+			"localPath": "tests/cms-integration/fixtures/images/hero.jpg",
+			"originalUrl": "https://example.com/images/hero.jpg"
+		},
+		{
+			"localPath": "tests/cms-integration/fixtures/images/portrait-jane.jpg",
+			"originalUrl": "https://example.com/images/portrait-jane.jpg"
+		},
+		{
+			"localPath": "tests/cms-integration/fixtures/images/portrait-john.jpg",
+			"originalUrl": "https://example.com/images/portrait-john.jpg"
+		}
+	]
+}

@@ -1,0 +1,9 @@
+{
+  "input": "../example",
+  "reference": "https://vercel.com/",
+  "profile": "friendli",
+  "visionModel": "gpt-5.4",
+  "steps": {
+    "layout": { "maxConcurrentPageAgents": 45 }
+  }
+}

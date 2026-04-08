@@ -1,0 +1,109 @@
+{
+	"skill_name": "astro-codegen",
+	"evals": [
+		{
+			"id": 1,
+			"name": "generate-homepage",
+			"prompt": "Generate src/pages/index.astro for a homepage. Design brief: page type 'homepage' with sections: hero (heading, subheading, cta), features (3 items grid). Shared components: Header, Footer. Template is at template/astro-project/. Output directory: output/test-site/",
+			"expected_output": "A valid src/pages/index.astro file that imports Layout, wraps content in Layout component, includes Hero section with heading/subheading/cta, and includes Features grid section.",
+			"assertions": [
+				{
+					"name": "file-created",
+					"check": "File src/pages/index.astro exists in output directory"
+				},
+				{
+					"name": "imports-layout",
+					"check": "File imports Layout from '@/layouts/Layout.astro'"
+				},
+				{
+					"name": "wraps-in-layout",
+					"check": "Content is wrapped in <Layout>...</Layout> component"
+				},
+				{
+					"name": "valid-astro-syntax",
+					"check": "File has valid Astro frontmatter (--- fences)"
+				}
+			],
+			"files": []
+		},
+		{
+			"id": 2,
+			"name": "generate-component",
+			"prompt": "Generate src/components/Header.astro component. Design brief: shared component 'Header' with navigation menu (Home, About, Contact links). Use semantic HTML and Tailwind classes.",
+			"expected_output": "A valid src/components/Header.astro file with header element, logo/title, and navigation links. Uses Tailwind classes for styling.",
+			"assertions": [
+				{
+					"name": "file-created",
+					"check": "File src/components/Header.astro exists"
+				},
+				{
+					"name": "has-header-tag",
+					"check": "File contains <header> element"
+				},
+				{
+					"name": "has-navigation",
+					"check": "File has navigation links (nav or anchor tags)"
+				},
+				{
+					"name": "uses-tailwind",
+					"check": "File contains Tailwind CSS classes"
+				}
+			],
+			"files": []
+		},
+		{
+			"id": 3,
+			"name": "generate-layout",
+			"prompt": "Generate src/layouts/Layout.astro. Should include HTML shell, head with meta tags, import globals.css, include Header and Footer components, and have a slot for page content.",
+			"expected_output": "A valid src/layouts/Layout.astro with proper HTML structure, DOCTYPE, head element with viewport meta, body with bg-background text-foreground classes, imports globals.css, includes Header/Footer, and has <slot />.",
+			"assertions": [
+				{
+					"name": "file-created",
+					"check": "File src/layouts/Layout.astro exists"
+				},
+				{
+					"name": "has-doctype",
+					"check": "File starts with <!DOCTYPE html>"
+				},
+				{
+					"name": "imports-globals-css",
+					"check": "File imports '../styles/globals.css'"
+				},
+				{
+					"name": "has-slot",
+					"check": "File contains <slot /> element"
+				},
+				{
+					"name": "body-classes",
+					"check": "Body element has bg-background and text-foreground classes"
+				}
+			],
+			"files": []
+		},
+		{
+			"id": 4,
+			"name": "shadcn-integration",
+			"prompt": "Generate src/components/FeatureCard.astro that uses Shadcn Card component. Design brief: component uses Card from Shadcn, displays title and description. Install Card component first if needed.",
+			"expected_output": "A valid src/components/FeatureCard.astro that imports Card from @/components/ui/card, uses Card, CardHeader, CardTitle, CardDescription components properly.",
+			"assertions": [
+				{
+					"name": "file-created",
+					"check": "File src/components/FeatureCard.astro exists"
+				},
+				{
+					"name": "imports-card",
+					"check": "File imports Card components from '@/components/ui/card'"
+				},
+				{
+					"name": "uses-shadcn-card",
+					"check": "File uses <Card> or Card* components"
+				},
+				{
+					"name": "no-client-directive",
+					"check": "Static Card component does NOT have client directive (Card is static)"
+				}
+			],
+			"files": []
+		}
+	]
+}

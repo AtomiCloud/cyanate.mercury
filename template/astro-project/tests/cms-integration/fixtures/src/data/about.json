@@ -1,0 +1,9 @@
+{
+	"mission": "<p>Our mission is to provide exceptional, compassionate healthcare to our community, combining cutting-edge medical technology with a patient-centered approach.</p>",
+	"foundedYear": 1995,
+	"isAcceptingPatients": true,
+	"establishedDate": "1995-06-01T00:00:00Z",
+	"headline": "Excellence in Healthcare Since 1995",
+	"heroImage": "tests/cms-integration/fixtures/images/hero.jpg",
+	"philosophy": "patient-first"
+}

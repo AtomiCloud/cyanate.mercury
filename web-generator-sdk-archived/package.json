@@ -1,0 +1,26 @@
+{
+  "name": "web-generator-sdk",
+  "version": "2.0.0",
+  "description": "Agent SDK that generates Astro.js projects from scraped website data",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "bun src/index.ts",
+    "llm-watch": "bun scripts/llm-watch.ts",
+    "start": "bun src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --declaration --outDir dist"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.76",
+    "playwright": "^1.58.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.8",
+    "@playwright/test": "^1.58.2",
+    "@types/bun": "latest",
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2"
+  }
+}
