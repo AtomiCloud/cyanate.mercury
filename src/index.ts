@@ -13,7 +13,7 @@
 import { program } from "./cli.js";
 
 // Register segments here as they are implemented:
-// import "./segments/analyze.js";
+import "./segments/analyze/index.js";
 // import "./segments/build-layout.js";
 
 program.parse();

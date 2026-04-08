@@ -16,5 +16,6 @@
 		"src/engine/index.ts"
 	],
 	"project": ["src/**/*.ts"],
-	"ignoreDependencies": []
+	"ignoreDependencies": [],
+	"ignore": []
 }
