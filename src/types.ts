@@ -290,6 +290,10 @@ export interface TestReport {
 
 // --- Config types ---
 
+/**
+ * @deprecated Use CuiConfig from engine/types.ts instead.
+ * This type is kept for backwards compatibility with archived v1 code.
+ */
 export interface CuiConfig {
 	/** Path to scraper output directory */
 	input: string;

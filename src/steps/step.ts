@@ -12,6 +12,7 @@ import type {
 	StepResult,
 } from "../engine/types.js";
 import { agentQuery } from "../lib/agent.js";
+import { parseReviewerVerdict } from "../lib/reviewers.js";
 
 /**
  * Create an agent step — runs a Claude SDK agent with the given prompt.
@@ -125,44 +126,18 @@ export function reviewerStep(opts: {
 }
 
 /**
- * Default verdict parser — looks for VERDICT: PASS or VERDICT: REJECT.
+ * Default verdict parser — delegates to shared parseReviewerVerdict.
  */
 function defaultParseVerdict(reviewerId: string, output: string): StepResult {
-	const normalized = output.toUpperCase();
-
-	if (
-		normalized.includes("VERDICT: PASS") ||
-		normalized.includes("VERDICT:PASS")
-	) {
-		return {
-			status: "pass",
-			reviews: [
-				{
-					reviewerId,
-					verdict: "pass",
-					findings: output,
-				},
-			],
-		};
-	}
-
-	// Extract rejection context (everything after "REJECTION CONTEXT:" if present)
-	let rejectionContext: string | undefined;
-	const rcMatch = output.match(
-		/REJECTION CONTEXT[:\s]*\n?([\s\S]*?)(?=\n#{1,3}\s|z)/i,
-	);
-	if (rcMatch) {
-		rejectionContext = rcMatch[1].trim();
-	}
-
+	const parsed = parseReviewerVerdict(output);
 	return {
-		status: "reject",
+		status: parsed.verdict === "pass" ? "pass" : "reject",
 		reviews: [
 			{
 				reviewerId,
-				verdict: "reject",
-				findings: output,
-				rejectionContext: rejectionContext ?? output,
+				verdict: parsed.verdict,
+				findings: parsed.findings,
+				rejectionContext: parsed.rejectionContext,
 			},
 		],
 	};

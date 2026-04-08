@@ -15,6 +15,10 @@ import type { PipelineLogger } from "../lib/logger.js";
 // LLM Profile
 // ---------------------------------------------------------------------------
 
+/**
+ * LLM provider profile — the canonical type definition.
+ * If modifying fields, also update the Zod schema in config.ts (LLMProfileSchema).
+ */
 export interface LLMProfile {
 	/** Provider name (e.g., "anthropic", "friendli") */
 	provider: string;
@@ -203,6 +207,13 @@ export interface LoggingConfig {
 	debugFile: string;
 }
 
+export interface ReviewerMatrixEntry {
+	/** Provider keys to use for this reviewer */
+	providers: string[];
+	/** How to aggregate: any provider rejects = reject (default), all must pass */
+	aggregation?: "any_reject";
+}
+
 export interface CuiConfig {
 	/** Path to scraper output directory */
 	input: string;
@@ -216,4 +227,10 @@ export interface CuiConfig {
 	heartbeat: HeartbeatConfig;
 	/** Logging file configuration */
 	logging: LoggingConfig;
+	/** Named LLM provider profiles for multi-provider dispatch */
+	providers?: Record<string, LLMProfile>;
+	/** Per-reviewer provider assignment and aggregation strategy */
+	reviewer_matrix?: Record<string, ReviewerMatrixEntry>;
+	/** Per-step provider override: stepId → provider key */
+	step_matrix?: Record<string, string>;
 }

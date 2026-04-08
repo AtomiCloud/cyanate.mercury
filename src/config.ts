@@ -8,6 +8,10 @@ import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import type { CuiConfig } from "./engine/types.js";
 
+/**
+ * Zod schema for LLMProfile — must be kept in sync with
+ * the LLMProfile interface in engine/types.ts.
+ */
 const LLMProfileSchema = z.object({
 	provider: z.string().default("anthropic"),
 	model: z.string(),
@@ -29,7 +33,12 @@ const LoggingSchema = z
 	})
 	.default({ eventsFile: "agent-events.jsonl", debugFile: "agent-debug.log" });
 
-const CuiConfigSchema = z.object({
+const ReviewerMatrixEntrySchema = z.object({
+	providers: z.array(z.string()).min(1),
+	aggregation: z.literal("any_reject").optional(),
+});
+
+export const CuiConfigSchema = z.object({
 	input: z.string(),
 	reference: z.string().optional(),
 	defaults: LLMProfileSchema.default({
@@ -49,6 +58,9 @@ const CuiConfigSchema = z.object({
 		.default({}),
 	heartbeat: HeartbeatSchema,
 	logging: LoggingSchema,
+	providers: z.record(z.string(), LLMProfileSchema).optional(),
+	reviewer_matrix: z.record(z.string(), ReviewerMatrixEntrySchema).optional(),
+	step_matrix: z.record(z.string(), z.string()).optional(),
 });
 
 export function loadConfig(configPath: string): CuiConfig {

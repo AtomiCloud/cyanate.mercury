@@ -6,8 +6,15 @@
 		"src/lib/agent.ts",
 		"src/lib/logger.ts",
 		"src/lib/dep-selector.ts",
+		"src/lib/multi-provider.ts",
+		"src/lib/multi-provider.io.ts",
+		"src/lib/semaphore.ts",
+		"src/lib/playwright-utils.ts",
+		"src/lib/reviewers.ts",
+		"src/lib/reviewers.io.ts",
+		"src/lib/validators.ts",
 		"src/engine/index.ts"
 	],
 	"project": ["src/**/*.ts"],
-	"ignoreDependencies": ["@playwright/test"]
+	"ignoreDependencies": []
 }
