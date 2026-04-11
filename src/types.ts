@@ -12,6 +12,7 @@ export interface ScraperOutput {
 
 export interface StructureData {
 	site_url?: string;
+	scraped_at?: string;
 	pages: PageStructure[];
 }
 

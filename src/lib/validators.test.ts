@@ -783,6 +783,27 @@ describe("findTailwindClasses", () => {
 		expect(result[0].classes.length).toBeGreaterThan(0);
 	});
 
+	test("variant-prefixed utilities (md:flex, hover:bg-red-500) → detected", () => {
+		const result = findTailwindClasses({
+			"Card.astro":
+				'<div class="md:flex hover:bg-red-500 lg:text-center">content</div>',
+		});
+		expect(result).toHaveLength(1);
+		expect(result[0].classes).toContain("md:flex");
+		expect(result[0].classes).toContain("hover:bg-red-500");
+		expect(result[0].classes).toContain("lg:text-center");
+	});
+
+	test("arbitrary value patterns ([100px], [calc(...)]) → detected as Tailwind", () => {
+		const result = findTailwindClasses({
+			"Card.astro": '<div class="w-[100px] h-[calc(100%-2rem)]">content</div>',
+		});
+		// Arbitrary values with Tailwind prefixes (w-, h-) are Tailwind classes
+		expect(result).toHaveLength(1);
+		expect(result[0].classes).toContain("w-[100px]");
+		expect(result[0].classes).toContain("h-[calc(100%-2rem)]");
+	});
+
 	test("non-component files skipped", () => {
 		const result = findTailwindClasses({
 			"globals.css": ".flex { display: flex; }",
@@ -795,5 +816,86 @@ describe("findTailwindClasses", () => {
 			"Comp.tsx": '<div className="flex justify-center">hi</div>',
 		});
 		expect(result).toHaveLength(1);
+	});
+
+	test("multiline class attribute detected", () => {
+		const result = findTailwindClasses({
+			"Card.astro": `<div class="flex\n  items-center\n  gap-4\n  p-4">content</div>`,
+		});
+		expect(result).toHaveLength(1);
+		expect(result[0].classes).toContain("flex");
+		expect(result[0].classes).toContain("items-center");
+		expect(result[0].classes).toContain("gap-4");
+		expect(result[0].classes).toContain("p-4");
+	});
+
+	test("BEM-style class names are not flagged", () => {
+		const result = findTailwindClasses({
+			"Button.astro":
+				'<button class="btn btn-primary btn--large">Click</button>',
+		});
+		expect(result).toEqual([]);
+	});
+
+	test("common semantic class names are not flagged", () => {
+		const result = findTailwindClasses({
+			"Layout.astro": '<div class="hero container wrapper">content</div>',
+		});
+		expect(result).toEqual([]);
+	});
+
+	test("opacity modifier utilities detected (bg-red-500/50)", () => {
+		const result = findTailwindClasses({
+			"Card.astro": '<div class="bg-red-500/50 text-blue-600/75">content</div>',
+		});
+		expect(result).toHaveLength(1);
+		expect(result[0].classes).toContain("bg-red-500/50");
+		expect(result[0].classes).toContain("text-blue-600/75");
+	});
+
+	test("negative values detected (-mt-4, -z-10)", () => {
+		const result = findTailwindClasses({
+			"Card.astro": '<div class="-mt-4 -z-10">content</div>',
+		});
+		expect(result).toHaveLength(1);
+		expect(result[0].classes).toContain("-mt-4");
+		expect(result[0].classes).toContain("-z-10");
+	});
+
+	test("compound variant utilities detected (sm:hover:flex)", () => {
+		const result = findTailwindClasses({
+			"Card.astro":
+				'<div class="sm:hover:flex md:dark:bg-gray-900">content</div>',
+		});
+		expect(result).toHaveLength(1);
+		expect(result[0].classes).toContain("sm:hover:flex");
+		expect(result[0].classes).toContain("md:dark:bg-gray-900");
+	});
+
+	test("w-full and h-screen are detected", () => {
+		const result = findTailwindClasses({
+			"Comp.astro":
+				'<div class="w-full h-screen min-w-0 max-w-prose">content</div>',
+		});
+		expect(result).toHaveLength(1);
+		expect(result[0].classes).toContain("w-full");
+		expect(result[0].classes).toContain("h-screen");
+		expect(result[0].classes).toContain("min-w-0");
+	});
+
+	test("font-bold, font-semibold, font-medium are detected", () => {
+		const result = findTailwindClasses({
+			"Comp.astro": '<span class="font-bold text-lg">text</span>',
+		});
+		expect(result).toHaveLength(1);
+		expect(result[0].classes).toContain("font-bold");
+		expect(result[0].classes).toContain("text-lg");
+	});
+
+	test("common UI class names like 'active' and 'disabled' not flagged", () => {
+		const result = findTailwindClasses({
+			"Nav.astro": '<a class="nav-link active" href="/about">About</a>',
+		});
+		expect(result).toEqual([]);
 	});
 });

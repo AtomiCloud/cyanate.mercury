@@ -191,7 +191,6 @@ export function validateWireframeOutput(input: {
   generatedRoutes: string[];
   assetManifest: Record<string, string>;
   existingImageFiles: string[];
-  componentFileContents: Record<string, string>;
   astroFileContents: Record<string, string>;
   originalSiteUrl: string;
   pagefindExists: boolean;
@@ -202,17 +201,19 @@ Internally calls from `src/lib/validators.ts`:
 - `validateContentCoverage(sourcePages, generatedRoutes)`
 - `validateAssetIntegrity(assetManifest, existingImageFiles)`
 - `findLeakedAbsoluteUrls(astroFileContents, originalSiteUrl)`
-- `findTailwindClasses(componentFileContents)`
 - Checks `pagefindExists`
+
+**Note:** Wireframe components should be generated without class attributes (unstyled semantic HTML), but this is NOT validated — the design phase will add/remove classes freely, so enforcing it here adds no value.
 
 **Tests** (`src/segments/wireframe/wireframe-validate.test.ts`):
 - All checks pass → `{ valid: true, errors: [] }`
 - Missing route → error about content coverage
 - Missing image → error about asset integrity
 - Leaked absolute URL → error with file + line
-- Tailwind class in component → error with file + line + classes
 - No pagefind dir → error
 - Multiple failures → all errors collected
+
+**Removed:** Tailwind class detection (`findTailwindClasses`) is not a wireframe-phase gate. Wireframe components should be unstyled but this is a prompt instruction, not a validation — the design phase adds/removes classes freely.
 
 ### 6. IO Shell: Phase Definitions — `src/segments/wireframe/phases.io.ts`
 
@@ -245,7 +246,7 @@ Internally calls from `src/lib/validators.ts`:
 | NFR-1: Linting | All files pass `bun run check` |
 | NFR-3: Unit Testing | High coverage: reduce, classify, seed, wireframe-validate |
 | NFR-5: E2E Testing | Phase 5 is comprehensive E2E gate |
-| NFR-8: Invariant Checking | Content coverage, asset integrity, no absolute URLs, no Tailwind |
+| NFR-8: Invariant Checking | Content coverage, asset integrity, no absolute URLs |
 | NFR-10: Performance | Fan-out capped by semaphore |
 | NFR-14: Retry Semantics | Phase 2: maxRetries 2, Phase 4: maxRetries 3, Phase 5: maxRetries 2 |
 | NFR-15: Fan-out Step Support | Phase 2a (3 classifiers), Phase 4a (per-component), Phase 4d (per-page-type) |
@@ -257,18 +258,96 @@ Internally calls from `src/lib/validators.ts`:
 - `groupByPageType` / `selectSamples`: correct grouping and richest/simplest selection
 - `rewriteInternalLinks`: internal → relative, external preserved, nested traversal
 - `crossValidateClassifiers`: catches missing types and conflicting routes
-- `generateContentConfig`: produces valid Astro v6 TypeScript
-- `validateWireframeOutput`: catches all 5 failure modes (coverage, assets, URLs, Tailwind, pagefind)
+- `generateContentConfig`: produces valid Astro v6 TypeScript with both `glob()` and `file()` loaders (glob for collections, file for singleton/global data files)
+- `validateWireframeOutput`: catches all 4 failure modes (coverage, assets, URLs, pagefind)
 - Phase 5 gate rejects if any check fails
 
 ### Non-Functional Checks
 - `bun run check` passes clean
 - Unit tests pass: reduce.test.ts, classify.test.ts, seed.test.ts, wireframe-validate.test.ts
 - Coverage >90% on pure modules
-- Generated Astro project passes `bun run check`
+- Generated Astro project passes `bun run check` (must be verified independently, not just root repo)
+
+### Edge-Case Correctness (Critical — address these explicitly)
+
+**IMPORTANT: Before marking work as complete, the implementer MUST systematically review every pure function for edge-case correctness.** For each function in reduce.ts, classify.ts, seed.ts, and wireframe-validate.ts:
+1. Trace through the function with empty inputs, single-element inputs, and adversarial inputs (missing fields, mismatched references, duplicate keys)
+2. Verify fallback paths don't silently produce wrong results — prefer returning errors/empty over guessing
+3. Ensure unit tests cover the edge cases, not just the happy path
+4. Check that validation functions can't false-pass (e.g., substring matching that should be exact matching)
+
+Specific known edge cases that MUST be addressed:
+- `findCollectionForListing()` must NOT have an unsafe fallback that returns the listing name when no collection match is found. It must use `listable_by` reverse lookup and return empty string when no collection found, generating a static placeholder page instead.
+- `validateSeedCompleteness()` must use exact route matching (not substring/prefix matching) to verify every source page is accounted for
+- `validateRoutePatterns()` must detect static-vs-dynamic overlaps, not just `[slug]` vs `[id]` conflicts
+- `validateContentModelRefs()` must validate listings, not just collections
+- Phase 2 step 2d-5 (conflict resolution agent) must ONLY run if 2d-4 found errors — skip it entirely when no errors are found
+- Component-manifest validation must accumulate ALL collection references per file (not overwrite/lose earlier references)
+- Collection item route `.astro` files must distinguish between content entries (use `render(entry)` + `<Content />`) and data entries (use `entry.data` directly) based on the collection's loader type (glob = content, file = data)
+- Phase 4e must implement the spec's two-pass reviewer structure: pass 1 runs static+console+vision+content, pass 2 runs trace
+
+## Evidence Requirements
+
+The implementer MUST produce these files in `{loop}/evidence/` so reviewers can verify without reading the full codebase:
+
+| File | Contents |
+|---|---|
+| `bun-run-check.txt` | Output of `bun run check` on the root repo |
+| `bun-test.txt` | Output of `bun test` showing pass/fail counts |
+| `bun-test-coverage.txt` | Per-module coverage percentages for pure modules |
+| `generated-project-bun-run-check.txt` | Output of running `bun run check` inside `template/astro-project/` after seeding content — proves the GENERATED project compiles, not just the root repo |
+| `segment-list.txt` | Output of `bun src/index.ts list` showing wireframe with 5 phases |
+| `acceptance-criteria.md` | Checklist of every acceptance criterion with PASS/FAIL and evidence file references |
+| `diff.patch` | `git diff` of all changes in this iteration |
+| `files.json` | Full file listing of all changed/created files |
+
+**Critical**: `generated-project-bun-run-check.txt` must show the check was run on the template/astro-project directory (look for "Checked N files" in the output), NOT on the root repo. This has been a recurring evidence gap.
+
+## Known Reviewer Concerns (Resolved)
+
+These issues were raised by reviewers in prior iterations and have been addressed. Do NOT regress on them:
+
+1. **Dev server port safety** (loop 1): `startDevServer()` must confirm the spawned Astro process is actually bound, not just that any process is responding on the port
+2. **Astro file() loader semantics** (loops 6-8): `file()` loaders for globals/singletons must use correct Zod schemas matching the actual data shape (not `z.record(z.unknown())`)
+3. **ReducedMeta schema conformance** (loop 6): `buildReducedMeta()` output must match the `ReducedMeta` TypeScript interface
+4. **Seed completeness for root page** (loop 8): `/` must be recognized as a valid route and not falsely rejected
+5. **Content vs data entry rendering** (loop 8): Generated `.astro` files must use `render(entry)` for content collections and `entry.data` for data collections
+6. **Unconditional 2d-5 execution** (loop 9): Phase 2d-5 conflict resolution must be conditional on 2d-4 finding errors
+7. **Component-manifest reference accumulation** (loop 9): Must collect ALL `getCollection()` refs per file, not overwrite with last match
+8. **Route generation safety** (loop 14): `findCollectionForListing()` must not fall back to arbitrary listing name; uses `listable_by` reverse lookup
 
 ## Validation Approach
 
-- **Immediate automated**: `bun run check` clean; `bun test` on wireframe pure modules
+- **Immediate automated**: `bun run check` clean; `bun test` on wireframe pure modules; run `bun run check` on template/astro-project separately
 - **Manual immediate**: Run wireframe against `example/` input; inspect generated project structure
 - **Post-release**: Full pipeline combining wireframe + analyze into design segment
+
+## Definition of Done (Pre-Completion Checklist)
+
+The implementer MUST NOT mark this plan as complete until ALL of the following are true. Run this checklist as the final step before declaring done:
+
+### Correctness audit (per pure function)
+- [ ] For each function in `reduce.ts`, `classify.ts`, `seed.ts`, `wireframe-validate.ts`: traced through with empty, single-element, and adversarial inputs
+- [ ] Every fallback branch verified to return errors/empty rather than silently guessing
+- [ ] Every validation function verified incapable of false-passing (exact matching, not substring/prefix)
+- [ ] Every heuristic explicitly reviewed: does it degrade gracefully when its assumptions don't hold?
+- [ ] All 8 known edge cases in the Edge-Case Correctness section are addressed AND covered by unit tests
+
+### Test coverage
+- [ ] Unit tests cover the edge cases listed above, not just happy paths
+- [ ] Coverage >90% on all pure modules (verified via `bun test --coverage`)
+- [ ] All 341+ tests pass
+
+### Evidence files
+- [ ] All 8 files in the Evidence Requirements table exist in `{loop}/evidence/`
+- [ ] `generated-project-bun-run-check.txt` was produced by running `bun run check` INSIDE `template/astro-project/`, not the root repo (verify by checking the file count in the output)
+- [ ] `acceptance-criteria.md` has a row for every criterion with a PASS/FAIL status and evidence file reference
+
+### Regression check
+- [ ] None of the 8 "Known Reviewer Concerns (Resolved)" have regressed
+- [ ] The root repo and generated project both pass `bun run check` independently
+
+### Final gate
+- [ ] A manual walkthrough: pick one pure function and re-read it end-to-end looking for ANY path that could silently produce wrong output. Fix or document before marking complete.
+
+**If any box above is unchecked, the implementation is NOT complete. Do not mark the task done until every box is verified.**

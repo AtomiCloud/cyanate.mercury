@@ -341,20 +341,61 @@ export function validateOklchValues(tokens: DesignTokensV2): string[] {
 }
 
 /**
- * Check content coverage: every source page has a route in generated output.
+ * Convert a route pattern like "/blog/[slug]" into a regex.
+ * "/blog/[slug]" → /^\/blog\/[^/]+$/
+ * "/blog/[...slug]" → /^\/blog\/.*$/
+ * "/" → /^\/$/
  */
+function routePatternToRegex(pattern: string): RegExp | null {
+	const segments = pattern.split("/").filter(Boolean);
+	const parts: string[] = [];
+	for (const seg of segments) {
+		if (seg.startsWith("[") && seg.endsWith("]")) {
+			const inner = seg.slice(1, -1);
+			if (inner.startsWith("...")) {
+				// Rest parameter — matches everything including /
+				parts.push(".*");
+			} else {
+				// Dynamic segment — matches one path segment
+				parts.push("[^/]+");
+			}
+		} else {
+			parts.push(seg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+		}
+	}
+	if (pattern === "/") return /^\/$/;
+	return new RegExp(`^/${parts.join("/")}$`);
+}
+
+/**
+ * Normalize a pathname by stripping trailing slash (except root "/").
+ * Astro treats /about and /about/ equivalently, so the validator must too.
+ */
+function normalizePath(path: string): string {
+	if (path === "/") return path;
+	return path.endsWith("/") ? path.slice(0, -1) : path;
+}
+
 export function validateContentCoverage(
 	sourcePages: PageContent[],
 	generatedRoutes: string[],
 ): { covered: string[]; missing: string[] } {
-	const routeSet = new Set(generatedRoutes);
 	const covered: string[] = [];
 	const missing: string[] = [];
 
 	for (const page of sourcePages) {
-		// Try to find a matching route for this page
-		const pagePath = new URL(page.url).pathname;
-		if (routeSet.has(pagePath)) {
+		const pagePath = normalizePath(new URL(page.url).pathname);
+		const matched = generatedRoutes.some((route) => {
+			// Exact match (both normalized)
+			if (normalizePath(route) === pagePath) return true;
+			// Dynamic pattern match
+			if (route.includes("[")) {
+				const regex = routePatternToRegex(route);
+				if (regex?.test(pagePath)) return true;
+			}
+			return false;
+		});
+		if (matched) {
 			covered.push(page.url);
 		} else {
 			missing.push(page.url);
@@ -366,6 +407,8 @@ export function validateContentCoverage(
 
 /**
  * Check asset integrity: every manifest entry has a file that exists.
+ * Files are stored under public/images/, but manifest values are bare names.
+ * Check both bare name and images/ prefixed variants.
  */
 export function validateAssetIntegrity(
 	manifest: Record<string, string>,
@@ -376,7 +419,14 @@ export function validateAssetIntegrity(
 	const missing: string[] = [];
 
 	for (const [asset, source] of Object.entries(manifest)) {
-		if (fileSet.has(asset) || fileSet.has(source)) {
+		// Manifest value may be bare ("abc123.png") or already prefixed ("images/abc123.png")
+		// existingFiles paths are relative to public/, always prefixed ("images/abc123.png")
+		const hasSource =
+			fileSet.has(source) ||
+			fileSet.has(asset) ||
+			fileSet.has(`images/${source}`) ||
+			fileSet.has(`images/${asset}`);
+		if (hasSource) {
 			valid.push(asset);
 		} else {
 			missing.push(asset);
@@ -456,51 +506,373 @@ function isComponentFile(file: string): boolean {
 	);
 }
 
-/** Scan a single line for Tailwind class patterns. */
-function scanLineForTailwindClasses(
-	line: string,
-	patterns: RegExp[],
-): string[] {
-	if (!line.includes("class=") && !line.includes("className=")) {
-		return [];
+/**
+ * Known Tailwind utility category prefixes.
+ * A class that starts with one of these prefixes (after stripping variant
+ * prefixes) and matches the expected format is considered a Tailwind utility.
+ * This is the definitive list — classes not starting with these are not flagged.
+ */
+const TW_PREFIXES = new Set([
+	// Layout
+	"block",
+	"inline",
+	"flex",
+	"grid",
+	"table",
+	"static",
+	"relative",
+	"absolute",
+	"fixed",
+	"sticky",
+	"float",
+	"clear",
+	"isolate",
+	"isolation",
+	"container",
+	"columns",
+	"break",
+	"box",
+	"z-",
+	"order",
+	// Flexbox
+	"flex",
+	"flex-",
+	"shrink",
+	"grow",
+	"basis",
+	"items",
+	"justify",
+	"self",
+	// Grid
+	"grid",
+	"col",
+	"row",
+	"auto",
+	"place",
+	// Spacing
+	"p",
+	"px",
+	"py",
+	"pt",
+	"pr",
+	"pb",
+	"pl",
+	"ps",
+	"pe",
+	"m",
+	"mx",
+	"my",
+	"mt",
+	"mr",
+	"mb",
+	"ml",
+	"ms",
+	"me",
+	"space",
+	"gap",
+	// Sizing
+	"w",
+	"h",
+	"min-w",
+	"min-h",
+	"max-w",
+	"max-h",
+	// Typography
+	"text",
+	"font",
+	"leading",
+	"tracking",
+	"antialiased",
+	"subpixel",
+	"whitespace",
+	"truncate",
+	"normal",
+	"uppercase",
+	"lowercase",
+	"capitalize",
+	"italic",
+	"not-italic",
+	"underline",
+	"line-through",
+	"decoration",
+	"indent",
+	"list",
+	"placeholder",
+	// Backgrounds
+	"bg",
+	"bg-",
+	"from",
+	"via",
+	"to",
+	"bg-gradient",
+	"bg-clip",
+	"bg-origin",
+	"bg-repeat",
+	"bg-position",
+	"bg-size",
+	"bg-attachment",
+	"bg-blend",
+	// Borders
+	"border",
+	"rounded",
+	"ring",
+	"ring-offset",
+	"outline",
+	"divide",
+	// Effects
+	"shadow",
+	"blur",
+	"drop-shadow",
+	"opacity",
+	"mix-blend",
+	// Filters
+	"brightness",
+	"contrast",
+	"grayscale",
+	"invert",
+	"saturate",
+	"sepia",
+	"backdrop",
+	"hue-rotate",
+	"saturate",
+	"filter",
+	// Transitions
+	"transition",
+	"duration",
+	"ease",
+	"delay",
+	// Animations
+	"animate",
+	"transform",
+	"scale",
+	"rotate",
+	"translate",
+	"skew",
+	"origin",
+	// Interactivity
+	"appearance",
+	"cursor",
+	"pointer-events",
+	"resize",
+	"select",
+	"user-select",
+	"scroll",
+	"snap",
+	"touch",
+	"overflow",
+	// SVG
+	"fill",
+	"stroke",
+	// Accessibility
+	"sr",
+	"not-sr",
+	// Tables
+	"border-collapse",
+	"border-separate",
+	"table",
+	// Positioning
+	"top",
+	"right",
+	"bottom",
+	"left",
+	"inset",
+	// Accent
+	"accent",
+	"caret",
+	"color-scheme",
+	// Content
+	"content",
+	"aspect",
+	"prose",
+	// Misc
+	"visible",
+	"invisible",
+	"hidden",
+	"overflow",
+	"overscroll",
+]);
+
+/** Normalize a Tailwind class by stripping modifiers and values. */
+function normalizeTailwindClass(cls: string): string {
+	let normalized = cls;
+	if (normalized.startsWith("-")) normalized = normalized.slice(1);
+
+	// Strip variant prefixes (colon-separated, e.g., "md:flex" → "flex")
+	while (normalized.includes(":")) {
+		normalized = normalized.slice(normalized.indexOf(":") + 1);
 	}
-	const found: string[] = [];
-	for (const pattern of patterns) {
-		const matches = line.match(pattern);
-		if (matches) found.push(...matches);
+
+	// Strip opacity modifier (e.g., "bg-red-500/50" → "bg-red-500")
+	const slashIdx = normalized.indexOf("/");
+	if (slashIdx > 0 && /^\d{1,3}$/.test(normalized.slice(slashIdx + 1))) {
+		normalized = normalized.slice(0, slashIdx);
 	}
-	return [...new Set(found)];
+
+	// Strip arbitrary value (e.g., "w-[100px]" → "w-")
+	const arbIdx = normalized.indexOf("[");
+	if (arbIdx > 0) normalized = normalized.slice(0, arbIdx);
+
+	return normalized;
+}
+
+/** Standalone Tailwind utilities (no suffix required). */
+const STANDALONE_TW = new Set([
+	"flex",
+	"inline-flex",
+	"grid",
+	"inline-grid",
+	"block",
+	"inline-block",
+	"inline",
+	"table",
+	"table-cell",
+	"table-row",
+	"table-column",
+	"table-caption",
+	"contents",
+	"flow-root",
+	"hidden",
+	"visible",
+	"none",
+	"static",
+	"relative",
+	"absolute",
+	"fixed",
+	"sticky",
+	"underline",
+	"line-through",
+	"no-underline",
+	"truncate",
+	"uppercase",
+	"lowercase",
+	"capitalize",
+	"normal-case",
+	"italic",
+	"not-italic",
+	"antialiased",
+	"subpixel-antialiased",
+	"border",
+	"sr-only",
+	"not-sr-only",
+	"isolate",
+	"isolation-auto",
+	"scroll-smooth",
+	"scroll-auto",
+	"border-collapse",
+	"border-separate",
+	"appearance-none",
+	"auto",
+]);
+
+/** Known semantic class names that are not Tailwind utilities. */
+const TW_EXCLUSIONS = new Set(["container", "content"]);
+
+/** Check if a normalized (modifier-stripped) utility starts with a known Tailwind prefix. */
+function matchesTwPrefix(normalized: string): boolean {
+	if (TW_EXCLUSIONS.has(normalized)) return false;
+	if (STANDALONE_TW.has(normalized)) return true;
+
+	for (const prefix of TW_PREFIXES) {
+		if (
+			normalized === prefix ||
+			normalized.startsWith(`${prefix}-`) ||
+			(prefix.endsWith("-") && normalized.startsWith(prefix))
+		) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Check if a string is a Tailwind utility class.
+ * Uses a prefix-based approach: strips variant prefixes, then checks
+ * if the remaining utility starts with a known Tailwind category.
+ */
+function isTailwindClass(cls: string): boolean {
+	if (!cls || cls.length < 2) return false;
+	const normalized = normalizeTailwindClass(cls);
+	return matchesTwPrefix(normalized);
+}
+
+/**
+ * Extract class attribute values from source, handling multiline attributes.
+ * Returns values paired with their starting line number.
+ */
+function extractClassValuesByLine(
+	source: string,
+): Array<{ line: number; value: string }> {
+	const results: Array<{ line: number; value: string }> = [];
+	const lines = source.split("\n");
+	let inClassAttr = false;
+	let classAttrQuote = "";
+	let classAttrStartLine = 0;
+	let currentClassValue = "";
+
+	for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+		const line = lines[lineNum];
+
+		if (inClassAttr) {
+			currentClassValue += line;
+			const closeIdx = currentClassValue.indexOf(classAttrQuote, 1);
+			if (closeIdx !== -1) {
+				results.push({
+					line: classAttrStartLine,
+					value: currentClassValue.slice(1, closeIdx),
+				});
+				inClassAttr = false;
+				currentClassValue = "";
+			}
+			continue;
+		}
+
+		const attrStart = line.match(/(?:class|className)\s*=\s*(['"`])/);
+		if (attrStart) {
+			const quote = attrStart[1];
+			const attrStr = line.slice(
+				line.indexOf(attrStart[0]) + attrStart[0].length - 1,
+			);
+			const closeIdx = attrStr.indexOf(quote, 1);
+			if (closeIdx !== -1) {
+				results.push({ line: lineNum, value: attrStr.slice(1, closeIdx) });
+			} else {
+				inClassAttr = true;
+				classAttrQuote = quote;
+				classAttrStartLine = lineNum;
+				currentClassValue = attrStr;
+			}
+		}
+	}
+
+	return results;
+}
+
+/** Filter and deduplicate Tailwind classes from a raw class string. */
+function extractTailwindClasses(raw: string): string[] {
+	const classes = raw.split(/\s+/).filter(Boolean).filter(isTailwindClass);
+	return [...new Set(classes)];
 }
 
 /**
  * Check no Tailwind utility classes in component files.
- * Looks for common Tailwind class patterns in class attributes.
+ * Scans all component files (.astro, .tsx, .jsx) for class/className attributes.
+ * Uses comprehensive prefix-based pattern matching with an allowlist of known
+ * false positives. Handles multiline attributes and arbitrary values.
  */
 export function findTailwindClasses(
 	fileContents: Record<string, string>,
 ): Array<{ file: string; line: number; classes: string[] }> {
-	const twPatterns = [
-		/\b(flex|grid|block|inline|hidden|visible)\b/g,
-		/\b(p-\d|px-\d|py-\d|pt-\d|pb-\d|pl-\d|pr-\d|m-\d|mx-\d|my-\d|mt-\d|mb-\d|ml-\d|mr-\d|space-[xy]-\d|gap-\d)/g,
-		/\b(text-(sm|base|lg|xl|2xl|3xl|4xl|xs))\b/g,
-		/\b(bg-(white|black|red|blue|green|yellow|gray|slate|zinc|neutral|stone)-\d{2,3})\b/g,
-		/\b(rounded-(sm|md|lg|xl|2xl|full|none))\b/g,
-		/\b(shadow-(sm|md|lg|xl|2xl|none))\b/g,
-		/\b(w-\d|h-\d|min-w-|max-w-|min-h-|max-h-)\b/g,
-		/\b(items-(center|start|end|stretch|baseline))\b/g,
-		/\b(justify-(center|start|end|between|around|evenly))\b/g,
-	];
-
 	const results: Array<{ file: string; line: number; classes: string[] }> = [];
 
 	for (const [file, content] of Object.entries(fileContents)) {
 		if (!isComponentFile(file)) continue;
 
-		const lines = content.split("\n");
-		for (let lineNum = 0; lineNum < lines.length; lineNum++) {
-			const classes = scanLineForTailwindClasses(lines[lineNum], twPatterns);
+		const entries = extractClassValuesByLine(content);
+		for (const entry of entries) {
+			const classes = extractTailwindClasses(entry.value);
 			if (classes.length > 0) {
-				results.push({ file, line: lineNum + 1, classes });
+				results.push({ file, line: entry.line + 1, classes });
 			}
 		}
 	}

@@ -14,6 +14,6 @@ import { program } from "./cli.js";
 
 // Register segments here as they are implemented:
 import "./segments/analyze/index.js";
-// import "./segments/build-layout.js";
+import "./segments/wireframe/index.js";
 
 program.parse();
