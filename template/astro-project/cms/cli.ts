@@ -32,6 +32,7 @@ interface CmsConfig {
 	adapter: string;
 	url: string;
 	apiKey: string;
+	tenantId?: string;
 }
 
 async function loadConfig(): Promise<CmsConfig> {
@@ -41,7 +42,7 @@ async function loadConfig(): Promise<CmsConfig> {
 		return JSON.parse(raw) as CmsConfig;
 	} catch {
 		console.error("Error: cms.config.json not found. Create it with:");
-		console.error('  { "adapter": "sonicjs", "url": "...", "apiKey": "..." }');
+		console.error('  { "adapter": "sonicjs", "url": "...", "apiKey": "...", "tenantId": "..." }');
 		process.exit(1);
 	}
 }
@@ -296,9 +297,9 @@ async function main(): Promise<void> {
 	const adapter = await loader();
 
 	if (command === "push") {
-		await cmdPush(adapter, { url: cfg.url, apiKey: cfg.apiKey });
+		await cmdPush(adapter, { url: cfg.url, apiKey: cfg.apiKey, ...(cfg.tenantId ? { tenantId: cfg.tenantId } : {}) });
 	} else {
-		await cmdPull(adapter, { url: cfg.url, apiKey: cfg.apiKey });
+		await cmdPull(adapter, { url: cfg.url, apiKey: cfg.apiKey, ...(cfg.tenantId ? { tenantId: cfg.tenantId } : {}) });
 	}
 }
 

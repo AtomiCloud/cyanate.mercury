@@ -286,12 +286,14 @@ async function createCollection(
 	baseUrl: string,
 	apiKey: string,
 	collection: CollectionDef,
+	tenantId?: string,
 ): Promise<string> {
 	const json = (await fetchJson(`${baseUrl}/admin/api/collections`, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
 			Authorization: `Bearer ${apiKey}`,
+			...(tenantId ? { "X-Tenant-Id": tenantId } : {}),
 		},
 		body: JSON.stringify({
 			name: collection.name,
@@ -313,8 +315,9 @@ async function replaceCollectionSchema(
 	apiKey: string,
 	collectionId: string,
 	collection: CollectionDef,
+	tenantId?: string,
 ): Promise<void> {
-	const headers = { Authorization: `Bearer ${apiKey}` };
+	const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}`, ...(tenantId ? { "X-Tenant-Id": tenantId } : {}) };
 	const details = (await fetchJson(
 		`${baseUrl}/admin/api/collections/${collectionId}`,
 		{
@@ -371,7 +374,7 @@ async function replaceCollectionSchema(
 		method: "PATCH",
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
+			...headers,
 		},
 		body: JSON.stringify({
 			display_name: toTitleCase(collection.name),
@@ -389,11 +392,12 @@ async function ensureCollectionSchema(
 	apiKey: string,
 	collection: CollectionDef,
 	existingCollectionId?: string,
+	tenantId?: string,
 ): Promise<{ collectionId: string; created: boolean }> {
 	const collectionId =
 		existingCollectionId ??
-		(await createCollection(baseUrl, apiKey, collection));
-	await replaceCollectionSchema(baseUrl, apiKey, collectionId, collection);
+		(await createCollection(baseUrl, apiKey, collection, tenantId));
+	await replaceCollectionSchema(baseUrl, apiKey, collectionId, collection, tenantId);
 	return { collectionId, created: !existingCollectionId };
 }
 
@@ -408,9 +412,11 @@ export const sonicjs: CmsAdapter = {
 	}): Promise<PushResult> {
 		const baseUrl = config.url.replace(/\/$/, "");
 		const apiKey = config.apiKey;
-		const headers = {
+		const tenantId = config.tenantId;
+		const headers: Record<string, string> = {
 			"Content-Type": "application/json",
 			Authorization: `Bearer ${apiKey}`,
+			...(tenantId ? { "X-Tenant-Id": tenantId } : {}),
 		};
 
 		const errors: SyncError[] = [];
@@ -432,6 +438,7 @@ export const sonicjs: CmsAdapter = {
 					apiKey,
 					collDef,
 					existingId,
+					tenantId,
 				);
 				collectionMap.set(collDef.name, result.collectionId);
 				if (result.created) {
@@ -482,7 +489,7 @@ export const sonicjs: CmsAdapter = {
 
 						const res = await fetch(`${baseUrl}/api/media/upload`, {
 							method: "POST",
-							headers: { Authorization: `Bearer ${apiKey}` },
+							headers: { Authorization: `Bearer ${apiKey}`, ...(tenantId ? { "X-Tenant-Id": tenantId } : {}) },
 							body: formData,
 						});
 
@@ -611,8 +618,10 @@ export const sonicjs: CmsAdapter = {
 	}): Promise<PullResult> {
 		const baseUrl = config.url.replace(/\/$/, "");
 		const apiKey = config.apiKey;
-		const headers = {
+		const tenantId = config.tenantId;
+		const headers: Record<string, string> = {
 			Authorization: `Bearer ${apiKey}`,
+			...(tenantId ? { "X-Tenant-Id": tenantId } : {}),
 		};
 
 		const errors: SyncError[] = [];
