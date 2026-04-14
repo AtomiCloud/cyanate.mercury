@@ -4,38 +4,50 @@
 
 // --- Scraper output types ---
 
-export interface ScraperOutput {
-	structure: StructureData;
-	schema: SchemaData;
-	content: ContentData;
-}
-
 export interface StructureData {
 	site_url?: string;
 	scraped_at?: string;
-	pages: PageStructure[];
+	primary_language?: string;
+	total_crawled?: number;
+	total_kept?: number;
+	page_types: PageType[];
 }
 
-export interface PageStructure {
-	id: string;
-	url: string;
-	pagetype: string;
-	title: string;
-	references?: string[];
+export interface PageType {
+	name: string;
+	url_pattern: string;
+	description: string;
+	sample_urls: string[];
+	urls: string[];
 }
 
 export interface SchemaData {
-	[pageType: string]: {
-		type: string;
-		properties: Record<string, unknown>;
-		required?: string[];
-	};
+	pages: Record<
+		string,
+		{
+			type: string;
+			properties: Record<string, unknown>;
+			required?: string[];
+		}
+	>;
+	definitions?: Record<string, unknown>;
 }
 
 export interface ContentData {
-	pages: PageContent[];
+	page_types: Record<string, { entries: ContentEntry[] }>;
 }
 
+export interface ContentEntry {
+	url: string;
+	content: Record<string, unknown>;
+}
+
+/**
+ * Internal normalized page content type.
+ * Not a direct scraper output — produced by the adapter layer
+ * (flattenContent) which injects pagetype from the parent key
+ * and synthesizes id.
+ */
 export interface PageContent {
 	id: string;
 	url: string;
@@ -239,7 +251,7 @@ export interface InteractionPattern {
 		| "other";
 	trigger?: string;
 	target?: string;
-	pageType?: string;
+	pageType?: "all" | string | string[];
 	route?: string;
 	description: string;
 }

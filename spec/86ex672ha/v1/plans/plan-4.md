@@ -250,10 +250,23 @@ export function composeFinalGate(input: {
 - Step 3d: `checkLayerIsolation(files, "typography", ...)` + `checkLayerIsolation(files, "surfaces", ...)` + vision review
 
 **Phase 4: Color + Dark Mode** (maxRetries: 2)
-- Step 4a (`programmaticStep`): reads tokens → `generateColorSystem()` → writes to `@layer color` in globals.css
-- Step 4b (`agentStep`): component color application + dark mode toggle
-- Step 4c (`programmaticStep`): reads color pairs from generated CSS (IO) → `findContrastViolations()` → `applyContrastFixes()` → writes fixed CSS
-- Step 4d: vision review (light + dark × 3 viewports) + `checkLayerIsolation(files, "color", ...)`
+- Step 4a (`programmaticStep`): reads tokens → `generateColorSystem()` → writes both `:root` (light) and `.dark` blocks inside `@layer color { ... }` in globals.css. **Important:** The `.dark` selector lives INSIDE `@layer color`, not outside — this is intentional so layer-isolation checks treat it as belonging to the color layer.
+- Step 4b (`agentStep`): component color application + dark mode toggle. Agent adds `class="dark"` toggle logic and applies color variables to components. All component color rules must be inside `@layer color { ... }`.
+- Step 4c (`programmaticStep`): **Contrast auto-fix wiring (must be fully connected):**
+  1. Parse the `@layer color { ... }` block from globals.css using `parseColorBlocks()` (regex: extracts `:root { ... }` and `.dark { ... }` blocks from within the layer)
+  2. Build contrast pairs from BOTH light AND dark maps: for light, pair each `--foreground-*` against `--background-*`; for dark, pair each `.dark` foreground against `.dark` background
+  3. Call `findContrastViolations()` on both light and dark pairs
+  4. Call `applyContrastFixes()` which calls `autoFixContrast()` per violation (binary-search OKLCH lightness, 32 iterations)
+  5. Write the fixed `:root` + `.dark` blocks back into `@layer color { ... }` in globals.css
+  6. Write evidence: `evidence/{iteration}/contrast-check.json` with violation count, fixes applied, before/after ratios
+- Step 4d: **Vision review (light + dark × 3 viewports):**
+  1. Start Astro dev server
+  2. Screenshot all routes at 375/768/1440px in light mode → `evidence/{iteration}/screenshots/light/`
+  3. Screenshot all routes at 375/768/1440px in dark mode (via `page.emulateMedia({ colorScheme: "dark" })`) → `evidence/{iteration}/screenshots/dark/`
+  4. Vision agent compares light vs dark screenshots for: color coherence, readable text, no invisible elements
+  5. `checkLayerIsolation(files, "color", allLayers)` — validates no CSS touches `@layer layout/typography/surfaces/motion`
+  6. Stop dev server
+  7. Evidence: write `reviews/{iteration}/color-vision-review.md` with findings + screenshots referenced
 
 **Phase 5: Motion** (maxRetries: 2)
 - Steps 5a-5b: agents for global motion + per-component states
@@ -264,6 +277,64 @@ export function composeFinalGate(input: {
 - Step 6b (`agentStep`): quality scoring → parse → writes `quality-scores.json`
 - Step 6c (`agentStep`): fidelity scoring (vision) → appends to `quality-scores.json`
 - Step 6d (`programmaticStep`): reads scores + runs build (IO) → `composeFinalGate()` (pure) → pass/reject
+
+## Disambiguation: Recurring Review Issues
+
+The following clarifications resolve ambiguities that caused repeated reviewer rejections across 15 iterations. These are authoritative for implementation:
+
+### D1: Layer Isolation and `.dark` Selector
+
+The `.dark` class selector in globals.css MUST live INSIDE `@layer color { ... }`, not at the top level. The `checkLayerIsolation()` function treats any CSS inside `@layer <name> { ... }` as belonging to that layer. Code pattern:
+
+```css
+@layer color {
+  :root { --color-primary: oklch(0.7 0.15 250); /* ... */ }
+  .dark { --color-primary: oklch(0.3 0.15 250); /* ... */ }
+}
+```
+
+The `findLayerViolations()` function checks for `@layer <other> { ... }` nested inside the owned layer (a violation) and for CSS written inside sibling `@layer` blocks (also a violation). `.dark` inside `@layer color` is NOT a violation — it's a selector within the owned layer.
+
+### D2: `parseColorBlocks()` Wiring in Step 4c
+
+Step 4c MUST parse globals.css to extract current color values and run contrast checks. The implementation:
+1. Read globals.css
+2. Find the `@layer color { ... }` block
+3. Extract `:root { ... }` within it (light mode colors)
+4. Extract `.dark { ... }` within it (dark mode colors)
+5. Parse CSS custom properties from both blocks into `CssPropertyMap` objects
+6. Build contrast pairs: `--foreground` vs `--background`, `--primary` vs `--background`, `--muted-foreground` vs `--muted` etc.
+7. Run `findContrastViolations()` on BOTH light and dark pairs
+8. Apply fixes with `applyContrastFixes()`
+9. Write updated blocks back to globals.css
+
+If `parseColorBlocks()` fails to find the blocks (e.g., malformed CSS), the step MUST reject with a descriptive error rather than silently passing.
+
+### D3: Evidence File Paths
+
+Every phase gate step MUST write evidence files. Required paths:
+- Build evidence: `evidence/{iteration}/build.json` (exit code, stdout, stderr)
+- Screenshot evidence: `evidence/{iteration}/screenshots/{viewport}/{route}.png`
+- Review markdown: `reviews/{iteration}/{reviewer-type}.md`
+- Contrast check: `evidence/{iteration}/contrast-check.json`
+- Layer isolation: `evidence/{iteration}/layer-isolation.json`
+- Quality scores: `quality-scores.json` (project root, not in evidence/)
+
+The `{iteration}` is the retry count (0-indexed). Evidence directories are created by the IO shell before writing.
+
+### D4: Cumulative CSS and Layer Ownership
+
+globals.css accumulates content from multiple phases. Layer ownership rules for `checkLayerIsolation()`:
+- Phase 2 (layout) owns `@layer layout`. May read but NOT write `@layer typography/surfaces/color/motion`.
+- Phase 3 (typography) owns `@layer typography` and `@layer surfaces`. May read but NOT write others.
+- Phase 4 (color) owns `@layer color`. May read but NOT write others.
+- Phase 5 (motion) owns `@layer motion`. May read but NOT write others.
+- `:root` declarations outside any `@layer` are ALLOWED by any phase (for CSS custom properties). The `findUnlayeredProperties()` function explicitly permits `:root { --var: value; }` and `.dark { --var: value; }` as top-level custom property blocks.
+- `@keyframes`, `@media`, `@import` outside layers are ALLOWED.
+
+### D5: Shadcn Installation Details
+
+Step 1b uses `npx shadcn@latest add <component-names>` with `cwd` set to the Astro project directory (not the pipeline root). The `mapToShadcnComponents()` function maps from the wireframe's `component-manifest.json` entries to known Shadcn slug names (button, card, dialog, etc.). If a component has no Shadcn mapping, it is skipped (custom components don't need Shadcn installation).
 
 ## Spec Adherence
 
@@ -297,6 +368,13 @@ export function composeFinalGate(input: {
 - Unit tests pass: tokens.test.ts, color.test.ts, layers.test.ts, quality.test.ts, merge-inputs.test.ts
 - Coverage >90% on pure modules
 - WCAG AA contrast met for all generated color pairs
+
+### Evidence Capture Checks
+- Every phase gate writes to `evidence/{iteration}/` per D3
+- Phase 4c writes `contrast-check.json` with before/after ratios for every violation
+- Phase 4d captures both light and dark screenshots at 3 viewports in `evidence/{iteration}/screenshots/light|dark/`
+- Every reviewer produces a markdown file in `reviews/{iteration}/`
+- Rejection context from a failed iteration is consumable by the next retry (readable from `reviews/{iteration-1}/`)
 
 ## Validation Approach
 

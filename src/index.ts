@@ -14,6 +14,9 @@ import { program } from "./cli.js";
 
 // Register segments here as they are implemented:
 import "./segments/analyze/index.js";
-import "./segments/wireframe/index.js";
+import "./segments/prepare/index.js";
+// TODO: re-enable once wireframe refactor lands (groupByPageType / selectSamples removed)
+// import "./segments/wireframe/index.js";
+// import "./segments/design/index.js";
 
 program.parse();

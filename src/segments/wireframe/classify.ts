@@ -1,56 +1,17 @@
 /**
- * Pure: classify logic — cross-validation, conflict detection, merge logic.
+ * Pure: classify logic — registry validation, component manifest building.
  *
  * All functions are pure (data in → errors/reports out). No IO.
  */
 
 import type { Registry } from "../../types.js";
+import type { ClassifiedPageType } from "./content-model.js";
 
 // ---------------------------------------------------------------------------
-// Classification types (produced by AI classifiers, consumed by validation)
+// Classification types (produced by registry builder, consumed by seed)
 // ---------------------------------------------------------------------------
 
-/** Architecture classifier output: layouts and routing. */
-export interface ArchitectureClassification {
-	layouts: Record<
-		string,
-		{
-			description: string;
-			page_types: string[];
-		}
-	>;
-	routes: Array<{ pattern: string; pageType: string }>;
-}
-
-/** Content model classifier output: collections and listings. */
-export interface ContentModelClassification {
-	collections: Record<
-		string,
-		{
-			source_pagetype: string;
-			slug_field: string;
-		}
-	>;
-	listings: Record<
-		string,
-		{
-			route: string;
-			paginated: boolean;
-		}
-	>;
-}
-
-/** Interaction classifier output: interactive patterns. */
-export interface InteractionClassification {
-	patterns: Array<{
-		id: string;
-		type: string;
-		pageType?: string;
-		description: string;
-	}>;
-}
-
-/** Full content model output (after merge). */
+/** Full content model output (after registry assembly). */
 export interface ContentModelOutput {
 	collections: Record<
 		string,
@@ -60,6 +21,10 @@ export interface ContentModelOutput {
 			listable_by: string[];
 		}
 	>;
+	/** Per-page-type field classifications with richtext composition specs. */
+	classified_page_types?: ClassifiedPageType[];
+	/** Singleton page types that get seeded as src/content/<pagetype>/default.json. */
+	singletons?: Array<{ pagetype: string; route: string }>;
 }
 
 /** Component manifest output (after merge). */
@@ -71,260 +36,6 @@ export interface ComponentManifestOutput {
 			collections: string[];
 		}
 	>;
-}
-
-// ---------------------------------------------------------------------------
-// crossValidateClassifiers
-// ---------------------------------------------------------------------------
-
-/**
- * Collect all page types referenced by a classifier output.
- */
-function collectClassifierTypes(
-	architecture: ArchitectureClassification,
-	contentModel: ContentModelClassification,
-	interaction: InteractionClassification,
-): Set<string> {
-	const types = new Set<string>();
-	for (const layout of Object.values(architecture.layouts)) {
-		for (const pt of layout.page_types) {
-			types.add(pt);
-		}
-	}
-	for (const coll of Object.values(contentModel.collections)) {
-		types.add(coll.source_pagetype);
-	}
-	for (const pattern of interaction.patterns) {
-		if (pattern.pageType) types.add(pattern.pageType);
-	}
-	return types;
-}
-
-/** Collect page types split by source for cross-validation. */
-function collectClassifierTypesSplit(
-	architecture: ArchitectureClassification,
-	contentModel: ContentModelClassification,
-	interaction: InteractionClassification,
-): { archTypes: Set<string>; cmTypes: Set<string>; intTypes: Set<string> } {
-	const archTypes = new Set<string>();
-	for (const layout of Object.values(architecture.layouts)) {
-		for (const pt of layout.page_types) {
-			archTypes.add(pt);
-		}
-	}
-	const cmTypes = new Set<string>();
-	for (const coll of Object.values(contentModel.collections)) {
-		cmTypes.add(coll.source_pagetype);
-	}
-	const intTypes = new Set<string>();
-	for (const pattern of interaction.patterns) {
-		if (pattern.pageType) intTypes.add(pattern.pageType);
-	}
-	return { archTypes, cmTypes, intTypes };
-}
-
-/**
- * Validate that content model collections reference valid page types.
- * Collections are checked against the union of all OTHER classifiers' types.
- */
-function validateContentModelTypes(
-	contentModel: ContentModelClassification,
-	archTypes: Set<string>,
-	intTypes: Set<string>,
-	knownPageTypes: string[],
-): string[] {
-	const errors: string[] = [];
-	const cmValidTypes = new Set([...knownPageTypes, ...archTypes, ...intTypes]);
-
-	for (const [collName, coll] of Object.entries(contentModel.collections)) {
-		if (!cmValidTypes.has(coll.source_pagetype)) {
-			errors.push(
-				`Content model collection "${collName}" references unknown page type "${coll.source_pagetype}"`,
-			);
-		}
-	}
-
-	return errors;
-}
-
-/**
- * Validate that content model listings reference architecture routes.
- */
-function validateListingRoutes(
-	contentModel: ContentModelClassification,
-	architecture: ArchitectureClassification,
-): string[] {
-	const errors: string[] = [];
-
-	for (const [listingName, listing] of Object.entries(contentModel.listings)) {
-		if (!listing.route) continue;
-		const hasMatchingRoute = architecture.routes.some(
-			(r) => r.pattern === listing.route,
-		);
-		if (!hasMatchingRoute) {
-			errors.push(
-				`Content model listing "${listingName}" references route "${listing.route}" with no matching architecture route`,
-			);
-		}
-	}
-
-	return errors;
-}
-
-/**
- * Validate that interaction patterns reference valid page types.
- * Interaction types are checked against the union of all OTHER classifiers' types.
- */
-function validateInteractionTypes(
-	interaction: InteractionClassification,
-	archTypes: Set<string>,
-	cmTypes: Set<string>,
-	knownPageTypes: string[],
-): string[] {
-	const errors: string[] = [];
-	const intValidTypes = new Set([...knownPageTypes, ...archTypes, ...cmTypes]);
-
-	for (const pattern of interaction.patterns) {
-		if (pattern.pageType && !intValidTypes.has(pattern.pageType)) {
-			errors.push(
-				`Interaction pattern "${pattern.id}" references unknown page type "${pattern.pageType}"`,
-			);
-		}
-	}
-
-	return errors;
-}
-
-/**
- * Validate that all classifier relationships resolve to valid page types.
- * Each classifier's references are validated against the union of all OTHER classifiers
- * (not its own types) to catch self-referencing orphans.
- */
-function validateRelationships(
-	contentModel: ContentModelClassification,
-	interaction: InteractionClassification,
-	architecture: ArchitectureClassification,
-	knownPageTypes: string[],
-): string[] {
-	const { archTypes, cmTypes, intTypes } = collectClassifierTypesSplit(
-		architecture,
-		contentModel,
-		interaction,
-	);
-
-	return [
-		...validateContentModelTypes(
-			contentModel,
-			archTypes,
-			intTypes,
-			knownPageTypes,
-		),
-		...validateListingRoutes(contentModel, architecture),
-		...validateInteractionTypes(
-			interaction,
-			archTypes,
-			cmTypes,
-			knownPageTypes,
-		),
-	];
-}
-
-/**
- * Cross-validate classifier outputs:
- * - All page types from knownPageTypes appear in at least one classifier
- * - Relationships resolve (collections reference valid page types)
- */
-export function crossValidateClassifiers(
-	architecture: ArchitectureClassification,
-	contentModel: ContentModelClassification,
-	interaction: InteractionClassification,
-	knownPageTypes: string[],
-): { valid: boolean; errors: string[] } {
-	const errors: string[] = [];
-
-	const allClassifierTypes = collectClassifierTypes(
-		architecture,
-		contentModel,
-		interaction,
-	);
-
-	// Check all known types are covered somewhere
-	for (const pt of knownPageTypes) {
-		if (!allClassifierTypes.has(pt)) {
-			errors.push(
-				`Page type "${pt}" not found in any classifier output (architecture, content model, or interaction)`,
-			);
-		}
-	}
-
-	// Check relationships resolve
-	errors.push(
-		...validateRelationships(
-			contentModel,
-			interaction,
-			architecture,
-			knownPageTypes,
-		),
-	);
-
-	return { valid: errors.length === 0, errors };
-}
-
-// ---------------------------------------------------------------------------
-// detectConflicts
-// ---------------------------------------------------------------------------
-
-export interface ConflictReport {
-	conflicts: Array<{
-		type: string;
-		description: string;
-		details: Record<string, unknown>;
-	}>;
-}
-
-/**
- * Detect conflicts between classifier outputs.
- * E.g., same page type assigned to different layouts.
- */
-export function detectConflicts(
-	architecture: ArchitectureClassification,
-	contentModel: ContentModelClassification,
-): ConflictReport {
-	const conflicts: ConflictReport["conflicts"] = [];
-
-	// Check: page type appears in multiple layouts
-	const typeToLayouts = new Map<string, string[]>();
-	for (const [layoutName, layout] of Object.entries(architecture.layouts)) {
-		for (const pt of layout.page_types) {
-			const list = typeToLayouts.get(pt) ?? [];
-			list.push(layoutName);
-			typeToLayouts.set(pt, list);
-		}
-	}
-
-	for (const [pt, layouts] of typeToLayouts) {
-		if (layouts.length > 1) {
-			conflicts.push({
-				type: "layout_conflict",
-				description: `Page type "${pt}" assigned to multiple layouts: ${layouts.join(", ")}`,
-				details: { pageType: pt, layouts },
-			});
-		}
-	}
-
-	// Check: collection source_pagetype has a matching route in architecture
-	const routePatterns = new Set(architecture.routes.map((r) => r.pageType));
-	for (const [collName, coll] of Object.entries(contentModel.collections)) {
-		if (!routePatterns.has(coll.source_pagetype)) {
-			conflicts.push({
-				type: "missing_route",
-				description: `Collection "${collName}" references page type "${coll.source_pagetype}" with no route in architecture`,
-				details: { collection: collName, pageType: coll.source_pagetype },
-			});
-		}
-	}
-
-	return { conflicts };
 }
 
 // ---------------------------------------------------------------------------
@@ -415,10 +126,9 @@ function compareSegments(
 				diverged: false,
 			};
 		if (aDyn !== bDyn) {
-			return {
-				conflict: `Static segment conflicts with dynamic segment at position ${i}: "${segA[i]}" vs "${segB[i]}"`,
-				diverged: false,
-			};
+			// Static routes take priority over dynamic routes in Astro —
+			// /about and /[slug] coexist without conflict.
+			return { conflict: null, diverged: true };
 		}
 		if (!aDyn && segA[i] !== segB[i]) return { conflict: null, diverged: true };
 	}
@@ -495,6 +205,9 @@ export function validateRegistryCompleteness(
 	for (const coll of Object.values(registry.collections)) {
 		covered.add(coll.source_pagetype);
 	}
+	for (const listingName of Object.keys(registry.listings)) {
+		covered.add(listingName);
+	}
 
 	const missing: string[] = [];
 	for (const pt of knownPageTypes) {
@@ -553,27 +266,45 @@ function validateCollectionRefs(
 	}
 }
 
+function validateListingQuery(
+	listingName: string,
+	query: Registry["listings"][string]["queries"][number],
+	registry: Registry,
+	knownPageTypes: Set<string>,
+	orphans: string[],
+) {
+	if (query.collection && !(query.collection in registry.collections)) {
+		orphans.push(
+			`Listing "${listingName}" references unknown collection "${query.collection}"`,
+		);
+	}
+	if (
+		"pagetype" in query &&
+		typeof query.pagetype === "string" &&
+		!knownPageTypes.has(query.pagetype)
+	) {
+		orphans.push(
+			`Listing "${listingName}" references unknown pagetype "${query.pagetype}"`,
+		);
+	}
+}
+
 function validateListingRefs(
 	registry: Registry,
 	knownPageTypes: Set<string>,
 	orphans: string[],
 ) {
 	for (const [listingName, listing] of Object.entries(registry.listings)) {
+		if (!Array.isArray(listing.queries)) continue;
 		for (const query of listing.queries) {
-			if (query.collection && !(query.collection in registry.collections)) {
-				orphans.push(
-					`Listing "${listingName}" references unknown collection "${query.collection}"`,
-				);
-			}
-			if (
-				"pagetype" in query &&
-				typeof query.pagetype === "string" &&
-				!knownPageTypes.has(query.pagetype)
-			) {
-				orphans.push(
-					`Listing "${listingName}" references unknown pagetype "${query.pagetype}"`,
-				);
-			}
+			if (typeof query !== "object" || query === null) continue;
+			validateListingQuery(
+				listingName,
+				query,
+				registry,
+				knownPageTypes,
+				orphans,
+			);
 		}
 	}
 }

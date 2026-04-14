@@ -4,9 +4,9 @@
  */
 
 import { type ChildProcess, execSync, spawn } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import type { Review, StepDef, StepResult } from "../engine/types.js";
 import { agentQuery } from "./agent.js";
 import {
@@ -75,11 +75,117 @@ export interface ReviewerOpts {
 	baseUrl?: string;
 	/** Subdirectory within workdir to target (e.g., "project"). If set, commands and file reads use this subdir. */
 	projectDir?: string;
+	/** Color scheme to emulate for vision screenshots. If set, screenshots are taken in this mode. */
+	colorScheme?: "light" | "dark";
+	/** When true, discover routes from src/pages/ at runtime instead of using static routes list. */
+	discoverRoutes?: boolean;
+	/** When discoverRoutes is true, keep at most this many routes per page-type group. Default: unlimited. */
+	maxRoutesPerType?: number;
 }
 
 /** Resolve the effective CWD for reviewer operations. */
 function resolveReviewerCwd(workdir: string, projectDir?: string): string {
 	return projectDir ? join(workdir, projectDir) : workdir;
+}
+
+/**
+ * Discover routes by scanning src/pages/ for .astro files and src/content/ for
+ * collection entries that back dynamic routes.
+ *
+ * Converts file paths to URL routes:
+ * - index.astro → /
+ * - about.astro → /about
+ * - blog/[slug].astro + src/content/blog/ entries → /blog/my-post, /blog/another-post
+ */
+async function discoverRoutesFromPages(projectDir: string): Promise<string[]> {
+	const staticRoutes = await scanPagesDir(join(projectDir, "src/pages"), "");
+	const concrete = staticRoutes.filter((r) => !r.includes("["));
+
+	// Discover dynamic route concrete URLs by scanning content collections.
+	// For each dynamic route pattern like /blog/[slug], look for collection entries
+	// in src/content/blog/ to generate /blog/my-post, /blog/another-post, etc.
+	const dynamicConcrete = await discoverDynamicRoutes(projectDir, staticRoutes);
+
+	const allRoutes = [...concrete, ...dynamicConcrete];
+	return allRoutes.length > 0 ? allRoutes : ["/"];
+}
+
+/**
+ * Scan content collections to find entry IDs, then map them to dynamic route patterns.
+ * For example, if src/pages/blog/[slug].astro exists and src/content/blog/ has
+ * my-post.md and another-post.md, this returns /blog/my-post and /blog/another-post.
+ */
+async function discoverDynamicRoutes(
+	projectDir: string,
+	staticRoutes: string[],
+): Promise<string[]> {
+	const concreteRoutes: string[] = [];
+
+	// Find dynamic route patterns (routes containing [)
+	const dynamicPatterns = staticRoutes.filter((r) => r.includes("["));
+	if (dynamicPatterns.length === 0) return [];
+
+	// Build a map of collection name -> param name for each dynamic pattern
+	// e.g., /blog/[slug] -> { collection: "blog", param: "slug" }
+	for (const pattern of dynamicPatterns) {
+		// Extract the directory and param from patterns like /blog/[slug] or /[slug]
+		const paramMatch = pattern.match(/\/([^/]+)\/\[([^\]]+)\]$/);
+		if (!paramMatch) continue;
+
+		const [, collection, _param] = paramMatch;
+		const contentDir = join(projectDir, "src/content", collection);
+
+		try {
+			const entries = await readdir(contentDir, { withFileTypes: true });
+			for (const entry of entries) {
+				if (entry.isFile()) {
+					// Content collection entry ID is the filename without extension
+					// e.g., my-post.md -> "my-post"
+					const ext = extname(entry.name);
+					const entryId = entry.name.slice(0, -ext.length - 1); // remove .md and .
+					// Generate route: /blog/my-post
+					const route = `/${collection}/${entryId}`;
+					if (!concreteRoutes.includes(route)) {
+						concreteRoutes.push(route);
+					}
+				}
+			}
+		} catch {
+			// Collection directory may not exist
+		}
+	}
+
+	return concreteRoutes;
+}
+
+async function scanPagesDir(dir: string, prefix: string): Promise<string[]> {
+	const routes: string[] = [];
+	try {
+		const entries = await readdir(dir, { withFileTypes: true });
+		for (const entry of entries) {
+			const route = astroFileToRoute(entry.name);
+			if (route !== null) {
+				routes.push(`${prefix}${route}`);
+			} else if (entry.isDirectory()) {
+				const sub = await scanPagesDir(
+					join(dir, entry.name),
+					`${prefix}/${entry.name}`,
+				);
+				routes.push(...sub);
+			}
+		}
+	} catch {
+		// Directory may not exist
+	}
+	return routes;
+}
+
+/** Convert an .astro filename to a route path. index.astro → /, about.astro → /about. */
+function astroFileToRoute(name: string): string | null {
+	if (!name.endsWith(".astro")) return null;
+	const base = name.slice(0, -6); // remove .astro
+	if (base === "index") return "/";
+	return `/${base}`;
 }
 
 /**
@@ -337,7 +443,11 @@ async function runConsoleErrorChecks(
 	const context = await browser.newContext({ baseURL: baseUrl });
 	const page = await context.newPage();
 
-	const routes = opts.routes ?? ["/"];
+	const routes = opts.discoverRoutes
+		? await discoverRoutesFromPages(
+				resolveReviewerCwd(ctx.workdir, opts.projectDir),
+			)
+		: (opts.routes ?? ["/"]);
 	const allErrors: string[] = [];
 
 	for (const route of routes) {
@@ -411,6 +521,7 @@ async function reviewVisionRoute(
 		route,
 		undefined,
 		evPath,
+		opts.colorScheme,
 	);
 
 	const screenshotPaths = screenshots.map((s) => s.path);
@@ -433,10 +544,11 @@ async function reviewVisionRoute(
 		// Write review evidence
 		const revPath = reviewPath(ctx.workdir, ctx.iteration);
 		await mkdir(revPath, { recursive: true });
-		await writeFile(
-			join(revPath, `vision-${opts.id}-${route.replace(/\//g, "-")}.md`),
-			output,
-		);
+		// Use a clean filename for color vision reviews per D3
+		const reviewFilename = opts.id.includes("color-vision")
+			? "color-vision-review.md"
+			: `vision-${opts.id}-${route.replace(/\//g, "-")}.md`;
+		await writeFile(join(revPath, reviewFilename), output);
 
 		return {
 			reviewerId: opts.id,
@@ -505,6 +617,37 @@ export function visionReviewer(opts: ReviewerOpts): StepDef {
 	};
 }
 
+/**
+ * Group routes by page-type prefix and keep at most `maxPerType` per group.
+ *
+ * Routes are grouped by their first path segment:
+ *   /blog/post-1, /blog/post-2 → group "blog"
+ *   /about                   → group "about"
+ *   /                        → group "/"  (always included)
+ *
+ * This ensures vision reviewers sample across page types rather than
+ * burning LLM calls on 20 blog posts that share the same template.
+ */
+function sampleRoutesByType(routes: string[], maxPerType: number): string[] {
+	if (maxPerType <= 0 || maxPerType >= Infinity) return routes;
+
+	const groups = new Map<string, string[]>();
+	for (const route of routes) {
+		// "/" is its own group — always include it
+		if (route === "/") {
+			groups.set("/", ["/"]);
+			continue;
+		}
+		// Group by first path segment: /blog/post-1 → "blog"
+		const key = route.split("/").filter(Boolean)[0] ?? route;
+		const group = groups.get(key) ?? [];
+		if (group.length < maxPerType) group.push(route);
+		groups.set(key, group);
+	}
+
+	return [...groups.values()].flat();
+}
+
 async function runVisionChecks(
 	opts: ReviewerOpts,
 	ctx: import("../engine/types.js").StepContext,
@@ -515,14 +658,56 @@ async function runVisionChecks(
 	const context = await browser.newContext({ baseURL: baseUrl });
 	const page = await context.newPage();
 
-	const routes = opts.routes ?? ["/"];
-	const reviews: Review[] = [];
-	const evPath = evidencePath(ctx.workdir, ctx.iteration);
-	await mkdir(evPath, { recursive: true });
+	let routes = opts.discoverRoutes
+		? await discoverRoutesFromPages(
+				resolveReviewerCwd(ctx.workdir, opts.projectDir),
+			)
+		: (opts.routes ?? ["/"]);
 
+	if (opts.maxRoutesPerType != null) {
+		routes = sampleRoutesByType(routes, opts.maxRoutesPerType);
+	}
+
+	const reviews: Review[] = [];
+	const evBase = evidencePath(ctx.workdir, ctx.iteration);
+
+	const captureBothModes = opts.colorScheme === "dark";
+
+	// Light mode screenshots
+	const lightDir = captureBothModes
+		? join(evBase, "screenshots", "light")
+		: evBase;
+	await mkdir(lightDir, { recursive: true });
+	await page.emulateMedia({ colorScheme: "light" });
 	for (const route of routes) {
-		const review = await reviewVisionRoute(page, route, evPath, opts, ctx);
+		const review = await reviewVisionRoute(
+			page,
+			route,
+			lightDir,
+			{ ...opts, colorScheme: "light" },
+			ctx,
+		);
 		reviews.push(review);
+	}
+
+	// Dark mode screenshots (if requested)
+	if (captureBothModes) {
+		const darkDir = join(evBase, "screenshots", "dark");
+		await mkdir(darkDir, { recursive: true });
+		await page.emulateMedia({ colorScheme: "dark" });
+		for (const route of routes) {
+			const review = await reviewVisionRoute(
+				page,
+				route,
+				darkDir,
+				{ ...opts, colorScheme: "dark" },
+				ctx,
+			);
+			reviews.push(review);
+		}
+
+		// Light-vs-dark comparison review (Step 4d requirement)
+		await writeComparisonReview(routes, lightDir, darkDir, opts, ctx);
 	}
 
 	await browser.close();
@@ -530,6 +715,55 @@ async function runVisionChecks(
 	const result = aggregateReviewerVerdicts(reviews);
 	result.duration = duration;
 	return result;
+}
+
+/**
+ * Write a light-vs-dark comparison review (Step 4d requirement).
+ * Sends both light and dark screenshots to the vision AI for comparison.
+ */
+async function writeComparisonReview(
+	routes: string[],
+	lightDir: string,
+	darkDir: string,
+	opts: ReviewerOpts,
+	ctx: import("../engine/types.js").StepContext,
+): Promise<void> {
+	const revDir = reviewPath(ctx.workdir, ctx.iteration);
+	await mkdir(revDir, { recursive: true });
+
+	const routeList = routes.length > 0 ? routes.join(", ") : "/";
+	const prompt = `Compare the light and dark mode screenshots for routes: ${routeList}.
+
+Light mode screenshots: ${lightDir}/
+Dark mode screenshots: ${darkDir}/
+
+Use the Read tool to view each screenshot, then evaluate:
+1. Color coherence between light and dark modes
+2. Text readability in both modes
+3. No invisible elements or missing contrast in either mode
+4. Dark mode toggle visual indicator is present
+
+Respond with:
+VERDICT: PASS
+or
+VERDICT: REJECT
+	REJECTION CONTEXT: <specific issues found>`;
+
+	try {
+		const output = await agentQuery({
+			prompt,
+			cwd: ctx.workdir,
+			profile: ctx.profile,
+			stepName: `color-vision-comparison/${opts.id}`,
+			logger: ctx.logger,
+			maxTurns: 1,
+			config: ctx.config,
+		});
+
+		await writeFile(join(revDir, "color-vision-review.md"), output);
+	} catch {
+		// Comparison review failure is non-blocking
+	}
 }
 
 /**

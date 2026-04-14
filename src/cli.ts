@@ -147,6 +147,67 @@ program
 		}
 	});
 
+// --- metrics command ---
+
+program
+	.command("metrics")
+	.description("Query pipeline metrics from a run")
+	.argument("[query]", "PromQL-esque query, e.g. 'avg by (segment, phase)'")
+	.option("--run <id>", "Run ID to query (default: latest)")
+	.option("--kind <kind>", "Record kind: step, segment, run", "step")
+	.action(async (queryStr: string | undefined, opts) => {
+		const { readMetrics } = await import("./engine/metrics.js");
+		const { executeQuery, formatTable, parseQuery } = await import(
+			"./engine/metrics-query.js"
+		);
+
+		const runDir = await resolveRunDir(opts.run);
+		if (!runDir) {
+			console.error(chalk.red("No runs found. Run the pipeline first."));
+			process.exit(1);
+		}
+
+		const allRecords = await readMetrics(runDir);
+		const kindFilter = opts.kind as string;
+		const records = allRecords.filter((r) => r.kind === kindFilter);
+
+		if (records.length === 0) {
+			console.log(chalk.yellow(`No ${kindFilter} records found in ${runDir}`));
+			return;
+		}
+
+		if (!queryStr) {
+			// No query — show raw table of all records
+			const { formatTable: fmt } = await import("./engine/metrics-query.js");
+			// Build flat rows from records
+			const rows = records.map((r) => {
+				const row: Record<string, string | number> = {};
+				for (const [k, v] of Object.entries(r)) {
+					if (k === "kind" || k === "ts") continue;
+					row[k] = v as string | number;
+				}
+				return row;
+			});
+			console.log(fmt(rows));
+			return;
+		}
+
+		// Parse and execute query (only step metrics support full aggregation)
+		if (kindFilter !== "step") {
+			console.error(
+				chalk.red("Aggregation queries only work with --kind step (default)"),
+			);
+			process.exit(1);
+		}
+
+		const parsed = parseQuery(queryStr);
+		const result = executeQuery(
+			records as import("./engine/metrics.js").StepMetric[],
+			parsed,
+		);
+		console.log(formatTable(result));
+	});
+
 // --- Helpers ---
 
 function parseDepFlags(deps?: string[]): Record<string, string> {
@@ -186,6 +247,25 @@ async function resolveInteractiveDeps(
 		missingDeps,
 	);
 	Object.assign(depOverrides, selected);
+}
+
+async function resolveRunDir(runId?: string): Promise<string | null> {
+	const { readdir } = await import("node:fs/promises");
+	const { join } = await import("node:path");
+	const runsDir = resolve("runs");
+	try {
+		const entries = await readdir(runsDir);
+		if (entries.length === 0) return null;
+		if (runId) {
+			const match = entries.find((e) => e === runId || e.includes(runId));
+			return match ? join(runsDir, match) : null;
+		}
+		// Latest: sort descending, take first
+		const sorted = entries.sort().reverse();
+		return join(runsDir, sorted[0]);
+	} catch {
+		return null;
+	}
 }
 
 function reportResult(result: DagRunResult): void {

@@ -638,6 +638,162 @@ describe("validateOklchValues", () => {
 		expect(errors[0]).toContain("primary");
 	});
 
+	test("percentage-form OKLCH → no errors", () => {
+		const tokens = {
+			atomic: {
+				colors: {
+					primary: "oklch(50% 0.1 180)",
+					white: "oklch(100% 0 0)",
+					dark: "oklch(22.46% 0 0)",
+					blue: "oklch(97.32% 0.0141 251.56)",
+				},
+				typography: { fontFamily: {}, fontSize: {}, fontWeight: {} },
+				spacing: {},
+				borderRadius: {},
+				shadows: {},
+			},
+			gradients: {},
+			layout: {
+				grid: { columns: {}, gutter: {} },
+				container: { maxWidth: {} },
+				breakpoints: {},
+				sections: {},
+				density: { mode: "" },
+				rhythm: { baseUnit: "", verticalRhythm: {} },
+			},
+			componentSpacing: {},
+			motion: {
+				duration: {},
+				easing: {},
+				state: { hover: {}, focus: {}, active: {}, disabled: {} },
+				scroll: {},
+				skeleton: {},
+			},
+			surfaces: { glass: {}, texture: {}, imageTreatment: {} },
+			visualIdentity: {
+				colorDistribution: { dominant: {}, secondary: {}, accent: {} },
+				borders: {},
+			},
+		} as unknown as DesignTokensV2;
+		expect(validateOklchValues(tokens)).toEqual([]);
+	});
+
+	test("OKLCH with alpha → no errors", () => {
+		const tokens = {
+			atomic: {
+				colors: {
+					overlay: "oklch(0.5 0.1 180 / 0.8)",
+					transparent: "oklch(50% 0.1 180 / 50%)",
+				},
+				typography: { fontFamily: {}, fontSize: {}, fontWeight: {} },
+				spacing: {},
+				borderRadius: {},
+				shadows: {},
+			},
+			gradients: {},
+			layout: {
+				grid: { columns: {}, gutter: {} },
+				container: { maxWidth: {} },
+				breakpoints: {},
+				sections: {},
+				density: { mode: "" },
+				rhythm: { baseUnit: "", verticalRhythm: {} },
+			},
+			componentSpacing: {},
+			motion: {
+				duration: {},
+				easing: {},
+				state: { hover: {}, focus: {}, active: {}, disabled: {} },
+				scroll: {},
+				skeleton: {},
+			},
+			surfaces: { glass: {}, texture: {}, imageTreatment: {} },
+			visualIdentity: {
+				colorDistribution: { dominant: {}, secondary: {}, accent: {} },
+				borders: {},
+			},
+		} as unknown as DesignTokensV2;
+		expect(validateOklchValues(tokens)).toEqual([]);
+	});
+
+	test("OKLCH with none keyword → no errors", () => {
+		const tokens = {
+			atomic: {
+				colors: {
+					achromatic: "oklch(0.5 none 180)",
+					hueless: "oklch(0.5 0.1 none)",
+				},
+				typography: { fontFamily: {}, fontSize: {}, fontWeight: {} },
+				spacing: {},
+				borderRadius: {},
+				shadows: {},
+			},
+			gradients: {},
+			layout: {
+				grid: { columns: {}, gutter: {} },
+				container: { maxWidth: {} },
+				breakpoints: {},
+				sections: {},
+				density: { mode: "" },
+				rhythm: { baseUnit: "", verticalRhythm: {} },
+			},
+			componentSpacing: {},
+			motion: {
+				duration: {},
+				easing: {},
+				state: { hover: {}, focus: {}, active: {}, disabled: {} },
+				scroll: {},
+				skeleton: {},
+			},
+			surfaces: { glass: {}, texture: {}, imageTreatment: {} },
+			visualIdentity: {
+				colorDistribution: { dominant: {}, secondary: {}, accent: {} },
+				borders: {},
+			},
+		} as unknown as DesignTokensV2;
+		expect(validateOklchValues(tokens)).toEqual([]);
+	});
+
+	test("gradient in colors → error (must be OKLCH)", () => {
+		const tokens = {
+			atomic: {
+				colors: {
+					hero: "linear-gradient(180deg, oklch(0.5 0.1 180), oklch(0.8 0.05 200))",
+				},
+				typography: { fontFamily: {}, fontSize: {}, fontWeight: {} },
+				spacing: {},
+				borderRadius: {},
+				shadows: {},
+			},
+			gradients: {},
+			layout: {
+				grid: { columns: {}, gutter: {} },
+				container: { maxWidth: {} },
+				breakpoints: {},
+				sections: {},
+				density: { mode: "" },
+				rhythm: { baseUnit: "", verticalRhythm: {} },
+			},
+			componentSpacing: {},
+			motion: {
+				duration: {},
+				easing: {},
+				state: { hover: {}, focus: {}, active: {}, disabled: {} },
+				scroll: {},
+				skeleton: {},
+			},
+			surfaces: { glass: {}, texture: {}, imageTreatment: {} },
+			visualIdentity: {
+				colorDistribution: { dominant: {}, secondary: {}, accent: {} },
+				borders: {},
+			},
+		} as unknown as DesignTokensV2;
+		const errors = validateOklchValues(tokens);
+		expect(errors).toHaveLength(1);
+		expect(errors[0]).toContain("hero");
+		expect(errors[0]).toContain("must be OKLCH");
+	});
+
 	test("hex colors → error (must be OKLCH)", () => {
 		const tokens = {
 			atomic: {

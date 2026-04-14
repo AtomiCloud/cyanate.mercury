@@ -1,6 +1,7 @@
 ### nix-init
 .direnv
 .pre-commit-config.yaml
+.env
 
 ### runtime
 node_modules

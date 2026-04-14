@@ -41,11 +41,13 @@ export function parseReviewerVerdict(output: string): ParsedVerdict {
 		normalized.includes("VERDICT:REJECT")
 	) {
 		let rejectionContext: string | undefined;
+		// Greedy match from "REJECTION CONTEXT" to end of output.
+		// The rejection context is always the last section in reviewer output.
 		const rcMatch = output.match(
-			/REJECTION CONTEXT[:\s]*\n?([\s\S]*?)(?=\n#{1,3}\s|$)/i,
+			/REJECTION CONTEXT[:\s\u2014-]*\n?([\s\S]+)$/i,
 		);
 		if (rcMatch) {
-			rejectionContext = rcMatch[1].trim();
+			rejectionContext = rcMatch[1].replace(/\n---\s*$/, "").trim();
 		}
 
 		return {
@@ -60,7 +62,7 @@ export function parseReviewerVerdict(output: string): ParsedVerdict {
 		verdict: "reject",
 		findings: `Malformed reviewer output — could not parse verdict.\n\nOriginal output:\n${output}`,
 		rejectionContext:
-			"Reviewer output did not contain a valid VERDICT: PASS or VERDICT: REJECT line.",
+			'Reviewer output was malformed — missing required "VERDICT: PASS" or "VERDICT: REJECT" line. Your response MUST contain exactly one of these lines.',
 	};
 }
 

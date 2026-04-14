@@ -1,0 +1,79 @@
+{
+  "site_url": "https://www.therehablabsg.com",
+  "scraped_at": "2026-04-08T09:10:50.284Z",
+  "primary_language": "en",
+  "total_crawled": 40,
+  "total_kept": 25,
+  "page_types": [
+    {
+      "name": "landing",
+      "url_pattern": "/",
+      "description": "Homepage - main landing page with clinic overview",
+      "sample_urls": ["/"],
+      "urls": ["/"]
+    },
+    {
+      "name": "about",
+      "url_pattern": "/our-story/",
+      "description": "About us page - company story and values",
+      "sample_urls": ["/our-story/"],
+      "urls": ["/our-story/"]
+    },
+    {
+      "name": "team_listing",
+      "url_pattern": "/team/",
+      "description": "Team listing page - overview of all staff members",
+      "sample_urls": ["/team/"],
+      "urls": ["/team/"]
+    },
+    {
+      "name": "team_member",
+      "url_pattern": "/team/{slug}/",
+      "description": "Individual team member profile page",
+      "sample_urls": ["/team/muhd-nash/", "/team/lorrian-lim/"],
+      "urls": ["/team/muhd-nash/", "/team/nur-adelina/", "/team/tiffany-wong/", "/team/hon.-dr.-muhd-fadhli/", "/team/lorrian-lim/", "/team/sue-ann/", "/team/raihan-rahim/", "/team/elizabeth-lee/", "/team/muhammad-hafashah/"]
+    },
+    {
+      "name": "service",
+      "url_pattern": "/{service}/",
+      "description": "Individual service detail pages",
+      "sample_urls": ["/spine-physiotherapy/"],
+      "urls": ["/home-physiotherapy/", "/sports-massage/", "/sports-physiotherapy/", "/spine-physiotherapy/", "/clinical-pilates/"]
+    },
+    {
+      "name": "patient_journey",
+      "url_pattern": "/what-to-expect/",
+      "description": "Patient journey page - what to expect during treatment",
+      "sample_urls": ["/what-to-expect/"],
+      "urls": ["/what-to-expect/"]
+    },
+    {
+      "name": "testimonials",
+      "url_pattern": "/success-stories/",
+      "description": "Success stories / testimonials page",
+      "sample_urls": ["/success-stories/"],
+      "urls": ["/success-stories/"]
+    },
+    {
+      "name": "blog_listing",
+      "url_pattern": "/learn/",
+      "description": "Blog/learn article listing page with featured posts",
+      "sample_urls": ["/learn/"],
+      "urls": ["/learn/"]
+    },
+    {
+      "name": "blog_post",
+      "url_pattern": "/post/{slug}/",
+      "description": "Individual blog/article post pages",
+      "sample_urls": ["/post/knee-pain-treatment-singapore/"],
+      "urls": ["/post/knee-pain-treatment-singapore/", "/post/best-pillow-for-neck-pain/", "/post/plantar-fasciitis/", "/post/what-is-sports-massage/"]
+    },
+    {
+      "name": "media",
+      "url_pattern": "/media/",
+      "description": "Media page featuring clinic appearances",
+      "sample_urls": ["/media/"],
+      "urls": ["/media/"]
+    }
+  ]
+}

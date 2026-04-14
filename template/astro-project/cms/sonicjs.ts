@@ -2,7 +2,7 @@
  * SonicJS adapter — default CMS implementation.
  *
  * Push: uploads images to R2, creates/updates entries via /api/content endpoints.
- * Pull: fetches entries via /api/collections/{name}/content, writes JSON to src/content/ and src/data/.
+ * Pull: fetches entries via /api/collections/{name}/content, writes JSON to src/content/.
  *
  * SonicJS API (verified from installed @sonicjs-cms/core 2.11.0 source):
  * - GET    /api/collections                           — list collections (returns { data: [{id, name}] })
@@ -613,7 +613,6 @@ export const sonicjs: CmsAdapter = {
 	async pull({
 		contentModel,
 		contentDir,
-		dataDir,
 		config,
 	}): Promise<PullResult> {
 		const baseUrl = config.url.replace(/\/$/, "");
@@ -644,14 +643,7 @@ export const sonicjs: CmsAdapter = {
 							const slug = item.slug ?? item.id;
 							if (!slug) continue;
 
-							let outputPath: string;
-							if (coll.type === "singleton") {
-								outputPath = join(dataDir, `${coll.name}.json`);
-							} else if (coll.type === "global") {
-								outputPath = join(dataDir, "globals", `${coll.name}.json`);
-							} else {
-								outputPath = join(contentDir, coll.name, `${slug}.json`);
-							}
+							const outputPath = join(contentDir, coll.name, `${slug}.json`);
 
 							const entryData: Record<string, unknown> =
 								coll.type === "collection"

@@ -9,7 +9,8 @@
  * This enables --from resumption and run inspection.
  */
 
-import { readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
 	IterationState,
@@ -40,11 +41,10 @@ export async function writePipelineState(
 	segmentDir: string,
 	state: PipelineState,
 ): Promise<void> {
-	await writeFile(
-		join(segmentDir, PIPELINE_FILE),
-		JSON.stringify(state, null, 2),
-		"utf-8",
-	);
+	const target = join(segmentDir, PIPELINE_FILE);
+	const tmp = `${target}.${randomUUID()}.tmp`;
+	await writeFile(tmp, JSON.stringify(state, null, 2), "utf-8");
+	await rename(tmp, target);
 }
 
 export function createPipelineState(
@@ -103,11 +103,10 @@ export async function writeRunState(
 	runDir: string,
 	state: RunState,
 ): Promise<void> {
-	await writeFile(
-		join(runDir, RUN_FILE),
-		JSON.stringify(state, null, 2),
-		"utf-8",
-	);
+	const target = join(runDir, RUN_FILE);
+	const tmp = `${target}.${randomUUID()}.tmp`;
+	await writeFile(tmp, JSON.stringify(state, null, 2), "utf-8");
+	await rename(tmp, target);
 }
 
 export function createRunState(runId: string, segmentIds: string[]): RunState {

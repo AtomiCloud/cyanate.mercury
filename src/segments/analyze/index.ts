@@ -5,15 +5,14 @@
  * canonical JSON artifacts. No dependencies — runs first in the DAG.
  */
 
-import { cp, mkdir } from "node:fs/promises";
+import { access, constants, cp, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { registry } from "../../engine/registry.js";
 import type { SegmentDef } from "../../engine/types.js";
 import {
-	extractPhase,
-	identifyPhase,
-	mergePhase,
-	validatePhase,
+	discoverComponentsPhase,
+	extractDesignPhase,
+	scoutPhase,
 } from "./phases.io.js";
 
 const analyzeSegment: SegmentDef = {
@@ -22,9 +21,20 @@ const analyzeSegment: SegmentDef = {
 	description:
 		"Extract a reference website's visual design into style-fingerprint.json, design-tokens.json, and component-recipes.json",
 	depends: [],
-	phases: [identifyPhase, extractPhase, mergePhase, validatePhase],
-	mergeInputs: async () => {
-		// No-op: analyze has no dependencies
+	phases: [scoutPhase, extractDesignPhase, discoverComponentsPhase],
+	mergeInputs: async (workdir, _deps, config) => {
+		// Copy scraper input files so the identify phase can read structure.json
+		const inputFiles = ["structure.json", "schema.json", "content.json"];
+		for (const file of inputFiles) {
+			const src = join(config.input, file);
+			const dst = join(workdir, file);
+			try {
+				await access(src, constants.R_OK);
+				await cp(src, dst);
+			} catch {
+				// Input file may not exist — not fatal for analyze
+			}
+		}
 	},
 	extractOutput: async (workdir, outputDir) => {
 		await mkdir(outputDir, { recursive: true });

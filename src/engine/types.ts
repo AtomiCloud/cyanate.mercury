@@ -43,6 +43,14 @@ export interface StepResult {
 	error?: string;
 	/** Wall-clock duration in ms */
 	duration?: number;
+	/** Agent turn count (populated by agentQueryWithMetrics) */
+	turns?: number;
+	/** Total input tokens (populated by agentQueryWithMetrics) */
+	inputTokens?: number;
+	/** Total output tokens (populated by agentQueryWithMetrics) */
+	outputTokens?: number;
+	/** Total cost in USD (populated by agentQueryWithMetrics) */
+	cost?: number;
 }
 
 export interface Review {
@@ -65,6 +73,8 @@ export interface StepContext {
 	runDir: string;
 	/** Current iteration index (1-based) */
 	iteration: number;
+	/** Which retry attempt within the phase (0 = first try) */
+	retry: number;
 	/** Resolved LLM profile for this step */
 	profile: LLMProfile;
 	/** Aggregated rejection context from previous failed iteration */
@@ -118,7 +128,11 @@ export interface SegmentDef {
 	/** Ordered phases within this segment */
 	phases: PhaseDef[];
 	/** Merge dependency outputs into this segment's initial workdir */
-	mergeInputs: (workdir: string, deps: Record<string, string>) => Promise<void>;
+	mergeInputs: (
+		workdir: string,
+		deps: Record<string, string>,
+		config: CuiConfig,
+	) => Promise<void>;
 	/** Extract output from final iteration workdir into outputDir */
 	extractOutput: (workdir: string, outputDir: string) => Promise<void>;
 }
@@ -187,6 +201,46 @@ export interface RunState {
 			outputDir?: string;
 		}
 	>;
+}
+
+// ---------------------------------------------------------------------------
+// Self-Check
+// ---------------------------------------------------------------------------
+
+/** Configuration for the inner self-check loop on agent steps. */
+export interface SelfCheckConfig {
+	/** Commands to run in the project subdir. All must pass. */
+	commands: string[];
+	/** Max agent-fix cycles (default: 2). */
+	maxAttempts: number;
+}
+
+// ---------------------------------------------------------------------------
+// Fork + Merge (for parallel agent isolation)
+// ---------------------------------------------------------------------------
+
+/** A single file change detected by diffing a fork against the original. */
+export interface FileChange {
+	/** Relative path within the workdir. */
+	path: string;
+	type: "add" | "modify" | "delete";
+	/** Which fork produced this change. */
+	forkId: string;
+}
+
+/** Tracks a set of forked workdirs and the pre-fork manifest for diffing. */
+export interface ForkPlan {
+	originalDir: string;
+	/** Pre-fork snapshot: relative path → content hash. */
+	manifest: Map<string, string>;
+	forks: Array<{ id: string; dir: string }>;
+}
+
+/** Result of merging all fork diffs back into the original workdir. */
+export interface MergeResult {
+	status: "clean" | "conflict";
+	applied: FileChange[];
+	conflicts?: Array<{ path: string; forkIds: string[] }>;
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,11 @@ import type {
 	ValidateAnalyzeOutputsInput,
 	ValidationResult,
 } from "./validate.js";
-import { validateAnalyzeOutputs } from "./validate.js";
+import {
+	validateAnalyzeOutputs,
+	validateComponentRecipes,
+	validateDesignOutputs,
+} from "./validate.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -198,7 +202,7 @@ describe("validateAnalyzeOutputs", () => {
 
 		expect(result.valid).toBe(false);
 		// Zod schema catches the missing base field before domain check
-		expect(result.errors.some((e) => e.includes("recipes:"))).toBe(true);
+		expect(result.errors.some((e) => e.startsWith("recipes"))).toBe(true);
 	});
 
 	it("completely invalid inputs → multiple errors", () => {
@@ -210,5 +214,67 @@ describe("validateAnalyzeOutputs", () => {
 
 		expect(result.valid).toBe(false);
 		expect(result.errors.length).toBeGreaterThan(1);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// validateDesignOutputs (fingerprint + tokens only)
+// ---------------------------------------------------------------------------
+
+describe("validateDesignOutputs", () => {
+	it("valid fingerprint + tokens → { valid: true }", () => {
+		const result = validateDesignOutputs(validFingerprint, validTokens);
+		expect(result.valid).toBe(true);
+		expect(result.errors).toEqual([]);
+	});
+
+	it("null fingerprint → errors", () => {
+		const result = validateDesignOutputs(null, validTokens);
+		expect(result.valid).toBe(false);
+		expect(result.errors.some((e) => e.includes("fingerprint"))).toBe(true);
+	});
+
+	it("bad spacing → domain error", () => {
+		const badTokens = {
+			...validTokens,
+			atomic: {
+				...validTokens.atomic,
+				spacing: { only: "4px" },
+			},
+		};
+		const result = validateDesignOutputs(validFingerprint, badTokens);
+		expect(result.valid).toBe(false);
+		expect(result.errors.some((e) => e.includes("expected at least 4"))).toBe(
+			true,
+		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// validateComponentRecipes
+// ---------------------------------------------------------------------------
+
+describe("validateComponentRecipes", () => {
+	it("valid recipes → { valid: true }", () => {
+		const result = validateComponentRecipes(validRecipes);
+		expect(result.valid).toBe(true);
+		expect(result.errors).toEqual([]);
+	});
+
+	it("recipes missing base → error", () => {
+		const bad = { Broken: { variants: {} } };
+		const result = validateComponentRecipes(bad);
+		expect(result.valid).toBe(false);
+		expect(result.errors.some((e) => e.includes("recipes"))).toBe(true);
+	});
+
+	it("null recipes → error", () => {
+		const result = validateComponentRecipes(null);
+		expect(result.valid).toBe(false);
+	});
+
+	it("empty recipes object → { valid: true }", () => {
+		const result = validateComponentRecipes({});
+		expect(result.valid).toBe(true);
 	});
 });

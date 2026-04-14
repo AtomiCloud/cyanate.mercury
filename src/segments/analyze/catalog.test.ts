@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import type { StructureData } from "../../types.js";
-import type { ScoutResult } from "./catalog.js";
+import type { Catalog, ScoutResult } from "./catalog.js";
 import {
 	buildCatalog,
 	extractPageTypes,
 	filterByConfidence,
+	selectDesignPages,
 } from "./catalog.js";
 
 // ---------------------------------------------------------------------------
@@ -15,11 +16,28 @@ describe("extractPageTypes", () => {
 	it("extracts unique page types and sorts alphabetically", () => {
 		const structure: StructureData = {
 			site_url: "https://example.com",
-			pages: [
-				{ id: "1", url: "/", pagetype: "landing", title: "Home" },
-				{ id: "2", url: "/about", pagetype: "about", title: "About" },
-				{ id: "3", url: "/blog", pagetype: "blog", title: "Blog" },
-				{ id: "4", url: "/blog/post-1", pagetype: "blog", title: "Post 1" },
+			page_types: [
+				{
+					name: "landing",
+					url_pattern: "/",
+					description: "Landing page",
+					sample_urls: ["/"],
+					urls: ["/"],
+				},
+				{
+					name: "about",
+					url_pattern: "/about",
+					description: "About page",
+					sample_urls: ["/about"],
+					urls: ["/about"],
+				},
+				{
+					name: "blog",
+					url_pattern: "/blog/{slug}",
+					description: "Blog posts",
+					sample_urls: ["/blog/post-1"],
+					urls: ["/blog", "/blog/post-1"],
+				},
 			],
 		};
 
@@ -27,16 +45,16 @@ describe("extractPageTypes", () => {
 		expect(result).toEqual(["about", "blog", "landing"]);
 	});
 
-	it("handles empty pages", () => {
+	it("handles empty page_types", () => {
 		const structure: StructureData = {
-			pages: [],
+			page_types: [],
 		};
 		expect(extractPageTypes(structure)).toEqual([]);
 	});
 
-	it("ignores pages without pagetype", () => {
+	it("ignores page types without name", () => {
 		const structure = {
-			pages: [{ id: "1", url: "/", title: "No type" }],
+			page_types: [{ url_pattern: "/", description: "No name" }],
 		} as unknown as StructureData;
 		expect(extractPageTypes(structure)).toEqual([]);
 	});
@@ -141,5 +159,106 @@ describe("buildCatalog", () => {
 		expect(catalog.lowConfidence).toEqual([]);
 		expect(catalog.skipped).toEqual(["a", "b"]);
 		expect(catalog.unmatched).toEqual([]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// selectDesignPages
+// ---------------------------------------------------------------------------
+
+function makeCatalog(
+	matched: Array<{
+		sourceType: string;
+		referenceUrl: string;
+		confidence: number;
+	}>,
+): Catalog {
+	return {
+		matched,
+		unmatched: [],
+		generic: [],
+		lowConfidence: [],
+		skipped: [],
+	};
+}
+
+describe("selectDesignPages", () => {
+	it("returns all matched when ≤ 3", () => {
+		const catalog = makeCatalog([
+			{ sourceType: "landing", referenceUrl: "/", confidence: 0.9 },
+			{ sourceType: "about", referenceUrl: "/about", confidence: 0.8 },
+		]);
+		const result = selectDesignPages(catalog);
+		expect(result.designPages).toHaveLength(2);
+		expect(result.componentPages).toHaveLength(2);
+	});
+
+	it("returns single matched page", () => {
+		const catalog = makeCatalog([
+			{ sourceType: "home", referenceUrl: "/", confidence: 0.95 },
+		]);
+		const result = selectDesignPages(catalog);
+		expect(result.designPages).toHaveLength(1);
+		expect(result.designPages[0].sourceType).toBe("home");
+	});
+
+	it("returns empty for no matched pages", () => {
+		const catalog = makeCatalog([]);
+		const result = selectDesignPages(catalog);
+		expect(result.designPages).toEqual([]);
+		expect(result.componentPages).toEqual([]);
+	});
+
+	it("selects 3 diverse pages from 6 matched", () => {
+		const catalog = makeCatalog([
+			{ sourceType: "landing", referenceUrl: "/", confidence: 0.95 },
+			{ sourceType: "blog", referenceUrl: "/blog", confidence: 0.9 },
+			{ sourceType: "pricing", referenceUrl: "/pricing", confidence: 0.85 },
+			{ sourceType: "contact", referenceUrl: "/contact", confidence: 0.8 },
+			{ sourceType: "features", referenceUrl: "/features", confidence: 0.75 },
+			{ sourceType: "docs", referenceUrl: "/docs", confidence: 0.7 },
+		]);
+		const result = selectDesignPages(catalog);
+
+		expect(result.designPages).toHaveLength(3);
+		// Should pick one from each tier: landing (tier 0), blog (tier 1), pricing (tier 2)
+		const types = result.designPages.map((d) => d.sourceType);
+		expect(types).toContain("landing");
+		expect(types).toContain("blog");
+		expect(types).toContain("pricing");
+
+		// componentPages should include ALL matched
+		expect(result.componentPages).toHaveLength(6);
+	});
+
+	it("fills remaining slots from highest confidence when tiers overlap", () => {
+		const catalog = makeCatalog([
+			{ sourceType: "home", referenceUrl: "/", confidence: 0.95 },
+			{ sourceType: "index", referenceUrl: "/index", confidence: 0.9 },
+			{ sourceType: "main", referenceUrl: "/main", confidence: 0.85 },
+			{ sourceType: "gallery", referenceUrl: "/gallery", confidence: 0.8 },
+		]);
+		const result = selectDesignPages(catalog);
+
+		expect(result.designPages).toHaveLength(3);
+		// home (tier 0), gallery (tier 3/uncategorized), then index (tier 0, fill pass)
+		const types = result.designPages.map((d) => d.sourceType);
+		expect(types).toContain("home");
+		expect(types).toContain("gallery");
+	});
+
+	it("preserves original catalog fields in output", () => {
+		const catalog: Catalog = {
+			matched: [{ sourceType: "landing", referenceUrl: "/", confidence: 0.9 }],
+			unmatched: ["orphan"],
+			generic: ["/extra"],
+			lowConfidence: ["maybe"],
+			skipped: ["nope"],
+		};
+		const result = selectDesignPages(catalog);
+		expect(result.unmatched).toEqual(["orphan"]);
+		expect(result.generic).toEqual(["/extra"]);
+		expect(result.lowConfidence).toEqual(["maybe"]);
+		expect(result.skipped).toEqual(["nope"]);
 	});
 });

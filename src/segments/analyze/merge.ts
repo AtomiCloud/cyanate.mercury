@@ -1,40 +1,24 @@
 /**
- * Pure: merge & reconciliation.
+ * Pure: merge & normalization.
  *
- * Clusters spacing, deduplicates colors, builds typography scales,
- * aggregates fingerprints, assembles design tokens, and organizes patterns manifests.
+ * Clusters spacing, flattens colors, assembles design tokens,
+ * deduplicates components, and organizes patterns manifests.
  */
 
+import valueParser from "postcss-value-parser";
 import type {
 	ComponentRecipes,
 	DesignTokensV2,
-	StyleFingerprint,
+	GradientDef,
 } from "../../types.js";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export interface MeasurementData {
-	pageId: string;
+export interface PageComponentExtraction {
 	pageType: string;
-	spacing?: Array<{ name: string; value: string }>;
-	colors?: Array<{ name: string; value: string }>;
-	typography?: Array<{
-		fontFamily: string;
-		fontSize: string;
-		fontWeight: number;
-	}>;
-	components?: Array<{
-		name: string;
-		structure: string;
-		properties: Record<string, unknown>;
-		variant?: string;
-	}>;
-	fingerprint?: {
-		dimensions: Record<string, number>;
-		weight: number;
-	};
+	components: Record<string, unknown>;
 }
 
 export interface PatternsManifest {
@@ -43,6 +27,226 @@ export interface PatternsManifest {
 		visualMd: string;
 		screenshots: string[];
 	}>;
+}
+
+// ---------------------------------------------------------------------------
+// Recursive walkers for nested extraction objects
+// ---------------------------------------------------------------------------
+
+const MAX_WALK_DEPTH = 10;
+
+/**
+ * Walk a nested object, yielding `{ name, value }` for every numeric leaf.
+ * String leaves matching `/^\d+(\.\d+)?\s*px$/i` are also parsed to numbers.
+ */
+export function walkNumericLeaves(
+	obj: Record<string, unknown>,
+	prefix: string,
+	depth = 0,
+): Array<{ name: string; value: number }> {
+	if (depth > MAX_WALK_DEPTH) return [];
+	const results: Array<{ name: string; value: number }> = [];
+
+	for (const [key, val] of Object.entries(obj)) {
+		const path = prefix ? `${prefix}.${key}` : key;
+		if (typeof val === "number" && Number.isFinite(val)) {
+			results.push({ name: path, value: val });
+		} else if (typeof val === "string") {
+			const px = parsePxValue(val);
+			if (px !== null) results.push({ name: path, value: px });
+		} else if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+			results.push(
+				...walkNumericLeaves(val as Record<string, unknown>, path, depth + 1),
+			);
+		}
+	}
+	return results;
+}
+
+/**
+ * Walk a nested object, yielding `{ name, value }` for every OKLCH color string.
+ */
+export function walkOklchLeaves(
+	obj: Record<string, unknown>,
+	prefix: string,
+	depth = 0,
+): Array<{ name: string; value: string }> {
+	if (depth > MAX_WALK_DEPTH) return [];
+	const results: Array<{ name: string; value: string }> = [];
+
+	for (const [key, val] of Object.entries(obj)) {
+		const path = prefix ? `${prefix}.${key}` : key;
+		if (typeof val === "string" && /oklch\s*\(/i.test(val)) {
+			results.push({ name: path, value: val });
+		} else if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+			results.push(
+				...walkOklchLeaves(val as Record<string, unknown>, path, depth + 1),
+			);
+		}
+	}
+	return results;
+}
+
+// ---------------------------------------------------------------------------
+// Color flattening
+// ---------------------------------------------------------------------------
+
+/**
+ * Flatten nested color objects into dot-delimited keys.
+ * Agents produce color scales like `gray: { "50": "oklch(...)" }` but the
+ * DesignTokensV2 schema expects flat `Record<string, string>`.
+ *
+ * Walks ALL string leaves (not just OKLCH) so that non-OKLCH values are
+ * preserved and caught by the downstream OKLCH validator — giving the agent
+ * an actionable retry signal instead of silently dropping colors.
+ */
+export function flattenColors(
+	colors: Record<string, unknown>,
+): Record<string, string> {
+	const flat: Record<string, string> = {};
+	for (const [key, val] of Object.entries(colors)) {
+		if (typeof val === "string") {
+			flat[key] = val;
+		} else if (typeof val === "object" && val !== null) {
+			walkStringLeaves(val as Record<string, unknown>, key, flat);
+		}
+	}
+	return flat;
+}
+
+function walkStringLeaves(
+	obj: Record<string, unknown>,
+	prefix: string,
+	out: Record<string, string>,
+	depth = 0,
+): void {
+	if (depth > 10) return;
+	for (const [key, val] of Object.entries(obj)) {
+		const path = prefix ? `${prefix}.${key}` : key;
+		if (typeof val === "string") {
+			out[path] = val;
+		} else if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+			walkStringLeaves(val as Record<string, unknown>, path, out, depth + 1);
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Spacing flattening
+// ---------------------------------------------------------------------------
+
+/**
+ * Flatten a potentially nested spacing object into a flat `Record<string, string>`.
+ *
+ * Agents sometimes produce nested structures like `{ scale: { "0": "0px" } }` but
+ * the DesignTokensV2 schema expects flat `Record<string, string>`.
+ * Nested objects get dot-delimited keys (e.g., `scale.0 → "0px"`).
+ */
+export function flattenSpacing(
+	spacing: Record<string, unknown>,
+	prefix = "",
+	depth = 0,
+): Record<string, string> {
+	if (depth > MAX_WALK_DEPTH) return {};
+	const flat: Record<string, string> = {};
+	for (const [key, val] of Object.entries(spacing)) {
+		const path = prefix ? `${prefix}.${key}` : key;
+		if (typeof val === "string") {
+			flat[path] = val;
+		} else if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+			Object.assign(
+				flat,
+				flattenSpacing(val as Record<string, unknown>, path, depth + 1),
+			);
+		}
+		// Skip numbers, booleans, arrays — not valid spacing values
+	}
+	return flat;
+}
+
+// ---------------------------------------------------------------------------
+// Typography helpers
+// ---------------------------------------------------------------------------
+
+type TypoBuckets = { families: string[]; sizes: string[]; weights: number[] };
+
+/** Check if a key signals a font-family context. */
+function isFamilyKey(key: string): boolean {
+	return /family|font/i.test(key);
+}
+
+function isWeightKey(key: string): boolean {
+	return /weight/i.test(key);
+}
+
+function isPxString(val: string): boolean {
+	return /^\d+(\.\d+)?\s*px$/i.test(val);
+}
+
+function isFontFamilyString(val: string): boolean {
+	return val.length > 1 && !/^\d/.test(val);
+}
+
+function classifyTypoString(
+	val: string,
+	inFamily: boolean,
+	out: TypoBuckets,
+): void {
+	if (isPxString(val)) {
+		out.sizes.push(val);
+	} else if (inFamily && isFontFamilyString(val)) {
+		out.families.push(val);
+	}
+}
+
+function walkTypographyInto(
+	obj: Record<string, unknown>,
+	out: TypoBuckets,
+	depth: number,
+	familyContext = false,
+): void {
+	if (depth > MAX_WALK_DEPTH) return;
+	for (const [key, val] of Object.entries(obj)) {
+		const inFamily = familyContext || isFamilyKey(key);
+		if (typeof val === "string") {
+			classifyTypoString(val, inFamily, out);
+		} else if (
+			typeof val === "number" &&
+			Number.isFinite(val) &&
+			isWeightKey(key)
+		) {
+			out.weights.push(val);
+		} else if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+			walkTypographyInto(
+				val as Record<string, unknown>,
+				out,
+				depth + 1,
+				inFamily,
+			);
+		}
+	}
+}
+
+/**
+ * Walk a nested typography object, collecting font families, sizes, and weights.
+ */
+export function walkTypographyLeaves(
+	obj: Record<string, unknown>,
+	depth = 0,
+): { families: string[]; sizes: string[]; weights: number[] } {
+	const out = {
+		families: [] as string[],
+		sizes: [] as string[],
+		weights: [] as number[],
+	};
+	walkTypographyInto(obj, out, depth);
+	return out;
+}
+
+/** Parse a px string to a number (used by walkers). */
+function parsePxValue(value: string): number | null {
+	const match = value.match(/^(\d+(?:\.\d+)?)\s*px$/i);
+	return match ? Number.parseFloat(match[1]) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,11 +259,6 @@ export interface PatternsManifest {
  */
 const SPACING_ANCHORS = [4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 96, 128];
 const SPACING_TOLERANCE = 2; // px
-
-function parsePx(value: string): number | null {
-	const match = value.match(/^(\d+(?:\.\d+)?)\s*px$/i);
-	return match ? Number.parseFloat(match[1]) : null;
-}
 
 function snapToAnchor(px: number): number {
 	let bestDist = Infinity;
@@ -75,22 +274,18 @@ function snapToAnchor(px: number): number {
 }
 
 /**
- * Cluster spacing values into a normalized scale.
+ * Cluster spacing values from a single spacing object into a normalized scale.
  *
  * Raw values are snapped to the nearest common scale anchor within tolerance.
  * Returns a sorted record of name→value.
  */
 export function clusterSpacing(
-	measurements: MeasurementData[],
+	spacing: Record<string, unknown>,
 ): Record<string, string> {
 	const values = new Map<string, number>();
 
-	for (const m of measurements) {
-		for (const s of m.spacing ?? []) {
-			const px = parsePx(s.value);
-			if (px === null) continue;
-			values.set(s.name, snapToAnchor(px));
-		}
+	for (const { name, value } of walkNumericLeaves(spacing, "")) {
+		values.set(name, snapToAnchor(value));
 	}
 
 	const entries = [...values.entries()].sort((a, b) => a[1] - b[1]);
@@ -102,252 +297,48 @@ export function clusterSpacing(
 }
 
 // ---------------------------------------------------------------------------
-// Color deduplication
-// ---------------------------------------------------------------------------
-
-/**
- * Simple OKLCH ΔE approximation using Euclidean distance in LCh space.
- * Not perceptually perfect but sufficient for deduplication.
- */
-function oklchDeltaE(a: string, b: string): number {
-	const parse = (v: string): [number, number, number] | null => {
-		const m = v.match(/oklch\s*\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/i);
-		if (!m) return null;
-		return [
-			Number.parseFloat(m[1]),
-			Number.parseFloat(m[2]),
-			Number.parseFloat(m[3]),
-		];
-	};
-
-	const pa = parse(a);
-	const pb = parse(b);
-	if (!pa || !pb) return Infinity;
-
-	// Approximate: L*100 for lightness weight, C and H weighted lower
-	const dL = (pa[0] - pb[0]) * 100;
-	const dC = pa[1] - pb[1];
-	const dH = (pa[2] - pb[2]) * 2; // scale hue difference
-
-	return Math.sqrt(dL * dL + dC * dC + dH * dH);
-}
-
-const COLOR_DE_THRESHOLD = 3; // OKLCH ΔE threshold for merging
-
-/**
- * Deduplicate color roles across pages.
- * Colors within ΔE threshold are merged, keeping the first name encountered.
- */
-export function deduplicateColors(
-	measurements: MeasurementData[],
-): Record<string, string> {
-	const result: Record<string, string> = {};
-
-	for (const m of measurements) {
-		for (const c of m.colors ?? []) {
-			// Check if a similar color already exists
-			let merged = false;
-			for (const [_existingName, existingValue] of Object.entries(result)) {
-				if (oklchDeltaE(c.value, existingValue) < COLOR_DE_THRESHOLD) {
-					merged = true;
-					break;
-				}
-			}
-			if (!merged) {
-				result[c.name] = c.value;
-			}
-		}
-	}
-
-	return result;
-}
-
-// ---------------------------------------------------------------------------
-// Typography scale
-// ---------------------------------------------------------------------------
-
-const FONT_SIZE_TOLERANCE = 1; // px
-
-function findNearbySize(sizes: Map<number, string[]>, sizePx: number): boolean {
-	for (const [existingPx] of sizes) {
-		if (Math.abs(existingPx - sizePx) <= FONT_SIZE_TOLERANCE) {
-			return true;
-		}
-	}
-	return false;
-}
-
-function processTypographyEntry(
-	t: NonNullable<MeasurementData["typography"]>[number],
-	families: Record<string, string>,
-	sizes: Map<number, string[]>,
-	weights: Record<string, number>,
-): void {
-	if (t.fontFamily) {
-		families[t.fontFamily] = t.fontFamily;
-	}
-
-	const sizePx = parsePx(t.fontSize);
-	if (sizePx !== null && !findNearbySize(sizes, sizePx)) {
-		sizes.set(sizePx, [`${sizePx}px`]);
-	}
-
-	if (t.fontWeight) {
-		weights[`${t.fontWeight}`] = t.fontWeight;
-	}
-}
-
-/**
- * Build typography scale from measured font sizes.
- * Deduplicates sizes within tolerance, preserving semantic names.
- */
-export function buildTypographyScale(measurements: MeasurementData[]): {
-	fontFamily: Record<string, string>;
-	fontSize: Record<string, string>;
-	fontWeight: Record<string, number>;
-} {
-	const families: Record<string, string> = {};
-	const sizes: Map<number, string[]> = new Map();
-	const weights: Record<string, number> = {};
-
-	for (const m of measurements) {
-		for (const t of m.typography ?? []) {
-			processTypographyEntry(t, families, sizes, weights);
-		}
-	}
-
-	const sortedSizes = [...sizes.entries()]
-		.sort((a, b) => a[0] - b[0])
-		.map(([px, names]) => ({ px, name: names[0] }));
-
-	const fontSize: Record<string, string> = {};
-	for (const s of sortedSizes) {
-		fontSize[s.name] = `${s.px}px`;
-	}
-
-	return { fontFamily: families, fontSize, fontWeight: weights };
-}
-
-// ---------------------------------------------------------------------------
 // Component deduplication
 // ---------------------------------------------------------------------------
 
 /**
- * Simple hash of component structure for deduplication.
+ * Simple hash of component properties for deduplication.
  */
-function structureKey(
-	structure: string,
-	properties: Record<string, unknown>,
-): string {
-	return `${structure}:${JSON.stringify(properties, Object.keys(properties).sort())}`;
-}
-
-function processComponent(
-	c: NonNullable<MeasurementData["components"]>[number],
-	pageType: string,
-	recipes: ComponentRecipes,
-	seenStructures: Map<string, string>,
-): void {
-	const key = structureKey(c.structure, c.properties);
-	const existing = seenStructures.get(key);
-
-	if (existing !== undefined) {
-		if (c.variant) {
-			recipes[existing].variants[c.variant] = {
-				...c.properties,
-				_pageType: pageType,
-			};
-		}
-	} else {
-		seenStructures.set(key, c.name);
-		recipes[c.name] = {
-			base: c.properties,
-			variants: c.variant ? { [c.variant]: { _pageType: pageType } } : {},
-		};
-	}
+function componentKey(properties: Record<string, unknown>): string {
+	return JSON.stringify(properties, Object.keys(properties).sort());
 }
 
 /**
  * Deduplicate component patterns across pages.
- * Same structure+properties → single recipe with variants.
+ * Same property hash → single recipe with page-type variants.
  */
 export function deduplicateComponents(
-	measurements: MeasurementData[],
+	extractions: PageComponentExtraction[],
 ): ComponentRecipes {
 	const recipes: ComponentRecipes = {};
-	const seenStructures = new Map<string, string>();
+	const seenKeys = new Map<string, string>();
 
-	for (const m of measurements) {
-		for (const c of m.components ?? []) {
-			processComponent(c, m.pageType, recipes, seenStructures);
+	for (const ext of extractions) {
+		if (!ext.components || typeof ext.components !== "object") continue;
+		for (const [name, rawProps] of Object.entries(ext.components)) {
+			if (typeof rawProps !== "object" || rawProps === null) continue;
+			const properties = rawProps as Record<string, unknown>;
+			const key = componentKey(properties);
+			const existing = seenKeys.get(key);
+
+			if (existing !== undefined) {
+				// Same structure seen from a different page type → add variant
+				recipes[existing].variants[ext.pageType] = {
+					...properties,
+					_pageType: ext.pageType,
+				};
+			} else {
+				seenKeys.set(key, name);
+				recipes[name] = { base: properties, variants: {} };
+			}
 		}
 	}
 
 	return recipes;
-}
-
-// ---------------------------------------------------------------------------
-// Fingerprint aggregation
-// ---------------------------------------------------------------------------
-
-const DIMENSION_KEYS = [
-	"ornament",
-	"playfulness",
-	"warmth",
-	"density",
-	"motion",
-	"depth",
-	"darkness",
-	"formality",
-] as const;
-
-type DimensionKey = (typeof DIMENSION_KEYS)[number];
-
-/**
- * Weighted aggregation of fingerprint dimensions across pages.
- */
-export function aggregateFingerprint(
-	perPageFingerprints: Array<{
-		dimensions: Record<string, number>;
-		weight: number;
-	}>,
-): StyleFingerprint["style"]["dimensions"] {
-	if (perPageFingerprints.length === 0) {
-		// Return neutral defaults
-		const result = {} as Record<DimensionKey, number>;
-		for (const key of DIMENSION_KEYS) {
-			result[key] = 0.5;
-		}
-		return result;
-	}
-
-	if (perPageFingerprints.length === 1) {
-		const fp = perPageFingerprints[0];
-		const result = {} as Record<DimensionKey, number>;
-		for (const key of DIMENSION_KEYS) {
-			result[key] = fp.dimensions[key] ?? 0.5;
-		}
-		return result;
-	}
-
-	let totalWeight = 0;
-	const weightedSums: Record<string, number> = {};
-	for (const key of DIMENSION_KEYS) {
-		weightedSums[key] = 0;
-	}
-
-	for (const fp of perPageFingerprints) {
-		totalWeight += fp.weight;
-		for (const key of DIMENSION_KEYS) {
-			weightedSums[key] += (fp.dimensions[key] ?? 0.5) * fp.weight;
-		}
-	}
-
-	const result = {} as Record<DimensionKey, number>;
-	for (const key of DIMENSION_KEYS) {
-		result[key] = Math.round((weightedSums[key] / totalWeight) * 1000) / 1000;
-	}
-	return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -359,10 +350,14 @@ export function aggregateFingerprint(
  */
 export function assembleDesignTokens(parts: {
 	colors: Record<string, string>;
-	typography: ReturnType<typeof buildTypographyScale>;
+	typography: {
+		fontFamily: Record<string, string>;
+		fontSize: Record<string, string>;
+		fontWeight: Record<string, number>;
+	};
 	spacing: Record<string, string>;
 }): DesignTokensV2 {
-	return {
+	const raw: DesignTokensV2 = {
 		atomic: {
 			colors: parts.colors,
 			typography: parts.typography,
@@ -401,6 +396,234 @@ export function assembleDesignTokens(parts: {
 			borders: {},
 		},
 	};
+	return raw;
+}
+
+/**
+ * Move gradient strings (linear-gradient, radial-gradient, conic-gradient)
+ * from atomic.colors into the gradients field where they belong.
+ */
+export function extractGradientsFromColors(
+	tokens: DesignTokensV2,
+): DesignTokensV2 {
+	const gradients: Record<string, GradientDef> = { ...tokens.gradients };
+	const cleanColors: Record<string, string> = {};
+
+	for (const [name, value] of Object.entries(tokens.atomic.colors)) {
+		if (/^(linear|radial|conic)-gradient\s*\(/i.test(value)) {
+			if (!(name in gradients)) {
+				gradients[name] = parseGradientString(value);
+			}
+		} else {
+			cleanColors[name] = value;
+		}
+	}
+
+	return {
+		...tokens,
+		atomic: { ...tokens.atomic, colors: cleanColors },
+		gradients,
+	};
+}
+
+const GRADIENT_RE = /^(linear|radial|conic)-gradient\s*\(/i;
+
+/**
+ * Normalize a gradients record: raw CSS gradient strings → GradientDef objects.
+ *
+ * Agents sometimes put raw CSS strings (e.g. `"linear-gradient(180deg, ...)"`)
+ * directly into the gradients field. The Zod schema expects structured
+ * `GradientDef` objects. Values that are already GradientDef-shaped pass through.
+ */
+export function normalizeGradients(
+	gradients: Record<string, unknown>,
+): Record<string, GradientDef> {
+	const result: Record<string, GradientDef> = {};
+	for (const [name, value] of Object.entries(gradients)) {
+		if (typeof value === "string" && GRADIENT_RE.test(value)) {
+			result[name] = parseGradientString(value);
+		} else if (
+			typeof value === "object" &&
+			value !== null &&
+			"type" in value &&
+			"stops" in value
+		) {
+			result[name] = value as GradientDef;
+		}
+		// Skip non-gradient values entirely
+	}
+	return result;
+}
+
+const ANGLE_UNITS = new Set(["deg", "rad", "turn", "grad"]);
+const POSITION_UNITS = new Set([
+	"%",
+	"px",
+	"em",
+	"rem",
+	"vw",
+	"vh",
+	"vmin",
+	"vmax",
+]);
+
+/** Parse a CSS gradient string into a GradientDef using postcss-value-parser. */
+function parseGradientString(raw: string): GradientDef {
+	const parsed = valueParser(raw);
+	const fn = parsed.nodes.find(
+		(
+			n,
+		): n is ReturnType<typeof valueParser>["nodes"][number] & {
+			type: "function";
+			nodes: ReturnType<typeof valueParser>["nodes"];
+		} => n.type === "function",
+	);
+	if (!fn) return { type: "linear", stops: [] };
+
+	const type = fn.value.replace(/-gradient$/i, "").toLowerCase();
+	const groups = splitByComma(fn.nodes);
+
+	let angle: string | undefined;
+	let stopStart = 0;
+
+	if (type === "linear" && groups.length > 0) {
+		const first = trimSpaceNodes(groups[0]);
+		const text = valueParser.stringify(first);
+		const dim =
+			first.length === 1 && first[0].type === "word"
+				? valueParser.unit(first[0].value)
+				: false;
+		if (
+			(dim && ANGLE_UNITS.has(dim.unit.toLowerCase())) ||
+			text.startsWith("to ")
+		) {
+			angle = text;
+			stopStart = 1;
+		}
+	}
+
+	const stops = groups.slice(stopStart).map(parseStopNodes);
+	return { type, ...(angle ? { angle } : {}), stops };
+}
+
+type VPNode = ReturnType<typeof valueParser>["nodes"][number];
+
+/** Split postcss-value-parser nodes on comma dividers. */
+function splitByComma(nodes: VPNode[]): VPNode[][] {
+	const groups: VPNode[][] = [];
+	let current: VPNode[] = [];
+	for (const node of nodes) {
+		if (node.type === "div" && node.value === ",") {
+			groups.push(current);
+			current = [];
+		} else {
+			current.push(node);
+		}
+	}
+	if (current.length > 0) groups.push(current);
+	return groups;
+}
+
+/** Parse a group of nodes as a gradient stop (color + optional position). */
+function parseStopNodes(nodes: VPNode[]): { color: string; position?: string } {
+	const trimmed = trimSpaceNodes(nodes);
+	if (trimmed.length === 0) return { color: "" };
+
+	const last = trimmed[trimmed.length - 1];
+	if (last.type === "word" && trimmed.length > 1) {
+		const dim = valueParser.unit(last.value);
+		if (dim && POSITION_UNITS.has(dim.unit.toLowerCase())) {
+			const colorNodes = trimSpaceNodes(trimmed.slice(0, -1));
+			return {
+				color: valueParser.stringify(colorNodes),
+				position: last.value,
+			};
+		}
+	}
+
+	return { color: valueParser.stringify(trimmed) };
+}
+
+/** Trim leading/trailing space nodes. */
+function trimSpaceNodes(nodes: VPNode[]): VPNode[] {
+	let start = 0;
+	let end = nodes.length;
+	while (start < end && nodes[start].type === "space") start++;
+	while (end > start && nodes[end - 1].type === "space") end--;
+	return nodes.slice(start, end);
+}
+
+// ---------------------------------------------------------------------------
+// Deep merge
+// ---------------------------------------------------------------------------
+
+/** Deep merge target with source, preferring source values for conflicts. */
+export function deepMerge(
+	target: Record<string, unknown>,
+	source: Record<string, unknown>,
+): Record<string, unknown> {
+	const result = { ...target };
+	for (const [key, value] of Object.entries(source)) {
+		const existing = result[key];
+		if (
+			typeof existing === "object" &&
+			existing !== null &&
+			!Array.isArray(existing) &&
+			typeof value === "object" &&
+			value !== null &&
+			!Array.isArray(value)
+		) {
+			result[key] = deepMerge(
+				existing as Record<string, unknown>,
+				value as Record<string, unknown>,
+			);
+		} else if (value !== undefined) {
+			result[key] = value;
+		}
+	}
+	return result;
+}
+
+// ---------------------------------------------------------------------------
+// Normalize raw tokens (full pipeline)
+// ---------------------------------------------------------------------------
+
+/**
+ * Run the full normalize chain on raw agent output.
+ *
+ * scaffold → deepMerge → flattenColors → flattenSpacing → clusterSpacing
+ * → normalizeGradients → extractGradientsFromColors
+ *
+ * Returns a DesignTokensV2 ready for Zod validation. Pure (no IO).
+ */
+export function normalizeRawTokens(
+	rawTokens: Record<string, unknown>,
+): DesignTokensV2 {
+	const scaffold = assembleDesignTokens({
+		colors: {},
+		typography: { fontFamily: {}, fontSize: {}, fontWeight: {} },
+		spacing: {},
+	});
+	const merged = deepMerge(
+		scaffold as unknown as Record<string, unknown>,
+		rawTokens,
+	);
+
+	const atomic = merged.atomic as Record<string, unknown> | undefined;
+	if (atomic?.colors && typeof atomic.colors === "object") {
+		atomic.colors = flattenColors(atomic.colors as Record<string, unknown>);
+	}
+	if (atomic?.spacing && typeof atomic.spacing === "object") {
+		const flat = flattenSpacing(atomic.spacing as Record<string, unknown>);
+		atomic.spacing = clusterSpacing(flat);
+	}
+	if (merged.gradients && typeof merged.gradients === "object") {
+		merged.gradients = normalizeGradients(
+			merged.gradients as Record<string, unknown>,
+		);
+	}
+
+	return extractGradientsFromColors(merged as unknown as DesignTokensV2);
 }
 
 // ---------------------------------------------------------------------------

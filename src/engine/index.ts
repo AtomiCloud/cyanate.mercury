@@ -4,6 +4,14 @@
 
 export { type DagRunOptions, type DagRunResult, runDag } from "./dag.js";
 export {
+	type MetricRecord,
+	MetricsWriter,
+	type RunMetric,
+	readMetrics,
+	type SegmentMetric,
+	type StepMetric,
+} from "./metrics.js";
+export {
 	type PhaseRunOptions,
 	type PhaseRunResult,
 	runPhase,
@@ -15,6 +23,7 @@ export {
 	type SegmentRunOptions,
 	type SegmentRunResult,
 } from "./segment-runner.js";
+export { runCheckCommands, runSelfCheckLoop } from "./self-check.js";
 export {
 	readPipelineState,
 	readRunState,

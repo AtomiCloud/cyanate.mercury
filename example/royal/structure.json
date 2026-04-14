@@ -1,0 +1,209 @@
+{
+  "site_url": "https://royal-healthcare.com",
+  "scraped_at": "2026-04-12T16:41:14.723Z",
+  "primary_language": "en",
+  "total_crawled": 270,
+  "total_kept": 86,
+  "page_types": [
+    {
+      "name": "landing",
+      "url_pattern": "/",
+      "description": "Website homepage",
+      "sample_urls": [
+        "/"
+      ],
+      "urls": [
+        "/"
+      ]
+    },
+    {
+      "name": "about",
+      "url_pattern": "/about-us/",
+      "description": "About us page with company story and awards",
+      "sample_urls": [
+        "/about-us/"
+      ],
+      "urls": [
+        "/about-us/"
+      ]
+    },
+    {
+      "name": "team_listing",
+      "url_pattern": "/meet-our-team/",
+      "description": "Meet the team page listing all doctors and leadership",
+      "sample_urls": [
+        "/meet-our-team/"
+      ],
+      "urls": [
+        "/meet-our-team/"
+      ]
+    },
+    {
+      "name": "doctor_profile",
+      "url_pattern": "/doctor/{slug}/",
+      "description": "Individual doctor profile pages",
+      "sample_urls": [
+        "/doctor/dr-michael-lim/",
+        "/doctor/dr-woo-jia-wei/"
+      ],
+      "urls": [
+        "/doctor/dr-woo-jia-wei/",
+        "/doctor/dr-leong-hoe-nam/",
+        "/doctor/dr-quan-wai-leong/",
+        "/doctor/dr-ambrose-yung/",
+        "/doctor/dr-pearllyn-quek/",
+        "/doctor/dr-denis-cheong/",
+        "/doctor/dr-teo-ngee/",
+        "/doctor/dr-melvin-look/",
+        "/doctor/dr-terence-goh/",
+        "/doctor/dr-pary-sivaraman/",
+        "/doctor/dr-kelvin-chye/",
+        "/doctor/dr-aaron-goh/",
+        "/doctor/dr-koh-chi-siong-dean/",
+        "/doctor/dr-choo-su-pin/",
+        "/doctor/dr-valerie-yang-shiwen/",
+        "/doctor/dr-fong-kah-leng/",
+        "/doctor/dr-chong-jin-ho/",
+        "/doctor/dr-priscilla-ang-mei-wei/",
+        "/doctor/dr-dharambir-singh-sethi/",
+        "/doctor/dr-lim-kar-seng/",
+        "/doctor/dr-liow-pei-hsiang/",
+        "/doctor/dr-keith-lee/",
+        "/doctor/dr-low-mun-hon/",
+        "/doctor/dr-chin-chong-min/",
+        "/doctor/dr-tan-kok-kuan/",
+        "/doctor/dr-steven-teo/",
+        "/doctor/dr-suresh-nair/",
+        "/doctor/dr-ho-wen-nee/",
+        "/doctor/dr-patrick-ang/",
+        "/doctor/dr-jessalynn-sukamto/",
+        "/doctor/dr-donovan-tay/",
+        "/doctor/dr-matthew-tan/",
+        "/doctor/dr-mohammed-tauqeer-ahmad/",
+        "/doctor/dr-francis-tjang/",
+        "/doctor/dr-lau-chin-wah/",
+        "/doctor/dr-michael-lim/",
+        "/doctor/dr-verena-tan/",
+        "/doctor/dr-kelvin-wong/",
+        "/doctor/dr-kang-wee-lee/",
+        "/doctor/dr-chong-yeh-woei/",
+        "/doctor/dr-elaine-huang/",
+        "/doctor/dr-behram-ali-khan/",
+        "/doctor/dr-francisco-salcido-ochoa/",
+        "/doctor/dr-keefe-tan/",
+        "/doctor/dr-amy-wong/",
+        "/doctor/dr-chan-tiong-beng/",
+        "/doctor/dr-darryl-lim/",
+        "/doctor/dr-tay-eng-hseon/"
+      ]
+    },
+    {
+      "name": "service_overview",
+      "url_pattern": "/our-services/",
+      "description": "Main services overview page",
+      "sample_urls": [
+        "/our-services/"
+      ],
+      "urls": [
+        "/our-services/"
+      ]
+    },
+    {
+      "name": "service_detail",
+      "url_pattern": "/{service-path}/",
+      "description": "Individual service detail pages",
+      "sample_urls": [
+        "/specialist-care/",
+        "/diagnostics-imaging/"
+      ],
+      "urls": [
+        "/specialist-care/",
+        "/diagnostics-imaging/",
+        "/our-services/longevity-wellness/",
+        "/our-services/concierge-services/",
+        "/measures-to-enhance-cognitive-resilience-and-reduce-dementia-risk/"
+      ]
+    },
+    {
+      "name": "patient_journey",
+      "url_pattern": "/patient-journey/",
+      "description": "Patient journey information page",
+      "sample_urls": [
+        "/patient-journey/"
+      ],
+      "urls": [
+        "/patient-journey/"
+      ]
+    },
+    {
+      "name": "blog_post",
+      "url_pattern": "/{slug}/",
+      "description": "Individual blog posts, news articles and events",
+      "sample_urls": [
+        "/the-path-to-longevity-begins-with-death-prevention/",
+        "/reducing-bad-cholesterol-without-medication/"
+      ],
+      "urls": [
+        "/the-path-to-longevity-begins-with-death-prevention/",
+        "/reducing-bad-cholesterol-without-medication/",
+        "/protecting-childrens-heart-health-from-environmental-hazards/",
+        "/the-science-of-intermittent-fasting-with-dr-keefe-tan/",
+        "/advances-in-coronary-artery-disease-cme-lunch-symposium/",
+        "/the-connection-between-oral-health-and-better-sleep/",
+        "/the-heart-of-wellness-east-meets-west-at-hsbc/",
+        "/reaching-a-utopia-where-heart-attacks-become-a-rarity/",
+        "/the-role-of-artificial-intelligence-in-cardiology/",
+        "/preventing-stroke-a-guide-to-lowering-your-risk-and-achieving-a-healthier-life/",
+        "/the-latest-truths-about-cholesterol/",
+        "/vitamin-b1-a-forgotten-nutrient/",
+        "/preventing-heart-attacks-a-peek-into-the-future/",
+        "/longevity-and-the-future-of-healthspan-in-manila/",
+        "/preventing-dementia-the-transformative-potential-of-artificial-intelligence/",
+        "/revolutionising-medical-imaging-a-new-era/",
+        "/longevity-health-insights-for-singapore-zhejiang-chamber/",
+        "/edge-of-healthcare-crafting-a-legacy-of-wellness/",
+        "/celebrating-our-21st-anniversary-in-batam/",
+        "/celebrating-22-years-of-excellence-growth/",
+        "/measure-to-enhance-cognitive-resilience-and-reduce-dementia-risk/",
+        "/notice-of-closure-for-chinese-new-year/",
+        "/royal-healthcare-at-the-asean-naeotom-alpha-summit-2025/",
+        "/20-years-of-innovation-care-at-royal-healthcare-group/"
+      ]
+    },
+    {
+      "name": "news_listing",
+      "url_pattern": "/news-events/",
+      "description": "News and articles listing page",
+      "sample_urls": [
+        "/news-events/"
+      ],
+      "urls": [
+        "/news-events/"
+      ]
+    },
+    {
+      "name": "event_listing",
+      "url_pattern": "/events/",
+      "description": "Events listing page",
+      "sample_urls": [
+        "/events/"
+      ],
+      "urls": [
+        "/events/"
+      ]
+    },
+    {
+      "name": "legal",
+      "url_pattern": "/{legal-page}/",
+      "description": "Legal pages",
+      "sample_urls": [
+        "/privacy-policy/",
+        "/terms-conditions/"
+      ],
+      "urls": [
+        "/privacy-policy/",
+        "/terms-conditions/"
+      ]
+    }
+  ]
+}

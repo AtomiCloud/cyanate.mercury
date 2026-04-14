@@ -15,6 +15,7 @@
  */
 
 import type { PipelineLogger } from "../lib/logger.js";
+import type { MetricsWriter } from "./metrics.js";
 import { resolveProfile } from "./profile.js";
 import { createIterationState, writePipelineState } from "./state.js";
 import type {
@@ -47,9 +48,12 @@ export interface PhaseRunOptions {
 	iterationIndex: number;
 	sourceDir: string | null;
 	rejectionContext?: string;
+	/** Which retry attempt within this phase (0 = first try) */
+	retry: number;
 	config: CuiConfig;
 	pipelineState: PipelineState;
 	logger: PipelineLogger;
+	metrics?: MetricsWriter;
 }
 
 export async function runPhase(opts: PhaseRunOptions): Promise<PhaseRunResult> {
@@ -76,7 +80,9 @@ export async function runPhase(opts: PhaseRunOptions): Promise<PhaseRunResult> {
 	opts.pipelineState.iterations.push(iterState);
 	await writePipelineState(segmentDir, opts.pipelineState);
 
+	const phaseStart = Date.now();
 	logger.startStep(`${segmentId}/${phase.id} (iteration ${iterationIndex})`);
+	logger.completeStep();
 
 	const allReviews: Review[] = [];
 
@@ -98,6 +104,7 @@ export async function runPhase(opts: PhaseRunOptions): Promise<PhaseRunResult> {
 		segmentDir,
 		opts,
 		logger,
+		phaseStart,
 	);
 }
 
@@ -116,6 +123,9 @@ async function executeStep(
 	stepState.startedAt = new Date().toISOString();
 	await writePipelineState(opts.segmentDir, opts.pipelineState);
 
+	const stepLabel = `${opts.segmentId}/${opts.phase.id}/${step.id}`;
+	opts.logger.startStep(stepLabel);
+
 	const profile = resolveProfile(
 		opts.config,
 		opts.segmentId,
@@ -131,6 +141,7 @@ async function executeStep(
 		runId: opts.runId,
 		runDir: opts.runDir,
 		iteration: opts.iterationIndex,
+		retry: opts.retry,
 		profile,
 		rejectionContext: opts.rejectionContext,
 		logger: opts.logger,
@@ -140,6 +151,27 @@ async function executeStep(
 	const result = await safeRunStep(step, ctx);
 	stepState.finishedAt = new Date().toISOString();
 	stepState.duration = result.duration;
+
+	// Record step metric
+	opts.metrics?.record({
+		kind: "step",
+		ts: new Date().toISOString(),
+		runId: opts.runId,
+		segment: opts.segmentId,
+		phase: opts.phase.id,
+		step: step.id,
+		iteration: opts.iterationIndex,
+		retry: opts.retry,
+		model: profile.model,
+		provider: profile.provider,
+		stepType: step.type,
+		status: result.status,
+		turns: result.turns ?? 0,
+		inputTokens: result.inputTokens ?? 0,
+		outputTokens: result.outputTokens ?? 0,
+		cost: result.cost ?? 0,
+		duration: result.duration ?? 0,
+	});
 
 	if (result.status === "reject") {
 		return handleRejection(stepState, result, iterState, allReviews, opts);
@@ -154,6 +186,7 @@ async function executeStep(
 		stepState.reviews = result.reviews;
 		allReviews.push(...result.reviews);
 	}
+	opts.logger.completeStep();
 	await writePipelineState(opts.segmentDir, opts.pipelineState);
 	return null;
 }
@@ -186,6 +219,8 @@ function handleRejection(
 	stepState.reviews = result.reviews;
 	if (result.reviews) allReviews.push(...result.reviews);
 	skipPending(iterState);
+	const context = aggregateRejectionContext(allReviews);
+	opts.logger.failStep(context);
 	return finishIterationSync(iterState, allReviews, "rejected", opts);
 }
 
@@ -198,6 +233,7 @@ function handleFailure(
 	stepState.status = "failed";
 	stepState.error = result.error;
 	skipPending(iterState);
+	opts.logger.failStep(result.error ?? "unknown error");
 	return finishIterationSync(iterState, [], "failed", opts, result.error);
 }
 
@@ -238,13 +274,29 @@ async function finishIteration(
 	segmentDir: string,
 	opts: PhaseRunOptions,
 	logger: PipelineLogger,
+	phaseStart?: number,
 ): Promise<PhaseRunResult> {
 	iterState.status = status;
 	iterState.finishedAt = new Date().toISOString();
 	iterState.reviews = reviews;
 	await writePipelineState(segmentDir, opts.pipelineState);
-	logger.completeStep();
+	if (phaseStart) {
+		const elapsed = Date.now() - phaseStart;
+		logger.startStep(
+			`${opts.segmentId}/${opts.phase.id} done (${formatPhaseDuration(elapsed)})`,
+		);
+		logger.completeStep();
+	}
 	return { status, iteration: iterState, reviews };
+}
+
+function formatPhaseDuration(ms: number): string {
+	if (ms < 1000) return `${ms}ms`;
+	const secs = ms / 1000;
+	if (secs < 60) return `${secs.toFixed(1)}s`;
+	const mins = Math.floor(secs / 60);
+	const rem = Math.round(secs % 60);
+	return `${mins}m${rem.toString().padStart(2, "0")}s`;
 }
 
 async function runParallelStep(

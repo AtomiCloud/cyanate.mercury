@@ -44,7 +44,7 @@ describe("parseReviewerVerdict", () => {
 		);
 		expect(result.verdict).toBe("reject");
 		expect(result.rejectionContext).toContain(
-			"VERDICT: PASS or VERDICT: REJECT",
+			'VERDICT: PASS" or "VERDICT: REJECT"',
 		);
 	});
 

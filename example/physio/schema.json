@@ -1,0 +1,1425 @@
+{
+  "pages": {
+    "landing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "headline": {
+              "type": "string",
+              "description": "Main headline text"
+            },
+            "subheadline": {
+              "type": "string",
+              "description": "Supporting headline"
+            },
+            "video_src": {
+              "type": "string",
+              "format": "uri",
+              "description": "Background video URL"
+            },
+            "background_image": {
+              "$ref": "#/definitions/image"
+            }
+          },
+          "required": [
+            "headline"
+          ]
+        },
+        "services_preview": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "href": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          },
+          "description": "Preview of main services offered"
+        },
+        "approach_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "principles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "testimonials_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "slides": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "quote": {
+                    "type": "string"
+                  },
+                  "author_name": {
+                    "type": "string"
+                  },
+                  "author_role": {
+                    "type": "string"
+                  },
+                  "rating_image": {
+                    "$ref": "#/definitions/image"
+                  },
+                  "patient_image": {
+                    "$ref": "#/definitions/image"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "team_preview": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "members": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "quote": {
+                    "type": "string"
+                  },
+                  "photo": {
+                    "$ref": "#/definitions/image"
+                  },
+                  "profile_url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "approach_steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "image": {
+                "$ref": "#/definitions/image"
+              }
+            }
+          },
+          "description": "Move Better, Live Stronger, Live Pain-Free sections"
+        },
+        "cta_section": {
+          "$ref": "#/definitions/cta_section"
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    },
+    "about": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/definitions/image"
+            },
+            "headline": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "philosophy_sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "image": {
+                "$ref": "#/definitions/image"
+              }
+            }
+          }
+        },
+        "values_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "letter": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "$ref": "#/definitions/image"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cta_section": {
+          "$ref": "#/definitions/cta_section"
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    },
+    "team_listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "founder_section": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/definitions/image"
+            },
+            "quote": {
+              "type": "string"
+            },
+            "signature_image": {
+              "$ref": "#/definitions/image"
+            }
+          }
+        },
+        "team_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "principles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": {
+              "type": "string"
+            },
+            "members": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "quote": {
+                    "type": "string"
+                  },
+                  "photo": {
+                    "$ref": "#/definitions/image"
+                  },
+                  "profile_url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cta_section": {
+          "$ref": "#/definitions/cta_section"
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    },
+    "team_member": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "profile_section": {
+          "type": "object",
+          "properties": {
+            "back_link": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            },
+            "name": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            },
+            "bio": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "specialties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "profile_photo": {
+              "$ref": "#/definitions/image"
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          },
+          "required": [
+            "name",
+            "role"
+          ]
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    },
+    "service": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/definitions/image"
+            },
+            "headline": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "content_sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "content": {
+                "type": "string"
+              },
+              "bullet_points": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "image": {
+                "$ref": "#/definitions/image"
+              }
+            }
+          }
+        },
+        "other_services_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "services": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cta_section": {
+          "$ref": "#/definitions/cta_section"
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    },
+    "patient_journey": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/definitions/image"
+            },
+            "headline": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "principles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "introduction": {
+              "type": "string"
+            }
+          }
+        },
+        "why_choose_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "preparation_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "first_visit_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "phase_number": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "string"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "treatment_plan_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "phases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "phase_title": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "payment_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "payment_methods": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "insurance_providers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "claims_process": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "faq_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "questions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string"
+                  },
+                  "answer": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cta_section": {
+          "$ref": "#/definitions/cta_section"
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    },
+    "testimonials": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "testimonials_grid": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "image": {
+                "$ref": "#/definitions/image"
+              },
+              "alt_text": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "approach_section": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/definitions/image"
+            },
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "bullet_points": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "google_reviews_badge": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/definitions/image"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        "cta_section": {
+          "$ref": "#/definitions/cta_section"
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    },
+    "blog_listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "blog_header": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "search_form": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "format": "uri"
+            },
+            "input_name": {
+              "type": "string"
+            },
+            "placeholder": {
+              "type": "string"
+            }
+          }
+        },
+        "featured_post": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "image": {
+              "$ref": "#/definitions/image"
+            },
+            "alt_text": {
+              "type": "string"
+            },
+            "href": {
+              "type": "string",
+              "format": "uri"
+            },
+            "author": {
+              "type": "string"
+            },
+            "read_time": {
+              "type": "string"
+            }
+          }
+        },
+        "recent_posts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "image": {
+                "$ref": "#/definitions/image"
+              },
+              "alt_text": {
+                "type": "string"
+              },
+              "href": {
+                "type": "string",
+                "format": "uri"
+              },
+              "author": {
+                "type": "string"
+              },
+              "read_time": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "cta_section": {
+          "$ref": "#/definitions/cta_section"
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    },
+    "blog_post": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "post_header": {
+          "type": "object",
+          "properties": {
+            "breadcrumb": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            },
+            "title": {
+              "type": "string"
+            },
+            "meta": {
+              "type": "object",
+              "properties": {
+                "author": {
+                  "type": "string"
+                },
+                "author_image": {
+                  "$ref": "#/definitions/image"
+                },
+                "publish_date": {
+                  "type": "string"
+                },
+                "read_time": {
+                  "type": "string"
+                }
+              }
+            },
+            "updated_date": {
+              "type": "string"
+            }
+          }
+        },
+        "article_content": {
+          "type": "object",
+          "properties": {
+            "subtitle": {
+              "type": "string"
+            },
+            "intro_image": {
+              "$ref": "#/definitions/image"
+            },
+            "sections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "heading": {
+                    "type": "string"
+                  },
+                  "content_paragraphs": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "image": {
+                    "$ref": "#/definitions/image"
+                  },
+                  "subsections": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "subheading": {
+                          "type": "string"
+                        },
+                        "content": {
+                          "type": "string"
+                        },
+                        "bullet_points": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "share_buttons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recent_posts_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "view_all_link": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              }
+            },
+            "posts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "$ref": "#/definitions/image"
+                  },
+                  "alt_text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    },
+    "media": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "header": {
+          "$ref": "#/definitions/header"
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/definitions/image"
+            },
+            "title": {
+              "type": "string"
+            }
+          }
+        },
+        "intro_section": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "highlight_text": {
+              "type": "string"
+            },
+            "cta_text": {
+              "type": "string"
+            }
+          }
+        },
+        "media_logos_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "logos": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "$ref": "#/definitions/image"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "features_section": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "link": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "gallery_section": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/image"
+          },
+          "description": "Media coverage images grid"
+        },
+        "workshops_section": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "social_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "cta_section": {
+          "$ref": "#/definitions/cta_section"
+        },
+        "footer": {
+          "$ref": "#/definitions/footer"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "header": {
+      "type": "object",
+      "properties": {
+        "logo": {
+          "type": "object",
+          "properties": {
+            "src": {
+              "type": "string",
+              "format": "uri"
+            },
+            "alt": {
+              "type": "string"
+            },
+            "href": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "cta_button": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "href": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "link"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "href": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "dropdown"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string"
+                            },
+                            "href": {
+                              "type": "string",
+                              "format": "uri"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "top_banner": {
+          "type": "string",
+          "description": "Top banner text with call to action"
+        }
+      },
+      "required": [
+        "logo",
+        "navigation"
+      ]
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "src": {
+          "type": "string",
+          "format": "uri"
+        },
+        "alt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "src"
+      ]
+    },
+    "cta_section": {
+      "type": "object",
+      "properties": {
+        "background_image": {
+          "$ref": "#/definitions/image"
+        },
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "cta_button": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "href": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      }
+    },
+    "footer": {
+      "type": "object",
+      "properties": {
+        "open_for_business_widget": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "iframe_title": {
+              "type": "string"
+            }
+          }
+        },
+        "cta_button": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "href": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        },
+        "contact_info": {
+          "type": "object",
+          "properties": {
+            "address": {
+              "type": "string"
+            },
+            "unit_number": {
+              "type": "string"
+            },
+            "postal_code": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "email": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string",
+                  "format": "email"
+                },
+                "subject": {
+                  "type": "string"
+                }
+              }
+            },
+            "social_links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string"
+                  },
+                  "handle": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "map_widget": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "iframe_title": {
+              "type": "string"
+            }
+          }
+        },
+        "accolades_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "badges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "$ref": "#/definitions/image"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "contact_form_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "placeholder": {
+                    "type": "string"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "pattern": {
+                    "type": "string"
+                  },
+                  "maxlength": {
+                    "type": "integer"
+                  }
+                }
+              }
+            },
+            "textarea_field": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "placeholder": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "submit_button": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              }
+            },
+            "success_message": {
+              "type": "string"
+            }
+          }
+        },
+        "tagline": {
+          "type": "string"
+        },
+        "copyright": {
+          "type": "string"
+        },
+        "powered_by": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

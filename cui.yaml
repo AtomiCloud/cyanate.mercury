@@ -2,7 +2,7 @@
 # =============================
 
 # Scraper output directory (structure.json, schema.json, content.json)
-input: ./example/
+input: ./example/physio
 
 # Reference website whose design to replicate
 reference: https://vercel.com/
@@ -10,37 +10,50 @@ reference: https://vercel.com/
 # Global LLM defaults (used when no profile override matches)
 defaults:
   provider: anthropic
-  model: claude-sonnet-4-20250514
-  maxTurns: 20
+  model: zai-org/GLM-5
+  maxTurns: 80
+  env:
+    ANTHROPIC_BASE_URL: http://localhost:8317/
 
 # Cascading profile overrides
 # Key format: segment | segment.phase | segment.phase.step
 # More specific keys take priority.
 profiles:
-  # Use Opus for the analyze segment (all phases/steps)
-  # analyze:
-  #   model: claude-opus-4-20250514
-  #   maxTurns: 30
+  # ---- Vision tasks (screenshots → LLM) ----
+  # Analyze vision review
+  analyze.validate.vision-review:
+    model: accounts/fireworks/models/qwen3p6-plus
 
-  # Use a faster model for layout build steps
-  # layout.build.make:
-  #   model: claude-sonnet-4-20250514
+  # Wireframe vision review (QA phase)
+  wireframe.validate.qa-vision:
+    model: accounts/fireworks/models/qwen3p6-plus
 
-  # Use Opus for design judges
-  # layout.build.judge:
-  #   model: claude-opus-4-20250514
+  # Design — all vision reviewers
+  design.typography.typography-vision-review:
+    model: accounts/fireworks/models/qwen3p6-plus
+  design.color.color-vision-review:
+    model: accounts/fireworks/models/qwen3p6-plus
+  design.motion.motion-vision-review:
+    model: accounts/fireworks/models/qwen3p6-plus
+  design.qa.qa-vision-review:
+    model: accounts/fireworks/models/qwen3p6-plus
+
+  # ---- mm25: automated reviewers only (no real LLM reasoning needed) ----
+  wireframe.generate.static-checks-review:
+    model: mm25
+  wireframe.generate.console-error-review:
+    model: mm25
+  design.qa.qa-static-checks:
+    model: mm25
+  design.qa.qa-console-errors:
+    model: mm25
 
 # Heartbeat configuration
 heartbeat:
-  # ms before an agent is considered dead and gets terminated (default: 900000 = 15 min)
-  # High-context agents (5M+ tokens) can have long API waits, so this is generous.
   timeout: 900000
-  # ms between heartbeat log lines in non-interactive/verbose mode (default: 30000 = 30s)
   interval: 30000
 
 # Logging configuration
 logging:
-  # Filename for per-step agent event logs (JSONL format)
   eventsFile: agent-events.jsonl
-  # Filename for SDK debug trace logs
   debugFile: agent-debug.log

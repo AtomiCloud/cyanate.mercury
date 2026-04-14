@@ -4,6 +4,7 @@
  * All validation functions are pure (data in → errors out). No IO.
  */
 
+import { parse as culoriParse } from "culori";
 import { z } from "zod";
 import type { DesignTokensV2, PageContent } from "../types.js";
 
@@ -206,7 +207,7 @@ export const RegistrySchema = z.object({
 				]),
 				trigger: z.string().optional(),
 				target: z.string().optional(),
-				pageType: z.string().optional(),
+				pageType: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
 				route: z.string().optional(),
 				description: z.string(),
 			}),
@@ -286,8 +287,11 @@ export const AssetManifestSchema = z.record(z.string(), z.string());
 // Domain-specific validators
 // ---------------------------------------------------------------------------
 
-/** OKLCH regex pattern */
-const OKLCH_REGEX = /^oklch\s*\(\s*[\d.]+\s+[\d.]+\s+[\d.]+/i;
+/** Check whether a CSS color string is valid OKLCH using culori. */
+function isValidOklch(value: string): boolean {
+	const parsed = culoriParse(value);
+	return parsed != null && parsed.mode === "oklch";
+}
 
 /**
  * Check spacing scale has >= 4 steps.
@@ -326,13 +330,11 @@ export function validateOklchValues(tokens: DesignTokensV2): string[] {
 	const colors = tokens.atomic.colors;
 
 	for (const [name, value] of Object.entries(colors)) {
+		if (isValidOklch(value)) continue;
+
 		if (value.toLowerCase().startsWith("oklch")) {
-			// Validate OKLCH format
-			if (!OKLCH_REGEX.test(value)) {
-				errors.push(`Color "${name}" has invalid OKLCH value: ${value}`);
-			}
+			errors.push(`Color "${name}" has invalid OKLCH value: ${value}`);
 		} else {
-			// Non-OKLCH values (hex, rgb, hsl, etc.) are not allowed
 			errors.push(`Color "${name}" must be OKLCH, got "${value}"`);
 		}
 	}

@@ -6,6 +6,7 @@
  */
 
 import type { PipelineLogger } from "../lib/logger.js";
+import { MetricsWriter } from "./metrics.js";
 import type { SegmentRegistry } from "./registry.js";
 import { runSegment, type SegmentRunResult } from "./segment-runner.js";
 import { createRunState, writeRunState } from "./state.js";
@@ -44,6 +45,7 @@ export async function runDag(opts: DagRunOptions): Promise<DagRunResult> {
 
 	const runId = generateRunId();
 	const runDir = await createRunDir(rootDir, runId);
+	const metrics = new MetricsWriter(runDir);
 	const order = resolveOrder(registry, startSegment);
 	const runState = createRunState(runId, order);
 	await writeRunState(runDir, runState);
@@ -63,12 +65,13 @@ export async function runDag(opts: DagRunOptions): Promise<DagRunResult> {
 		registry,
 		config,
 		logger,
+		metrics,
 		startSegment,
 		fromPhase,
 		depOverrides,
 	);
 
-	return finalizeDag(runState, runDir, runId, results);
+	return finalizeDag(runState, runDir, runId, results, metrics);
 }
 
 // --- Helpers ---
@@ -131,6 +134,7 @@ async function executeBatch(
 	registry: SegmentRegistry,
 	config: CuiConfig,
 	logger: PipelineLogger,
+	metrics: MetricsWriter,
 	startSegment?: string,
 	fromPhase?: string,
 ): Promise<Array<{ id: string; result: SegmentRunResult }>> {
@@ -153,6 +157,7 @@ async function executeBatch(
 				fromPhase: id === startSegment ? fromPhase : undefined,
 				config,
 				logger,
+				metrics,
 			});
 
 			return { id, result };
@@ -214,6 +219,7 @@ async function executeDag(
 	registry: SegmentRegistry,
 	config: CuiConfig,
 	logger: PipelineLogger,
+	metrics: MetricsWriter,
 	startSegment?: string,
 	fromPhase?: string,
 	depOverrides?: Record<string, string>,
@@ -235,6 +241,7 @@ async function executeDag(
 			registry,
 			config,
 			logger,
+			metrics,
 			startSegment,
 			fromPhase,
 		);
@@ -257,11 +264,30 @@ async function finalizeDag(
 	runDir: string,
 	runId: string,
 	results: Record<string, SegmentRunResult>,
+	metrics: MetricsWriter,
 ): Promise<DagRunResult> {
 	const anyFailed = Object.values(results).some((r) => r.status === "failed");
 	runState.status = anyFailed ? "failed" : "completed";
 	runState.finishedAt = new Date().toISOString();
 	await writeRunState(runDir, runState);
+
+	// Read back segment metrics to build run summary
+	const segMetrics = await readSegmentMetrics(runDir);
+	metrics.record({
+		kind: "run",
+		ts: new Date().toISOString(),
+		runId,
+		status: runState.status,
+		segments: Object.keys(results).length,
+		steps: segMetrics.reduce((s, m) => s + m.steps, 0),
+		turns: segMetrics.reduce((s, m) => s + m.turns, 0),
+		inputTokens: segMetrics.reduce((s, m) => s + m.inputTokens, 0),
+		outputTokens: segMetrics.reduce((s, m) => s + m.outputTokens, 0),
+		cost: segMetrics.reduce((s, m) => s + m.cost, 0),
+		duration: runState.startedAt
+			? Date.now() - new Date(runState.startedAt).getTime()
+			: 0,
+	});
 
 	return {
 		runId,
@@ -269,6 +295,26 @@ async function finalizeDag(
 		status: runState.status,
 		segmentResults: results,
 	};
+}
+
+async function readSegmentMetrics(runDir: string): Promise<
+	Array<{
+		steps: number;
+		turns: number;
+		inputTokens: number;
+		outputTokens: number;
+		cost: number;
+	}>
+> {
+	try {
+		const { readMetrics } = await import("./metrics.js");
+		const records = await readMetrics(runDir);
+		return records.filter(
+			(r): r is import("./metrics.js").SegmentMetric => r.kind === "segment",
+		);
+	} catch {
+		return [];
+	}
 }
 
 function generateRunId(): string {

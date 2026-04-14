@@ -1,11 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import type { PageContent, Registry } from "../../types.js";
 import type { ContentModelOutput } from "./classify.js";
+import type { ClassifiedContentModel } from "./content-model.js";
 import {
+	generateCmsAssetManifest,
+	generateCmsContentModel,
 	generateCollectionEntries,
 	generateContentConfig,
 	generateGlobals,
 	generateRouteFiles,
+	generateSingletons,
 	validateSeedCompleteness,
 } from "./seed.js";
 
@@ -132,60 +136,51 @@ const dataContentModel: ContentModelOutput = {
 // ---------------------------------------------------------------------------
 
 describe("generateCollectionEntries", () => {
-	it("blog type with multiple pages → correct entries with frontmatter", () => {
+	it("blog type with multiple pages → all JSON entries", () => {
 		const entries = generateCollectionEntries(registry, contentModel, pages);
 
 		const blogEntries = entries.filter((e) => e.path.includes("blog"));
 		expect(blogEntries.length).toBe(3);
 
-		// Each entry should have valid YAML frontmatter (--- delimiters)
+		// All entries are JSON (no markdown)
 		for (const entry of blogEntries) {
-			// Markdown entries: should start with --- delimiter
-			expect(entry.content).toContain("---");
-			// Frontmatter should have expected fields
-			expect(entry.content).toContain("id:");
-			expect(entry.content).toContain("pagetype: blog");
-			expect(entry.content).toContain("collection: blog");
+			expect(entry.format).toBe("json");
+			expect(entry.path).toMatch(/\.json$/);
+
+			const parsed = JSON.parse(entry.content);
+			expect(parsed.id).toBeDefined();
+			expect(parsed.pagetype).toBe("blog");
+			expect(parsed.collection).toBe("blog");
 		}
 	});
 
-	it("pages with body field → markdown format", () => {
+	it("all entries are JSON format — no markdown", () => {
 		const entries = generateCollectionEntries(registry, contentModel, pages);
 
-		const blogEntries = entries.filter(
-			(e) => e.path.includes("blog") && e.format === "md",
-		);
-		// post-1 and post-2 have "body" fields
-		expect(blogEntries.length).toBeGreaterThanOrEqual(2);
-
-		// Markdown entries should have frontmatter delimiters
-		for (const entry of blogEntries) {
-			expect(entry.content.startsWith("---")).toBe(true);
+		for (const entry of entries) {
+			expect(entry.format).toBe("json");
+			expect(entry.path).toMatch(/\.json$/);
+			// Should be valid JSON
+			expect(() => JSON.parse(entry.content)).not.toThrow();
 		}
 	});
 
-	it("pages without body → aggregated JSON file in src/data/ for data collections", () => {
+	it("data-only collection → JSON files with scalar fields", () => {
 		const entries = generateCollectionEntries(
 			dataRegistry,
 			dataContentModel,
 			dataPages,
 		);
-		// Data collections (slug_field: "") aggregate all entries into one file
-		expect(entries.length).toBe(1);
-		expect(entries[0].path).toBe("src/data/events.json");
-		expect(entries[0].format).toBe("json");
+		expect(entries.length).toBe(2);
+		for (const entry of entries) {
+			expect(entry.path).toMatch(/^src\/content\/events\//);
+			expect(entry.format).toBe("json");
 
-		// Content must be a valid JSON array
-		const parsed = JSON.parse(entries[0].content);
-		expect(Array.isArray(parsed)).toBe(true);
-		expect(parsed).toHaveLength(2);
-
-		// Each entry must have required fields
-		for (const item of parsed) {
-			expect(item.id).toBeDefined();
-			expect(item.pagetype).toBe("event");
-			expect(item.collection).toBe("events");
-			expect(typeof item.title).toBe("string");
+			const parsed = JSON.parse(entry.content);
+			expect(parsed.id).toBeDefined();
+			expect(parsed.pagetype).toBe("event");
+			expect(parsed.collection).toBe("events");
+			expect(typeof parsed.title).toBe("string");
 		}
 	});
 
@@ -198,35 +193,20 @@ describe("generateCollectionEntries", () => {
 		expect(entries.length).toBe(0);
 	});
 
-	it("pages with description field → markdown format (description is body-like)", () => {
-		// post-3 has description which extractBody considers body-like
+	it("pages with scalar fields → included in JSON output", () => {
 		const entries = generateCollectionEntries(registry, contentModel, pages);
-		const post3 = entries.find((e) => e.path.includes("third-post"));
-		if (post3) {
-			expect(post3.format).toBe("md");
-		}
+		const post1 = entries.find((e) => e.path.includes("first-post"));
+		expect(post1).toBeDefined();
+
+		const parsed = JSON.parse(post1?.content ?? "");
+		expect(parsed.title).toBe("First Post");
+		expect(parsed.author).toBe("John");
 	});
 
 	it("non-collection pages produce no entries", () => {
 		const entries = generateCollectionEntries(registry, contentModel, pages);
 		// landing and about are static pages, not in collections
 		expect(entries.every((e) => e.path.includes("blog"))).toBe(true);
-	});
-
-	it("markdown entries have YAML frontmatter with --- delimiters", () => {
-		const entries = generateCollectionEntries(registry, contentModel, pages);
-		const blogEntries = entries.filter((e) => e.format === "md");
-
-		for (const entry of blogEntries) {
-			const lines = entry.content.split("\n");
-			// First line should be the opening --- delimiter
-			expect(lines[0]).toBe("---");
-			// Second line should be the first frontmatter key
-			expect(lines[1]).toMatch(/^[a-z_]+:/i);
-			// Content should have matching closing delimiter after frontmatter
-			const closingDelimiterIndex = lines.indexOf("---", 1);
-			expect(closingDelimiterIndex).toBeGreaterThan(1);
-		}
 	});
 });
 
@@ -235,48 +215,43 @@ describe("generateCollectionEntries", () => {
 // ---------------------------------------------------------------------------
 
 describe("generateGlobals", () => {
-	it("produces global data files in src/data/", () => {
+	it("produces global data files in src/content/", () => {
 		const files = generateGlobals(contentModel, pages);
 		const paths = files.map((f) => f.path);
 
-		expect(paths.some((p) => p.includes("src/data/"))).toBe(true);
-		expect(paths).toContain("src/data/site.json");
+		expect(paths.some((p) => p.includes("src/content/"))).toBe(true);
+		expect(paths).toContain("src/content/site/default.json");
 	});
 
-	it("extracts navigation from landing page as array with id: default", () => {
+	it("extracts navigation from landing page as plain object", () => {
 		const files = generateGlobals(contentModel, pages);
-		const nav = files.find((f) => f.path.includes("navigation.json"));
+		const nav = files.find((f) => f.path.includes("navigation"));
 
 		expect(nav).toBeDefined();
+		expect(nav?.path).toBe("src/content/navigation/default.json");
 		const parsed = JSON.parse(nav?.content ?? "");
-		// Global data is wrapped in a single-element array for file() loader
-		expect(Array.isArray(parsed)).toBe(true);
-		expect(parsed).toHaveLength(1);
-		expect(parsed[0].id).toBe("default");
-		expect(parsed[0].main_menu).toBeDefined();
+		expect(parsed.main_menu).toBeDefined();
 	});
 
-	it("extracts header from landing page as array with id: default", () => {
+	it("extracts header from landing page as plain object", () => {
 		const files = generateGlobals(contentModel, pages);
-		const header = files.find((f) => f.path.includes("header.json"));
+		const header = files.find((f) => f.path.includes("header"));
 
 		expect(header).toBeDefined();
+		expect(header?.path).toBe("src/content/header/default.json");
 		const parsed = JSON.parse(header?.content ?? "");
-		expect(Array.isArray(parsed)).toBe(true);
-		expect(parsed).toHaveLength(1);
-		expect(parsed[0].id).toBe("default");
+		expect(typeof parsed).toBe("object");
+		expect(Array.isArray(parsed)).toBe(false);
 	});
 
-	it("site.json is array-wrapped with id: default", () => {
+	it("site.json is a plain object with totalPages", () => {
 		const files = generateGlobals(contentModel, pages);
-		const site = files.find((f) => f.path.includes("site.json"));
+		const site = files.find((f) => f.path.includes("site"));
 
 		expect(site).toBeDefined();
+		expect(site?.path).toBe("src/content/site/default.json");
 		const parsed = JSON.parse(site?.content ?? "");
-		expect(Array.isArray(parsed)).toBe(true);
-		expect(parsed).toHaveLength(1);
-		expect(parsed[0].id).toBe("default");
-		expect(parsed[0].totalPages).toBe(pages.length);
+		expect(parsed.totalPages).toBe(pages.length);
 	});
 
 	it("no landing page → no nav/header files", () => {
@@ -307,11 +282,11 @@ describe("generateContentConfig", () => {
 		expect(config).toContain("glob");
 	});
 
-	it("includes glob() loader with dual extension for content collections", () => {
+	it("includes glob() loader with JSON pattern for content collections", () => {
 		const config = generateContentConfig(registry, contentModel);
 
-		// Content collections use {md,json} to handle mixed Markdown/JSON pages
-		expect(config).toContain('glob({ pattern: "**/*.{md,json}"');
+		// All content collections use JSON-only pattern
+		expect(config).toContain('glob({ pattern: "**/*.json"');
 		expect(config).toContain("blog");
 	});
 
@@ -321,22 +296,16 @@ describe("generateContentConfig", () => {
 		expect(config).toContain("title: z.string().optional()");
 	});
 
-	it("uses file() loader for data collections (slug_field empty)", () => {
+	it("uses glob() loader for all collections including slug_field empty", () => {
 		const config = generateContentConfig(dataRegistry, dataContentModel);
 
-		// Data collections use file() loader, not glob()
-		expect(config).toContain('file("./src/data/events.json")');
-		expect(config).not.toContain('glob({ pattern: "**/*.{md,json}"');
+		// All collections use glob() loader
+		expect(config).toContain(
+			'glob({ pattern: "**/*.json", base: "./src/content/events" })',
+		);
 		expect(config).toContain("events");
-		// Data collections use passthrough schema (arbitrary data shapes)
-		expect(config).toContain("z.object({ id: z.string() }).passthrough()");
-	});
-
-	it("data collections import file() loader even without globals", () => {
-		const config = generateContentConfig(dataRegistry, dataContentModel);
-
-		// Should import file because data collections use it
-		expect(config).toContain("import { file, glob }");
+		// No file() loader anywhere
+		expect(config).not.toContain("file(");
 	});
 
 	it("outputs content.config.ts format (named export)", () => {
@@ -392,36 +361,40 @@ describe("generateContentConfig", () => {
 		expect(config).toContain('from "astro/zod"');
 	});
 
+	it("url field uses z.string() not z.string().url() (accepts route paths)", () => {
+		const config = generateContentConfig(registry, contentModel);
+
+		// url field must be z.string() so relative paths like "/about" are valid
+		expect(config).toContain("url: z.string(),");
+		expect(config).not.toContain("url: z.string().url()");
+	});
+
 	it("content-only registry without globals does not import file() loader", () => {
 		const config = generateContentConfig(registry, contentModel);
 		expect(config).not.toContain("file(");
 		expect(config).not.toContain("import { file");
 	});
 
-	it("with globals param, imports file() and registers globals as file() collections", () => {
+	it("with globals param, registers globals as glob() collections", () => {
 		const globals = [
-			{ path: "src/data/navigation.json", content: "[]" },
-			{ path: "src/data/header.json", content: "[]" },
-			{ path: "src/data/site.json", content: "[]" },
+			{ path: "src/content/navigation/default.json", content: "{}" },
+			{ path: "src/content/header/default.json", content: "{}" },
+			{ path: "src/content/site/default.json", content: "{}" },
 		];
 		const config = generateContentConfig(registry, contentModel, globals);
 
-		// Should import both file and glob
-		expect(config).toContain("import { file, glob }");
-		// Should register globals with file() loader
-		expect(config).toContain('file("./src/data/navigation.json")');
-		expect(config).toContain('file("./src/data/header.json")');
-		expect(config).toContain('file("./src/data/site.json")');
-		// Global collection names use globals_ prefix
-		expect(config).toContain("globals_navigation: defineCollection");
-		expect(config).toContain("globals_header: defineCollection");
-		expect(config).toContain("globals_site: defineCollection");
+		// Only glob loader (no file)
+		expect(config).not.toContain("file(");
+		// Global collection names — flat, no prefix
+		expect(config).toContain("navigation: defineCollection");
+		expect(config).toContain("header: defineCollection");
+		expect(config).toContain("site: defineCollection");
 		// Schema uses passthrough for arbitrary global data shapes
 		expect(config).toContain("z.object({ id: z.string() }).passthrough()");
 	});
 
 	it("global collections use passthrough schema (not z.any())", () => {
-		const globals = [{ path: "src/data/site.json", content: "[]" }];
+		const globals = [{ path: "src/content/site/default.json", content: "{}" }];
 		const config = generateContentConfig(registry, contentModel, globals);
 
 		// Must NOT use z.any() — that breaks type safety
@@ -432,15 +405,7 @@ describe("generateContentConfig", () => {
 		expect(config).toContain(".passthrough()");
 	});
 
-	it("does not use deprecated global_ prefixed collection names (no s)", () => {
-		const globals = [{ path: "src/data/site.json", content: "[]" }];
-		const config = generateContentConfig(registry, contentModel, globals);
-		// Old naming was "global_site" (no s). New naming is "globals_site".
-		expect(config).not.toContain("global_site:");
-		expect(config).toContain("globals_site:");
-	});
-
-	it("mixed content and data collections use correct loaders", () => {
+	it("all collections use glob() loader — no file() anywhere", () => {
 		const mixedRegistry: Registry = {
 			layouts: {
 				default: { description: "Default", page_types: ["blog", "event"] },
@@ -477,16 +442,15 @@ describe("generateContentConfig", () => {
 
 		const config = generateContentConfig(mixedRegistry, mixedContentModel);
 
-		// blog (content collection) → glob() loader
-		expect(config).toContain('glob({ pattern: "**/*.{md,json}"');
+		// Both collections use glob() loader
+		expect(config).toContain('glob({ pattern: "**/*.json"');
 		expect(config).toContain("blog: defineCollection");
-
-		// events (data collection) → file() loader
-		expect(config).toContain('file("./src/data/events.json")');
 		expect(config).toContain("events: defineCollection");
 
-		// Must import both loaders
-		expect(config).toContain("import { file, glob }");
+		// No file() loader
+		expect(config).not.toContain("file(");
+		// Only imports glob
+		expect(config).toContain('import { glob } from "astro/loaders"');
 	});
 });
 
@@ -533,41 +497,29 @@ describe("generateRouteFiles", () => {
 		expect(dynamicRoutes.length).toBeGreaterThan(0);
 	});
 
-	it("collection item routes use render() for glob() collections (content)", () => {
-		const files = generateRouteFiles(registry, contentModel);
-		const dynamicRoute = files.find((f) => f.path.includes("["));
+	it("all collection routes use render() + Content", () => {
+		const files = generateRouteFiles(registry);
+		const dynamicRoute = files.find((f) => f.path.includes("[slug]"));
 		const content = dynamicRoute?.content ?? "";
 
-		// glob() loader → content collection → use render(entry) + <Content />
+		// All collections use render(entry) + <Content />
 		expect(content).toContain("render(entry)");
 		expect(content).toContain("<Content />");
-		// Should use getCollection, not getEntry
 		expect(content).toContain('getCollection("blog")');
-		// No runtime isRenderable check
 		expect(content).not.toContain("isRenderable");
 	});
 
-	it("data collection (slug_field empty) uses getStaticPaths + getCollection + entry.data", () => {
-		// dataRegistry has an "events" collection with slug_field: ""
-		// This signals a data-only collection → file() loader → getCollection() + entry.data path
-		const files = generateRouteFiles(dataRegistry, dataContentModel);
+	it("data collection routes also use render() (no special file() path)", () => {
+		const files = generateRouteFiles(dataRegistry);
 		const dynamicRoute = files.find((f) => f.path.includes("["));
 		const content = dynamicRoute?.content ?? "";
 
-		// Must have getStaticPaths (Astro requires this for dynamic routes)
+		// All routes use the same content renderer pattern
 		expect(content).toContain("getStaticPaths");
-		// Uses getCollection (not getEntry) because file() with JSON array
-		// creates multiple entries keyed by id — getCollection retrieves them
 		expect(content).toContain("getCollection");
-		expect(content).not.toContain("getEntry");
-		// Should use entry.data directly (no render)
-		expect(content).not.toContain("render(entry)");
-		// Should have <dl> for data rendering
-		expect(content).toContain("<dl>");
-		// No runtime isRenderable check
-		expect(content).not.toContain("isRenderable");
-		// Gets entry from Astro.props (set by getStaticPaths), not from params
-		expect(content).toContain("Astro.props");
+		expect(content).toContain("render(entry)");
+		expect(content).toContain("<Content />");
+		expect(content).not.toContain("<dl>");
 	});
 
 	it("listing page links use listing.route instead of collection name", () => {
@@ -749,6 +701,44 @@ describe("generateRouteFiles", () => {
 		expect(dynamicRoute?.path).toContain("articles/[slug]");
 		expect(dynamicRoute?.content ?? "").toContain('getCollection("blog")');
 	});
+
+	it("paginated listing generates pagination sub-route", () => {
+		const files = generateRouteFiles(registry);
+		const pagRoute = files.find(
+			(f) => f.path.includes("page/[page]") && f.path.includes("blog"),
+		);
+
+		expect(pagRoute).toBeDefined();
+		expect(pagRoute?.content ?? "").toContain("getStaticPaths");
+		expect(pagRoute?.content ?? "").toContain('getCollection("blog")');
+	});
+
+	it("non-paginated listing does NOT generate pagination sub-route", () => {
+		const reg: Registry = {
+			layouts: {
+				default: { description: "Default", page_types: ["blog"] },
+			},
+			collections: {
+				blog: {
+					source_pagetype: "blog",
+					slug_field: "title",
+					listable_by: [],
+				},
+			},
+			listings: {
+				blog_index: {
+					route: "/blog",
+					queries: [{ collection: "blog" }],
+					paginated: false,
+				},
+			},
+			static_pages: [],
+		};
+
+		const files = generateRouteFiles(reg);
+		const pagRoute = files.find((f) => f.path.includes("page/[page]"));
+		expect(pagRoute).toBeUndefined();
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -865,7 +855,7 @@ describe("validateSeedCompleteness", () => {
 		expect(result.missing).toHaveLength(pages.length);
 	});
 
-	it("globals in src/data/ do not count as page coverage", () => {
+	it("globals do not count as page coverage unless slug matches", () => {
 		const result = validateSeedCompleteness(
 			[
 				{
@@ -875,8 +865,9 @@ describe("validateSeedCompleteness", () => {
 					content: {},
 				},
 			],
-			[{ path: "src/data/site.json" }],
+			[{ path: "src/content/site/default.json" }],
 		);
+		// "default.json" doesn't match page URL "/site"
 		expect(result.complete).toBe(false);
 		expect(result.missing).toContain("https://example.com/site");
 	});
@@ -898,8 +889,8 @@ describe("validateSeedCompleteness", () => {
 				},
 			],
 			[
-				{ path: "src/data/site.json" },
-				{ path: "src/data/navigation.json" },
+				{ path: "src/content/site/default.json" },
+				{ path: "src/content/navigation/default.json" },
 				{ path: "src/pages/index.astro" },
 				{ path: "src/content/blog/post-1.md" },
 			],
@@ -1095,23 +1086,574 @@ describe("validateSeedCompleteness", () => {
 		expect(result.complete).toBe(false);
 	});
 
-	it("data collection pages covered by route files, not src/data/ aggregate", () => {
-		// Data collection entries are in src/data/events.json (skipped by validation).
-		// Coverage must come from route files like src/pages/events/[slug].astro.
+	it("data collection pages covered by route files", () => {
+		// Coverage comes from route files like src/pages/events/[slug].astro.
 		const result = validateSeedCompleteness(dataPages, [
-			{ path: "src/data/events.json" },
 			{ path: "src/pages/events/[slug].astro" },
 		]);
 		expect(result.complete).toBe(true);
 	});
 
-	it("data collection pages NOT covered without route files", () => {
-		// src/data/events.json is skipped (src/data/ prefix).
-		// Without route files, data collection pages are uncovered.
+	it("data collection pages covered by individual content entries", () => {
+		// All entries are now in src/content/ as individual files
 		const result = validateSeedCompleteness(dataPages, [
-			{ path: "src/data/events.json" },
+			{ path: "src/content/events/launch.json" },
+			{ path: "src/content/events/meetup.json" },
 		]);
+		expect(result.complete).toBe(true);
+	});
+
+	it("pagination route covers paginated listing URLs", () => {
+		const result = validateSeedCompleteness(
+			[
+				{
+					id: "1",
+					url: "https://example.com/category/articles",
+					pagetype: "blog_category",
+					content: {},
+				},
+				{
+					id: "2",
+					url: "https://example.com/category/articles/page/2",
+					pagetype: "blog_listing",
+					content: {},
+				},
+			],
+			[
+				{ path: "src/pages/category/[slug].astro" },
+				{ path: "src/pages/category/[slug]/page/[page].astro" },
+			],
+		);
+		expect(result.complete).toBe(true);
+		expect(result.missing).toEqual([]);
+	});
+
+	it("paginated URL NOT covered without pagination route", () => {
+		const result = validateSeedCompleteness(
+			[
+				{
+					id: "1",
+					url: "https://example.com/category/articles/page/2",
+					pagetype: "blog_listing",
+					content: {},
+				},
+			],
+			[{ path: "src/pages/category/[slug].astro" }],
+		);
 		expect(result.complete).toBe(false);
-		expect(result.missing).toHaveLength(2);
+		expect(result.missing).toContain(
+			"https://example.com/category/articles/page/2",
+		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// generateSingletons
+// ---------------------------------------------------------------------------
+
+describe("generateSingletons", () => {
+	const classifiedModel: ClassifiedContentModel = {
+		page_types: [
+			{
+				pagetype: "landing",
+				is_singleton: true,
+				field_classifications: [
+					{ field_path: "hero.headline", type: "string" },
+					{ field_path: "hero.body", type: "richtext" },
+				],
+				body_compose: {
+					field: "hero",
+					render_as: "div",
+					children: [
+						{ field: "headline", render_as: "h1" },
+						{ field: "body", render_as: "p" },
+					],
+				},
+			},
+			{
+				pagetype: "blog",
+				is_singleton: false,
+				field_classifications: [],
+			},
+		],
+	};
+
+	const singletonPages: PageContent[] = [
+		{
+			id: "landing-1",
+			url: "https://example.com/",
+			pagetype: "landing",
+			content: {
+				hero: { headline: "Welcome", body: "Hello world" },
+				title: "Home",
+			},
+		},
+	];
+
+	it("generates singleton files in src/content/{pagetype}/default.json", () => {
+		const files = generateSingletons(classifiedModel, singletonPages);
+		expect(files).toHaveLength(1);
+		expect(files[0].path).toBe("src/content/landing/default.json");
+	});
+
+	it("writes plain object (not array-wrapped)", () => {
+		const files = generateSingletons(classifiedModel, singletonPages);
+		const parsed = JSON.parse(files[0].content);
+		expect(Array.isArray(parsed)).toBe(false);
+		expect(parsed.id).toBe("default");
+	});
+
+	it("composes richtext body from body_compose spec", () => {
+		const files = generateSingletons(classifiedModel, singletonPages);
+		const parsed = JSON.parse(files[0].content);
+		expect(parsed.body).toContain("<h1>Welcome</h1>");
+		expect(parsed.body).toContain("<p>Hello world</p>");
+	});
+
+	it("includes scalar fields in singleton data", () => {
+		const files = generateSingletons(classifiedModel, singletonPages);
+		const parsed = JSON.parse(files[0].content);
+		expect(parsed.title).toBe("Home");
+		expect(parsed.pagetype).toBe("landing");
+		expect(parsed.url).toBe("https://example.com/");
+	});
+
+	it("skips non-singleton page types", () => {
+		const files = generateSingletons(classifiedModel, [
+			...singletonPages,
+			{
+				id: "b1",
+				url: "https://example.com/blog/post",
+				pagetype: "blog",
+				content: { title: "Post" },
+			},
+		]);
+		expect(files).toHaveLength(1);
+		expect(files[0].path).toContain("landing");
+	});
+
+	it("skips singleton page types with no matching pages", () => {
+		const files = generateSingletons(classifiedModel, []);
+		expect(files).toHaveLength(0);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// generateCollectionEntries with classified model (richtext composition)
+// ---------------------------------------------------------------------------
+
+describe("generateCollectionEntries with classified model", () => {
+	const classifiedModel: ClassifiedContentModel = {
+		page_types: [
+			{
+				pagetype: "blog",
+				is_singleton: false,
+				field_classifications: [
+					{ field_path: "title", type: "string" },
+					{
+						field_path: "article_content",
+						type: "richtext",
+						compose_spec: {
+							field: "article_content",
+							render_as: "div",
+							children: [{ field: "intro", render_as: "p" }],
+						},
+					},
+				],
+				body_compose: {
+					field: "article_content",
+					render_as: "div",
+					children: [{ field: "intro", render_as: "p" }],
+				},
+			},
+		],
+	};
+
+	const blogPages: PageContent[] = [
+		{
+			id: "b1",
+			url: "https://example.com/blog/rich-post",
+			pagetype: "blog",
+			content: {
+				title: "Rich Post",
+				article_content: { intro: "Hello from richtext" },
+			},
+		},
+	];
+
+	it("uses composeRichtext for body field in JSON when classified", () => {
+		const entries = generateCollectionEntries(
+			registry,
+			contentModel,
+			blogPages,
+			classifiedModel,
+		);
+		const entry = entries.find((e) => e.path.includes("rich-post"));
+		expect(entry).toBeDefined();
+		expect(entry?.format).toBe("json");
+
+		const parsed = JSON.parse(entry?.content ?? "");
+		expect(parsed.body).toContain("<p>Hello from richtext</p>");
+		expect(parsed.title).toBe("Rich Post");
+	});
+
+	it("produces JSON without classification (scalar fields only)", () => {
+		const noClassification: ClassifiedContentModel = {
+			page_types: [], // no classifications
+		};
+		const pagesWithScalars: PageContent[] = [
+			{
+				id: "b2",
+				url: "https://example.com/blog/fallback",
+				pagetype: "blog",
+				content: { title: "Fallback", author: "Jane" },
+			},
+		];
+		const entries = generateCollectionEntries(
+			registry,
+			contentModel,
+			pagesWithScalars,
+			noClassification,
+		);
+		const entry = entries.find((e) => e.path.includes("fallback"));
+		expect(entry).toBeDefined();
+		expect(entry?.format).toBe("json");
+
+		const parsed = JSON.parse(entry?.content ?? "");
+		expect(parsed.title).toBe("Fallback");
+		expect(parsed.author).toBe("Jane");
+	});
+
+	it("richtext fields do not appear as top-level data keys", () => {
+		const entries = generateCollectionEntries(
+			registry,
+			contentModel,
+			blogPages,
+			classifiedModel,
+		);
+		const entry = entries.find((e) => e.path.includes("rich-post"));
+		expect(entry).toBeDefined();
+
+		const parsed = JSON.parse(entry?.content ?? "");
+		// article_content is richtext, composed into body — should not appear as raw data
+		expect(parsed.article_content).toBeUndefined();
+		expect(parsed.body).toBeDefined();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// generateContentConfig with classified model (Zod nesting)
+// ---------------------------------------------------------------------------
+
+describe("generateContentConfig with classified model", () => {
+	it("generates typed Zod fields from field classifications", () => {
+		const classifiedModel: ClassifiedContentModel = {
+			page_types: [
+				{
+					pagetype: "blog",
+					is_singleton: false,
+					field_classifications: [
+						{ field_path: "title", type: "string" },
+						{ field_path: "hero_image", type: "image" },
+						{ field_path: "testimonials", type: "repeater" },
+						{ field_path: "hero_section", type: "object" },
+					],
+				},
+			],
+		};
+
+		const config = generateContentConfig(
+			registry,
+			contentModel,
+			undefined,
+			undefined,
+			classifiedModel,
+		);
+		expect(config).toContain("title: z.string().optional()");
+		expect(config).toContain("hero_image: z.string().optional()");
+		// Without child fields, repeater/object fall back to passthrough
+		expect(config).toContain(
+			"testimonials: z.array(z.object({}).passthrough())",
+		);
+		// Object without children gets z.unknown() (null from fieldTypeToZod)
+		// and does not appear since fieldTypeToZod returns null
+		expect(config).not.toContain("hero_section: z.object({}).passthrough()");
+	});
+
+	it("generates typed nested Zod schemas for object/repeater with children", () => {
+		const classifiedModel: ClassifiedContentModel = {
+			page_types: [
+				{
+					pagetype: "blog",
+					is_singleton: false,
+					field_classifications: [
+						{ field_path: "title", type: "string" },
+						{ field_path: "hero_section", type: "object" },
+						{ field_path: "hero_section.headline", type: "string" },
+						{ field_path: "hero_section.bg_image", type: "image" },
+						{ field_path: "features", type: "repeater" },
+						{ field_path: "features.title", type: "string" },
+						{ field_path: "features.description", type: "string" },
+					],
+				},
+			],
+		};
+
+		const config = generateContentConfig(
+			registry,
+			contentModel,
+			undefined,
+			undefined,
+			classifiedModel,
+		);
+		expect(config).toContain("title: z.string().optional()");
+		// Object with children: typed z.object({...}).optional()
+		expect(config).toContain("hero_section: z.object({");
+		expect(config).toContain("headline: z.string().optional()");
+		expect(config).toContain("bg_image: z.string().optional()");
+		// Repeater with children: z.array(z.object({...})).optional()
+		expect(config).toContain("features: z.array(z.object({");
+		expect(config).toContain("description: z.string().optional()");
+	});
+
+	it("merges sibling nested fields under same parent", () => {
+		const classifiedModel: ClassifiedContentModel = {
+			page_types: [
+				{
+					pagetype: "blog",
+					is_singleton: false,
+					field_classifications: [
+						{ field_path: "seo.title", type: "string" },
+						{ field_path: "seo.description", type: "string" },
+					],
+				},
+			],
+		};
+
+		const config = generateContentConfig(
+			registry,
+			contentModel,
+			undefined,
+			undefined,
+			classifiedModel,
+		);
+		// Should be one seo: z.object({ title: ..., description: ... }) not two separate entries
+		const seoMatches = config.match(/seo:/g);
+		expect(seoMatches).toHaveLength(1);
+		expect(config).toContain("title: z.string().optional()");
+		expect(config).toContain("description: z.string().optional()");
+	});
+
+	it("handles 3-level nested field paths", () => {
+		const classifiedModel: ClassifiedContentModel = {
+			page_types: [
+				{
+					pagetype: "blog",
+					is_singleton: false,
+					field_classifications: [
+						{ field_path: "seo.og.title", type: "string" },
+						{ field_path: "seo.og.image", type: "image" },
+					],
+				},
+			],
+		};
+
+		const config = generateContentConfig(
+			registry,
+			contentModel,
+			undefined,
+			undefined,
+			classifiedModel,
+		);
+		expect(config).toContain("seo:");
+		expect(config).toContain("og:");
+		expect(config).toContain("title: z.string().optional()");
+		expect(config).toContain("image: z.string().optional()");
+	});
+
+	it("registers singleton collections with glob() loader", () => {
+		const singletons = [{ path: "src/content/landing/default.json" }];
+		const config = generateContentConfig(
+			registry,
+			contentModel,
+			undefined,
+			singletons,
+		);
+		expect(config).toContain("landing: defineCollection");
+		expect(config).toContain(
+			'glob({ pattern: "**/*.json", base: "./src/content/landing" })',
+		);
+		expect(config).toContain("body: z.string().optional()");
+	});
+
+	it("singleton and global collections have flat names (no prefix)", () => {
+		const singletons = [{ path: "src/content/about/default.json" }];
+		const globals = [{ path: "src/content/navigation/default.json" }];
+		const config = generateContentConfig(
+			registry,
+			contentModel,
+			globals,
+			singletons,
+		);
+		expect(config).toContain("about: defineCollection");
+		expect(config).toContain("navigation: defineCollection");
+		// No file() loader
+		expect(config).not.toContain("file(");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// generateCmsContentModel
+// ---------------------------------------------------------------------------
+
+describe("generateCmsContentModel", () => {
+	it("produces CMS-format content model with typed fields", () => {
+		const classifiedModel: ClassifiedContentModel = {
+			page_types: [
+				{
+					pagetype: "blog",
+					is_singleton: false,
+					field_classifications: [
+						{ field_path: "title", type: "string" },
+						{ field_path: "hero_image", type: "image" },
+						{
+							field_path: "body",
+							type: "richtext",
+							compose_spec: { field: "body", render_as: "div" },
+						},
+					],
+					body_compose: { field: "body", render_as: "div" },
+				},
+			],
+		};
+
+		const result = generateCmsContentModel(registry, classifiedModel);
+		expect(result.collections).toHaveLength(1);
+
+		const blogColl = result.collections[0];
+		expect(blogColl.name).toBe("blog");
+		expect(blogColl.type).toBe("collection");
+		expect(blogColl.slugField).toBe("title");
+
+		const fieldNames = blogColl.fields.map((f) => f.name);
+		expect(fieldNames).toContain("title");
+		expect(fieldNames).toContain("hero_image");
+		expect(fieldNames).toContain("body");
+
+		const bodyField = blogColl.fields.find((f) => f.name === "body");
+		expect(bodyField?.type).toBe("richtext");
+	});
+
+	it("produces nested fields for object/repeater types", () => {
+		const classifiedModel: ClassifiedContentModel = {
+			page_types: [
+				{
+					pagetype: "blog",
+					is_singleton: false,
+					field_classifications: [
+						{ field_path: "title", type: "string" },
+						{ field_path: "hero_section", type: "object" },
+						{ field_path: "hero_section.headline", type: "string" },
+						{ field_path: "hero_section.subheadline", type: "string" },
+						{ field_path: "hero_section.background_image", type: "image" },
+						{ field_path: "features", type: "repeater" },
+						{ field_path: "features.title", type: "string" },
+						{ field_path: "features.description", type: "string" },
+					],
+				},
+			],
+		};
+
+		const result = generateCmsContentModel(registry, classifiedModel);
+		const blogColl = result.collections[0];
+
+		const heroField = blogColl.fields.find((f) => f.name === "hero_section");
+		expect(heroField?.type).toBe("object");
+		expect(heroField?.fields).toHaveLength(3);
+		expect(heroField?.fields?.map((f) => f.name)).toEqual([
+			"headline",
+			"subheadline",
+			"background_image",
+		]);
+		expect(heroField?.fields?.[2].type).toBe("image");
+
+		const featuresField = blogColl.fields.find((f) => f.name === "features");
+		expect(featuresField?.type).toBe("repeater");
+		expect(featuresField?.fields).toHaveLength(2);
+		expect(featuresField?.fields?.map((f) => f.name)).toEqual([
+			"title",
+			"description",
+		]);
+	});
+
+	it("creates parent for children without explicit parent classification", () => {
+		const classifiedModel: ClassifiedContentModel = {
+			page_types: [
+				{
+					pagetype: "blog",
+					is_singleton: false,
+					field_classifications: [
+						{ field_path: "seo.title", type: "string" },
+						{ field_path: "seo.description", type: "string" },
+					],
+				},
+			],
+		};
+
+		const result = generateCmsContentModel(registry, classifiedModel);
+		const blogColl = result.collections[0];
+
+		const seoField = blogColl.fields.find((f) => f.name === "seo");
+		expect(seoField?.type).toBe("object");
+		expect(seoField?.fields).toHaveLength(2);
+	});
+
+	it("includes singletons as singleton type", () => {
+		const classifiedModel: ClassifiedContentModel = {
+			page_types: [
+				{
+					pagetype: "landing",
+					is_singleton: true,
+					field_classifications: [{ field_path: "hero", type: "object" }],
+				},
+			],
+		};
+
+		const result = generateCmsContentModel(
+			{ ...registry, collections: {} },
+			classifiedModel,
+		);
+		const landing = result.collections.find((c) => c.name === "landing");
+		expect(landing).toBeDefined();
+		expect(landing?.type).toBe("singleton");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// generateCmsAssetManifest
+// ---------------------------------------------------------------------------
+
+describe("generateCmsAssetManifest", () => {
+	it("transforms flat map to CMS format", () => {
+		const manifest = {
+			"https://example.com/hero.jpg": "abc123.jpg",
+			"https://example.com/logo.png": "def456.png",
+		};
+
+		const result = generateCmsAssetManifest(manifest);
+		expect(result.entries).toHaveLength(2);
+		expect(result.entries).toContainEqual({
+			localPath: "public/images/abc123.jpg",
+			originalUrl: "https://example.com/hero.jpg",
+		});
+		expect(result.entries).toContainEqual({
+			localPath: "public/images/def456.png",
+			originalUrl: "https://example.com/logo.png",
+		});
+	});
+
+	it("handles empty manifest", () => {
+		const result = generateCmsAssetManifest({});
+		expect(result.entries).toHaveLength(0);
 	});
 });

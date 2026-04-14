@@ -1,107 +1,12 @@
 /**
- * Pure: reduce logic — grouping, sampling, link rewriting, manifest building.
+ * Pure: reduce logic — asset manifest, link rewriting, reduced tree building.
  *
  * All functions are pure (data in → data out). No IO.
  */
 
 import { createHash } from "node:crypto";
-import type {
-	PageContent,
-	PageStructure,
-	ReducedMeta,
-	SchemaData,
-} from "../../types.js";
-
-// ---------------------------------------------------------------------------
-// groupByPageType
-// ---------------------------------------------------------------------------
-
-/**
- * Group pages by their pagetype field.
- * Returns a Map from pagetype → array of PageStructure.
- */
-export function groupByPageType(
-	pages: PageStructure[],
-): Map<string, PageStructure[]> {
-	const grouped = new Map<string, PageStructure[]>();
-	for (const page of pages) {
-		const list = grouped.get(page.pagetype);
-		if (list) {
-			list.push(page);
-		} else {
-			grouped.set(page.pagetype, [page]);
-		}
-	}
-	return grouped;
-}
-
-// ---------------------------------------------------------------------------
-// selectSamples
-// ---------------------------------------------------------------------------
-
-/**
- * For each page type, select the richest page (most content keys)
- * and the simplest page (fewest content keys).
- * Tie-breaking is deterministic: by page id (numeric or string sort).
- */
-export function selectSamples(
-	grouped: Map<string, PageStructure[]>,
-	contentByPageId: Map<string, PageContent>,
-): Map<string, { richest: PageContent; simplest: PageContent }> {
-	const samples = new Map<
-		string,
-		{ richest: PageContent; simplest: PageContent }
-	>();
-
-	for (const [pagetype, pages] of grouped) {
-		let richest: PageContent | null = null;
-		let richestKeyCount = -1;
-		let simplest: PageContent | null = null;
-		let simplestKeyCount = Number.POSITIVE_INFINITY;
-
-		// Sort by id for deterministic tie-breaking
-		const sorted = [...pages].sort((a, b) => {
-			const na = Number(a.id);
-			const nb = Number(b.id);
-			if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-			return String(a.id).localeCompare(String(b.id));
-		});
-
-		for (const page of sorted) {
-			// Match by url since PageContent.id may differ
-			const content = findContentByUrl(contentByPageId, page.url);
-			if (!content) continue;
-
-			const keyCount = Object.keys(content.content).length;
-
-			if (keyCount > richestKeyCount) {
-				richest = content;
-				richestKeyCount = keyCount;
-			}
-			if (keyCount < simplestKeyCount) {
-				simplest = content;
-				simplestKeyCount = keyCount;
-			}
-		}
-
-		if (richest && simplest) {
-			samples.set(pagetype, { richest, simplest });
-		}
-	}
-
-	return samples;
-}
-
-/** Find a PageContent entry by matching on url. */
-function findContentByUrl(
-	contentByPageId: Map<string, PageContent>,
-	url: string,
-): PageContent | undefined {
-	for (const content of contentByPageId.values()) {
-		if (content.url === url) return content;
-	}
-	return undefined;
-}
+import type { PageContent, ReducedMeta, StructureData } from "../../types.js";
+import { convertUrlPattern, extractSlugParam } from "./adapter.js";
 
 // ---------------------------------------------------------------------------
 // contentAddressedName
@@ -164,6 +69,7 @@ function collectImageUrls(obj: unknown, accumulator: string[]): void {
 	for (const [key, value] of Object.entries(record)) {
 		if (
 			typeof value === "string" &&
+			looksLikeUrl(value) &&
 			(isImageKey(key) || looksLikeImageUrl(value))
 		) {
 			accumulator.push(value);
@@ -171,6 +77,15 @@ function collectImageUrls(obj: unknown, accumulator: string[]): void {
 			collectImageUrls(value, accumulator);
 		}
 	}
+}
+
+function looksLikeUrl(value: string): boolean {
+	return (
+		value.startsWith("http://") ||
+		value.startsWith("https://") ||
+		value.startsWith("//") ||
+		value.startsWith("/")
+	);
 }
 
 function isImageKey(key: string): boolean {
@@ -328,36 +243,110 @@ export function buildReducedTree(
 }
 
 // ---------------------------------------------------------------------------
+// selectSamplesFromUrls
+// ---------------------------------------------------------------------------
+
+/**
+ * Select richest + simplest sample content entries from sample_urls.
+ *
+ * For each page type, looks up the content for the declared sample_urls
+ * and picks the richest (most content keys) and simplest (fewest content keys).
+ * If only one sample exists, it serves as both richest and simplest.
+ */
+export function selectSamplesFromUrls(
+	structure: StructureData,
+	pages: PageContent[],
+): Map<string, { richest: PageContent; simplest: PageContent }> {
+	const samples = new Map<
+		string,
+		{ richest: PageContent; simplest: PageContent }
+	>();
+
+	for (const pt of structure.page_types) {
+		const samplePages = collectSamplePages(pt, pages);
+		if (samplePages.length === 0) continue;
+
+		const { richest, simplest } = pickRichestAndSimplest(samplePages);
+		samples.set(pt.name, { richest, simplest });
+	}
+
+	return samples;
+}
+
+/** Collect pages matching sample_urls for a page type, with fallback. */
+function collectSamplePages(
+	pt: StructureData["page_types"][number],
+	pages: PageContent[],
+): PageContent[] {
+	const samplePages: PageContent[] = [];
+	for (const sampleUrl of pt.sample_urls) {
+		const match = pages.find(
+			(p) =>
+				p.pagetype === pt.name &&
+				normalizeUrl(p.url) === normalizeUrl(sampleUrl),
+		);
+		if (match) samplePages.push(match);
+	}
+
+	// Fallback: if no sample_urls matched, use any page of this type
+	if (samplePages.length === 0) {
+		const fallback = pages.find((p) => p.pagetype === pt.name);
+		if (fallback) samplePages.push(fallback);
+	}
+
+	return samplePages;
+}
+
+/** Pick the richest (most content keys) and simplest (fewest) from a list of pages. */
+function pickRichestAndSimplest(pages: PageContent[]): {
+	richest: PageContent;
+	simplest: PageContent;
+} {
+	let richest = pages[0];
+	let simplest = pages[0];
+	for (const page of pages) {
+		const keyCount = Object.keys(page.content).length;
+		if (keyCount > Object.keys(richest.content).length) richest = page;
+		if (keyCount < Object.keys(simplest.content).length) simplest = page;
+	}
+	return { richest, simplest };
+}
+
+/** Normalize URLs for comparison: strip trailing slash, lowercase. */
+function normalizeUrl(url: string): string {
+	const stripped = url.length > 1 && url.endsWith("/") ? url.slice(0, -1) : url;
+	return stripped.toLowerCase();
+}
+
+// ---------------------------------------------------------------------------
 // buildReducedMeta
 // ---------------------------------------------------------------------------
 
 /**
- * Build a ReducedMeta object conforming to the ReducedMeta type contract.
+ * Build a ReducedMeta object from the new StructureData format.
  *
- * @param grouped — Pages grouped by pagetype (from groupByPageType)
- * @param pages — All page content (for global key extraction)
- * @param schema — Schema data per page type (for schema_keys extraction)
- * @param siteUrl — The source site URL
- * @param scrapedAt — Timestamp when the site was scraped
+ * Most fields are derived directly from structure.page_types rather than
+ * computed from raw page data.
  */
 export function buildReducedMeta(
-	grouped: Map<string, PageStructure[]>,
+	structure: StructureData,
 	pages: PageContent[],
-	schema: SchemaData,
-	siteUrl: string,
-	scrapedAt: string,
+	resolvedSchema: Record<
+		string,
+		{ type: string; properties: Record<string, unknown> }
+	>,
 ): ReducedMeta {
-	const pageTypes = [...grouped.entries()].map(([pagetype, items]) => {
-		const schemaKeys = extractSchemaKeys(schema, pagetype);
-		const ownKeys = extractOwnKeys(items, pages);
-		const route = deriveRoute(items, pagetype);
+	const pageTypes = structure.page_types.map((pt) => {
+		const schemaKeys = extractSchemaKeys(resolvedSchema, pt.name);
+		const ownKeys = extractOwnKeys(pt.name, pages);
+		const route = convertUrlPattern(pt.url_pattern);
 		return {
-			pagetype,
+			pagetype: pt.name,
 			route,
-			count: items.length,
-			multi: items.length > 1,
-			has_pagination: items.length > 10,
-			slug_param: deriveSlugParam(route),
+			count: pt.urls.length,
+			multi: pt.urls.length > 1,
+			has_pagination: pt.urls.length >= 3,
+			slug_param: extractSlugParam(pt.url_pattern),
 			schema_keys: schemaKeys,
 			own_keys: ownKeys,
 		};
@@ -365,19 +354,24 @@ export function buildReducedMeta(
 
 	const globalKeys = extractGlobalKeys(pages);
 
+	const totalPages = structure.page_types.reduce(
+		(sum, pt) => sum + pt.urls.length,
+		0,
+	);
+
 	const paginationCandidates = pageTypes
 		.filter((pt) => pt.has_pagination)
 		.map((pt) => ({
 			pagetype: pt.pagetype,
-			evidence: `${pt.count} instances exceed threshold of 10`,
+			evidence: `${pt.count} instances meet threshold of 3`,
 		}));
 
 	return {
 		source: {
-			total_pages: pages.length,
-			page_types: grouped.size,
-			scraped_at: scrapedAt,
-			site_url: siteUrl,
+			total_pages: totalPages,
+			page_types: structure.page_types.length,
+			scraped_at: structure.scraped_at ?? new Date().toISOString(),
+			site_url: structure.site_url ?? "",
 		},
 		global_keys: globalKeys,
 		page_types: pageTypes,
@@ -385,21 +379,26 @@ export function buildReducedMeta(
 	};
 }
 
-/** Extract top-level property names from a page type's schema. */
-function extractSchemaKeys(schema: SchemaData, pagetype: string): string[] {
-	const typeSchema = schema[pagetype];
+/** Extract top-level property names from a page type's resolved schema. */
+function extractSchemaKeys(
+	resolvedSchema: Record<
+		string,
+		{ type: string; properties: Record<string, unknown> }
+	>,
+	pagetype: string,
+): string[] {
+	const typeSchema = resolvedSchema[pagetype];
 	if (!typeSchema?.properties) return [];
 	return Object.keys(typeSchema.properties);
 }
 
-/** Extract content keys unique to pages of a given type (not present in all pages). */
-function extractOwnKeys(
-	items: PageStructure[],
-	allPages: PageContent[],
-): string[] {
-	if (items.length === 0 || allPages.length === 0) return [];
+/**
+ * Extract content keys unique to pages of a given type (not present in all pages).
+ */
+function extractOwnKeys(pagetype: string, allPages: PageContent[]): string[] {
+	if (allPages.length === 0) return [];
 
-	const typePages = allPages.filter((p) => items.some((i) => i.url === p.url));
+	const typePages = allPages.filter((p) => p.pagetype === pagetype);
 	if (typePages.length === 0) return [];
 
 	// Keys present in ALL pages globally
@@ -429,32 +428,6 @@ function extractOwnKeys(
 		)
 		.map(([key]) => key)
 		.sort();
-}
-
-/** Derive a route pattern from page URLs for a given page type. */
-function deriveRoute(items: PageStructure[], pagetype: string): string {
-	if (items.length === 0) return `/${pagetype}`;
-
-	const url = items[0].url;
-	try {
-		const pathname = new URL(url, "https://fallback.com").pathname;
-		if (items.length > 1) {
-			const segments = pathname.split("/").filter(Boolean);
-			if (segments.length > 0) {
-				segments[segments.length - 1] = "[slug]";
-				return `/${segments.join("/")}`;
-			}
-		}
-		return pathname;
-	} catch {
-		return `/${pagetype}`;
-	}
-}
-
-/** Derive slug parameter name from a dynamic route. */
-function deriveSlugParam(route: string): string | undefined {
-	const match = /\[([^\]]+)\]/.exec(route);
-	return match ? match[1] : undefined;
 }
 
 /** Extract keys that appear in every page across all types (global content keys). */

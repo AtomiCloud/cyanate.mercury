@@ -21,12 +21,14 @@
 		"chalk": "^5.6.2",
 		"commander": "^14.0.3",
 		"culori": "^4.0.2",
+		"postcss-value-parser": "^4.2.0",
 		"yaml": "^2.8.3",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.10",
 		"@types/bun": "latest",
+		"@types/culori": "^4.0.1",
 		"@types/node": "^25.5.2",
 		"knip": "^5.88.1",
 		"typescript": "^6.0.2"

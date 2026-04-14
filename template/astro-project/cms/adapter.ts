@@ -107,7 +107,6 @@ export interface CmsAdapter {
 	pull(opts: {
 		contentModel: ContentModel;
 		contentDir: string; // absolute path to src/content/
-		dataDir: string; // absolute path to src/data/
 		config: Record<string, string>;
 	}): Promise<PullResult>;
 }

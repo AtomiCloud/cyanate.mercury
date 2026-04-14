@@ -5,13 +5,15 @@
  * using the engine's StepDef interface.
  */
 
+import { runSelfCheckLoop } from "../engine/self-check.js";
 import type {
+	SelfCheckConfig,
 	StepContext,
 	StepDef,
 	StepFn,
 	StepResult,
 } from "../engine/types.js";
-import { agentQuery } from "../lib/agent.js";
+import { agentQueryWithMetrics } from "../lib/agent.js";
 import { parseReviewerVerdict } from "../lib/reviewers.js";
 
 /**
@@ -26,12 +28,18 @@ export function agentStep(opts: {
 	/** Validate output after agent completes (return reviews/errors) */
 	validate?: (ctx: StepContext, output: string) => Promise<StepResult>;
 	profileKey?: string;
+	/** Run static checks after agent + validate, auto-fix on failure. */
+	selfCheck?: SelfCheckConfig;
 }): StepDef {
 	const run: StepFn = async (ctx) => {
 		const start = Date.now();
-		const prompt = await opts.buildPrompt(ctx);
+		let prompt = await opts.buildPrompt(ctx);
 
-		const output = await agentQuery({
+		if (ctx.rejectionContext) {
+			prompt += `\n\n---\nPREVIOUS ATTEMPT REJECTED. Fix these issues:\n${ctx.rejectionContext}`;
+		}
+
+		const agentResult = await agentQueryWithMetrics({
 			prompt,
 			systemPrompt: opts.systemPrompt,
 			cwd: ctx.workdir,
@@ -42,13 +50,47 @@ export function agentStep(opts: {
 			config: ctx.config,
 		});
 
+		const metrics = {
+			turns: agentResult.turns,
+			inputTokens: agentResult.inputTokens,
+			outputTokens: agentResult.outputTokens,
+			cost: agentResult.cost,
+		};
+
 		if (opts.validate) {
-			const result = await opts.validate(ctx, output);
-			result.duration = Date.now() - start;
-			return result;
+			const result = await opts.validate(ctx, agentResult.output);
+			if (result.status !== "pass") {
+				result.duration = Date.now() - start;
+				Object.assign(result, metrics);
+				return result;
+			}
 		}
 
-		return { status: "pass", duration: Date.now() - start };
+		if (opts.selfCheck) {
+			const errors = await runSelfCheckLoop({
+				workdir: ctx.workdir,
+				profile: ctx.profile,
+				config: opts.selfCheck,
+				logger: ctx.logger,
+			});
+			if (errors) {
+				return {
+					status: "reject",
+					duration: Date.now() - start,
+					...metrics,
+					reviews: [
+						{
+							reviewerId: `${opts.id}-self-check`,
+							verdict: "reject",
+							findings: errors,
+							rejectionContext: `Self-check failed:\n${errors}`,
+						},
+					],
+				};
+			}
+		}
+
+		return { status: "pass", duration: Date.now() - start, ...metrics };
 	};
 
 	return {
@@ -80,6 +122,29 @@ export function programmaticStep(opts: {
 }
 
 /**
+ * Create an agent-typed step with custom run logic.
+ *
+ * Use for fan-out steps that call agentQuery internally but need
+ * the engine to classify them as non-deterministic for retry eligibility.
+ */
+export function agentFanOutStep(opts: {
+	id: string;
+	name: string;
+	description: string;
+	profileKey?: string;
+	run: StepFn;
+}): StepDef {
+	return {
+		id: opts.id,
+		name: opts.name,
+		description: opts.description,
+		type: "agent",
+		profileKey: opts.profileKey,
+		run: opts.run,
+	};
+}
+
+/**
  * Create a reviewer step — runs an AI judge that returns pass/reject.
  */
 export function reviewerStep(opts: {
@@ -94,9 +159,13 @@ export function reviewerStep(opts: {
 }): StepDef {
 	const run: StepFn = async (ctx) => {
 		const start = Date.now();
-		const prompt = await opts.buildPrompt(ctx);
+		let prompt = await opts.buildPrompt(ctx);
 
-		const output = await agentQuery({
+		if (ctx.rejectionContext) {
+			prompt += `\n\n---\nPREVIOUS ATTEMPT REJECTED — context from prior iteration:\n${ctx.rejectionContext}`;
+		}
+
+		const agentResult = await agentQueryWithMetrics({
 			prompt,
 			systemPrompt: opts.systemPrompt,
 			cwd: ctx.workdir,
@@ -108,10 +177,14 @@ export function reviewerStep(opts: {
 		});
 
 		const result = opts.parseVerdict
-			? opts.parseVerdict(output)
-			: defaultParseVerdict(opts.id, output);
+			? opts.parseVerdict(agentResult.output)
+			: defaultParseVerdict(opts.id, agentResult.output);
 
 		result.duration = Date.now() - start;
+		result.turns = agentResult.turns;
+		result.inputTokens = agentResult.inputTokens;
+		result.outputTokens = agentResult.outputTokens;
+		result.cost = agentResult.cost;
 		return result;
 	};
 

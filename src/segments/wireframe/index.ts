@@ -24,8 +24,9 @@ const wireframeSegment: SegmentDef = {
 		"Transform scraper output into an unstyled Astro project with content collections, routes, and wireframe components",
 	depends: [],
 	phases: [reducePhase, classifyPhase, seedPhase, generatePhase, validatePhase],
-	mergeInputs: async () => {
+	mergeInputs: async (_workdir, _deps, _config) => {
 		// No-op: wireframe has no dependencies
+		// Input files are copied at step time by copyInputFilesToWorkdir()
 	},
 	extractOutput: async (workdir, outputDir) => {
 		await mkdir(outputDir, { recursive: true });
@@ -46,12 +47,10 @@ const wireframeSegment: SegmentDef = {
 		const manifestFiles = [
 			"registry.json",
 			"content-model.json",
-			"component-manifest.json",
 			"asset-manifest.json",
 			"reduced-meta.json",
-			"classifier-architecture.json",
-			"classifier-content-model.json",
-			"classifier-interaction.json",
+			"registry-draft.json",
+			"listing-pairings.json",
 		];
 		for (const file of manifestFiles) {
 			try {

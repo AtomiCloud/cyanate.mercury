@@ -83,15 +83,14 @@ async function walkJson(dir: string): Promise<string[]> {
 }
 
 /**
- * Load all entries from src/content/{collection}/ and src/data/.
+ * Load all entries from src/content/{collection}/.
+ * Every collection (regular, singleton, global) lives under src/content/.
  */
 async function loadCollections(
 	contentDir: string,
-	dataDir: string,
 ): Promise<CollectionData[]> {
 	const collections: CollectionData[] = [];
 
-	// Load regular collections from src/content/
 	const contentJsonFiles = await walkJson(contentDir);
 
 	// Group by collection name (parent directory)
@@ -116,47 +115,6 @@ async function loadCollections(
 		collections.push({ name: collName, type: "collection", entries });
 	}
 
-	// Load singletons and globals from src/data/
-	try {
-		const dataFiles = await walkJson(dataDir);
-		for (const file of dataFiles) {
-			const rel = file.slice(dataDir.length + 1);
-			const parts = rel.split("/");
-			const fileName = parts[parts.length - 1];
-			const name = basename(fileName, ".json");
-
-			// Skip globals subdirectory for now — handled below
-			if (parts.length === 1) {
-				// Singleton at src/data/{name}.json
-				const raw = await readFile(file, "utf-8");
-				collections.push({
-					name,
-					type: "singleton",
-					entries: [{ slug: name, data: JSON.parse(raw) }],
-				});
-			}
-		}
-
-		// Load globals from src/data/globals/
-		const globalsDir = join(dataDir, "globals");
-		try {
-			const globalFiles = await walkJson(globalsDir);
-			for (const file of globalFiles) {
-				const name = basename(file, ".json");
-				const raw = await readFile(file, "utf-8");
-				collections.push({
-					name,
-					type: "global",
-					entries: [{ slug: name, data: JSON.parse(raw) }],
-				});
-			}
-		} catch {
-			// No globals directory — ok
-		}
-	} catch {
-		// No data directory — ok
-	}
-
 	return collections;
 }
 
@@ -178,11 +136,9 @@ async function cmdPush(
 		join(rootDir, "asset-manifest.json"),
 	);
 
-	const srcDir = join(rootDir, "src");
-	const contentDir = join(srcDir, "content");
-	const dataDir = join(srcDir, "data");
+	const contentDir = join(rootDir, "src", "content");
 
-	const collections = await loadCollections(contentDir, dataDir);
+	const collections = await loadCollections(contentDir);
 
 	console.log(`Pushing ${collections.length} collections...`);
 	const result = await adapter.push({
@@ -223,14 +179,11 @@ async function cmdPull(
 		join(rootDir, "content-model.json"),
 	);
 
-	const srcDir = join(rootDir, "src");
-	const contentDir = join(srcDir, "content");
-	const dataDir = join(srcDir, "data");
+	const contentDir = join(rootDir, "src", "content");
 
 	const result = await adapter.pull({
 		contentModel,
 		contentDir,
-		dataDir,
 		config,
 	});
 

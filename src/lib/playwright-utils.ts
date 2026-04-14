@@ -114,17 +114,23 @@ export function categorizeConsoleMessages(
 
 /**
  * Launch a browser with the default Playwright config.
+ * Respects PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH env var (set by nix shell).
  */
 export async function launchBrowser(): Promise<
 	import("@playwright/test").Browser
 > {
 	const { chromium } = await import("@playwright/test");
-	return chromium.launch({ headless: true });
+	const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+	return chromium.launch({
+		headless: true,
+		...(executablePath ? { executablePath } : {}),
+	});
 }
 
 /**
  * Screenshot a page at multiple viewports.
  * @param outputDir - Optional directory to write screenshots into. Defaults to CWD.
+ * @param colorScheme - Optional color scheme to emulate before navigation.
  */
 export async function screenshotAtViewports(
 	page: Page,
@@ -132,16 +138,22 @@ export async function screenshotAtViewports(
 	viewports = [
 		{ name: "mobile", width: 375, height: 812 },
 		{ name: "tablet", width: 768, height: 1024 },
-		{ name: "desktop", width: 1280, height: 720 },
+		{ name: "desktop", width: 1440, height: 720 },
 	],
 	outputDir?: string,
+	colorScheme?: "light" | "dark",
 ): Promise<Array<{ viewport: string; path: string }>> {
+	if (colorScheme) {
+		await page.emulateMedia({ colorScheme });
+	}
+
 	const results: Array<{ viewport: string; path: string }> = [];
 
 	for (const vp of viewports) {
 		await page.setViewportSize({ width: vp.width, height: vp.height });
 		await page.goto(route, { waitUntil: "networkidle" });
-		const filename = `screenshot-${vp.name}-${vp.width}x${vp.height}.png`;
+		const routeSlug = route === "/" ? "root" : route.replace(/\//g, "-");
+		const filename = `screenshot-${routeSlug}-${vp.name}-${vp.width}x${vp.height}${colorScheme ? `-${colorScheme}` : ""}.png`;
 		const path = outputDir ? join(outputDir, filename) : filename;
 		await page.screenshot({ path, fullPage: true });
 		results.push({ viewport: vp.name, path });

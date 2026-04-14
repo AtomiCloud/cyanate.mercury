@@ -13,7 +13,8 @@
 		"src/lib/reviewers.ts",
 		"src/lib/reviewers.io.ts",
 		"src/lib/validators.ts",
-		"src/engine/index.ts"
+		"src/engine/index.ts",
+		"src/segments/analyze/validate-tokens-cli.ts"
 	],
 	"project": ["src/**/*.ts"],
 	"ignoreDependencies": [],

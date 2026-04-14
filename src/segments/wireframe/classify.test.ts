@@ -1,194 +1,16 @@
 import { describe, expect, it } from "bun:test";
 import type { Registry } from "../../types.js";
 import type {
-	ArchitectureClassification,
 	ComponentManifestOutput,
-	ContentModelClassification,
 	ContentModelOutput,
-	InteractionClassification,
 } from "./classify.js";
 import {
 	buildComponentManifestFromFiles,
-	crossValidateClassifiers,
-	detectConflicts,
 	validateComponentManifestRefs,
 	validateContentModelRefs,
 	validateRegistryCompleteness,
 	validateRoutePatterns,
 } from "./classify.js";
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-const validArch: ArchitectureClassification = {
-	layouts: {
-		default: {
-			description: "Default layout",
-			page_types: ["landing", "about"],
-		},
-		blog: { description: "Blog layout", page_types: ["blog"] },
-	},
-	routes: [
-		{ pattern: "/", pageType: "landing" },
-		{ pattern: "/about", pageType: "about" },
-		{ pattern: "/blog", pageType: "blog" },
-		{ pattern: "/blog/[slug]", pageType: "blog" },
-	],
-};
-
-const validCM: ContentModelClassification = {
-	collections: {
-		blog: { source_pagetype: "blog", slug_field: "slug" },
-	},
-	listings: {
-		blog_index: { route: "/blog", paginated: true },
-	},
-};
-
-const validInteraction: InteractionClassification = {
-	patterns: [
-		{
-			id: "nav-mobile",
-			type: "modal",
-			pageType: "landing",
-			description: "Mobile nav",
-		},
-	],
-};
-
-// ---------------------------------------------------------------------------
-// crossValidateClassifiers
-// ---------------------------------------------------------------------------
-
-describe("crossValidateClassifiers", () => {
-	it("all types present → valid", () => {
-		const result = crossValidateClassifiers(
-			validArch,
-			validCM,
-			validInteraction,
-			["landing", "about", "blog"],
-		);
-		expect(result.valid).toBe(true);
-		expect(result.errors).toEqual([]);
-	});
-
-	it("missing type → specific error", () => {
-		const result = crossValidateClassifiers(
-			validArch,
-			validCM,
-			validInteraction,
-			["landing", "about", "blog", "contact"],
-		);
-		expect(result.valid).toBe(false);
-		expect(result.errors.some((e) => e.includes("contact"))).toBe(true);
-	});
-
-	it("empty classifiers → all types missing", () => {
-		const empty: ArchitectureClassification = {
-			layouts: {},
-			routes: [],
-		};
-		const emptyCM: ContentModelClassification = {
-			collections: {},
-			listings: {},
-		};
-		const emptyInt: InteractionClassification = { patterns: [] };
-
-		const result = crossValidateClassifiers(empty, emptyCM, emptyInt, [
-			"landing",
-		]);
-		expect(result.valid).toBe(false);
-		expect(result.errors).toHaveLength(1);
-	});
-
-	it("collection references unknown page type → error", () => {
-		const cm: ContentModelClassification = {
-			collections: {
-				orphan: { source_pagetype: "orphan", slug_field: "slug" },
-			},
-			listings: {},
-		};
-
-		const result = crossValidateClassifiers(validArch, cm, validInteraction, [
-			"landing",
-			"about",
-			"blog",
-		]);
-		expect(result.valid).toBe(false);
-		expect(
-			result.errors.some(
-				(e) => e.includes("orphan") && e.includes("unknown page type"),
-			),
-		).toBe(true);
-	});
-
-	it("interaction pattern references unknown page type → error", () => {
-		const interaction: InteractionClassification = {
-			patterns: [
-				{
-					id: "bad-pattern",
-					type: "modal",
-					pageType: "nonexistent",
-					description: "Bad",
-				},
-			],
-		};
-
-		const result = crossValidateClassifiers(validArch, validCM, interaction, [
-			"landing",
-			"about",
-			"blog",
-		]);
-		expect(result.valid).toBe(false);
-		expect(
-			result.errors.some(
-				(e) => e.includes("bad-pattern") && e.includes("nonexistent"),
-			),
-		).toBe(true);
-	});
-});
-
-// ---------------------------------------------------------------------------
-// detectConflicts
-// ---------------------------------------------------------------------------
-
-describe("detectConflicts", () => {
-	it("same page type in different layouts → conflict", () => {
-		const arch: ArchitectureClassification = {
-			layouts: {
-				a: { description: "A", page_types: ["blog"] },
-				b: { description: "B", page_types: ["blog"] },
-			},
-			routes: [{ pattern: "/blog/[slug]", pageType: "blog" }],
-		};
-
-		const result = detectConflicts(arch, validCM);
-		expect(result.conflicts.length).toBeGreaterThan(0);
-		expect(result.conflicts[0].type).toBe("layout_conflict");
-	});
-
-	it("no conflicts → empty array", () => {
-		const result = detectConflicts(validArch, validCM);
-		expect(result.conflicts).toEqual([]);
-	});
-
-	it("collection without route → missing_route conflict", () => {
-		const arch: ArchitectureClassification = {
-			layouts: { default: { description: "D", page_types: ["landing"] } },
-			routes: [],
-		};
-		const cm: ContentModelClassification = {
-			collections: {
-				blog: { source_pagetype: "blog", slug_field: "slug" },
-			},
-			listings: {},
-		};
-
-		const result = detectConflicts(arch, cm);
-		expect(result.conflicts.some((c) => c.type === "missing_route")).toBe(true);
-	});
-});
 
 // ---------------------------------------------------------------------------
 // validateRoutePatterns
@@ -217,18 +39,14 @@ describe("validateRoutePatterns", () => {
 		expect(result.valid).toBe(true);
 	});
 
-	it("/blog/[slug] and /blog/archive → conflict (static vs dynamic)", () => {
+	it("/blog/[slug] and /blog/archive → no conflict (static takes priority in Astro)", () => {
 		const routes = [
 			{ pattern: "/blog/[slug]", pageType: "blog" },
 			{ pattern: "/blog/archive", pageType: "blog_archive" },
 		];
 
 		const result = validateRoutePatterns(routes);
-		expect(result.valid).toBe(false);
-		expect(result.conflicts.length).toBe(1);
-		expect(result.conflicts[0].reason).toContain(
-			"Static segment conflicts with dynamic segment",
-		);
+		expect(result.valid).toBe(true);
 	});
 
 	it("identical patterns → conflict (duplicate)", () => {
@@ -343,6 +161,27 @@ describe("validateRegistryCompleteness", () => {
 			"contact",
 		]);
 		expect(result.missing).toEqual(["contact"]);
+	});
+
+	it("listing-only page type is covered", () => {
+		const reg: Registry = {
+			layouts: { default: { description: "D", page_types: ["landing"] } },
+			collections: {},
+			listings: {
+				blog_listing: {
+					route: "/blog",
+					queries: [],
+					paginated: true,
+				},
+			},
+			static_pages: [{ pagetype: "landing", route: "/" }],
+		};
+		const result = validateRegistryCompleteness(reg, [
+			"landing",
+			"blog_listing",
+		]);
+		expect(result.missing).toEqual([]);
+		expect(result.covered).toContain("blog_listing");
 	});
 });
 
@@ -469,6 +308,34 @@ describe("validateContentModelRefs", () => {
 		const result = validateContentModelRefs(cm, reg);
 		expect(result.valid).toBe(false);
 		expect(result.orphans.some((o) => o.includes("nonexistent"))).toBe(true);
+	});
+
+	it("listing with string queries (instead of objects) → does not crash", () => {
+		const cm: ContentModelOutput = {
+			collections: {
+				blog: { source_pagetype: "blog", slug_field: "slug", listable_by: [] },
+			},
+		};
+		const reg: Registry = {
+			layouts: {},
+			collections: {
+				blog: { source_pagetype: "blog", slug_field: "slug", listable_by: [] },
+			},
+			listings: {
+				my_listing: {
+					route: "/blog",
+					queries: [
+						"doctor_categories",
+						"blog",
+					] as unknown as Registry["listings"][string]["queries"],
+					paginated: false,
+				},
+			},
+			static_pages: [],
+		};
+		const result = validateContentModelRefs(cm, reg);
+		// Should not throw — string queries are silently skipped
+		expect(result).toBeDefined();
 	});
 
 	it("listing with unknown pagetype → reported", () => {

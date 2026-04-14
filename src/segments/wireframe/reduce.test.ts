@@ -1,91 +1,87 @@
 import { describe, expect, it } from "bun:test";
-import type { PageContent, PageStructure, SchemaData } from "../../types.js";
+import type { PageContent, StructureData } from "../../types.js";
 import {
 	buildAssetManifest,
 	buildReducedMeta,
 	buildReducedTree,
 	classifyUrls,
 	contentAddressedName,
-	groupByPageType,
 	rewriteInternalLinks,
-	selectSamples,
+	selectSamplesFromUrls,
 } from "./reduce.js";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const structurePages: PageStructure[] = [
-	{ id: "1", url: "/", pagetype: "landing", title: "Home" },
-	{ id: "2", url: "/about", pagetype: "about", title: "About" },
-	{ id: "3", url: "/blog/post-1", pagetype: "blog", title: "Blog Post 1" },
-	{ id: "4", url: "/blog/post-2", pagetype: "blog", title: "Blog Post 2" },
-	{ id: "5", url: "/blog/post-3", pagetype: "blog", title: "Blog Post 3" },
-];
+const structure: StructureData = {
+	site_url: "https://example.com",
+	scraped_at: "2026-03-03T15:15:59.216Z",
+	page_types: [
+		{
+			name: "landing",
+			url_pattern: "/",
+			description: "Landing page",
+			sample_urls: ["/"],
+			urls: ["/"],
+		},
+		{
+			name: "about",
+			url_pattern: "/about",
+			description: "About page",
+			sample_urls: ["/about"],
+			urls: ["/about"],
+		},
+		{
+			name: "blog",
+			url_pattern: "/blog/{slug}",
+			description: "Blog posts",
+			sample_urls: ["/blog/post-1", "/blog/post-2"],
+			urls: ["/blog/post-1", "/blog/post-2", "/blog/post-3"],
+		},
+	],
+};
 
 const contentPages: PageContent[] = [
 	{
-		id: "c1",
+		id: "landing-0",
 		url: "/",
 		pagetype: "landing",
 		content: { hero: "text", nav: "text", cta: "text", footer: "text" },
 	},
 	{
-		id: "c2",
+		id: "about-0",
 		url: "/about",
 		pagetype: "about",
 		content: { title: "text", body: "text" },
 	},
 	{
-		id: "c3",
+		id: "blog-0",
 		url: "/blog/post-1",
 		pagetype: "blog",
 		content: { title: "text", body: "text", author: "text", tags: "text" },
 	},
 	{
-		id: "c4",
+		id: "blog-1",
 		url: "/blog/post-2",
 		pagetype: "blog",
 		content: { title: "text", body: "text" },
 	},
 	{
-		id: "c5",
+		id: "blog-2",
 		url: "/blog/post-3",
 		pagetype: "blog",
 		content: { title: "text", body: "text", gallery: "text" },
 	},
 ];
 
-const contentMap = new Map<string, PageContent>();
-for (const p of contentPages) contentMap.set(p.id, p);
-
 // ---------------------------------------------------------------------------
-// groupByPageType
+// selectSamplesFromUrls
 // ---------------------------------------------------------------------------
 
-describe("groupByPageType", () => {
-	it("groups 5 pages with 3 types correctly", () => {
-		const grouped = groupByPageType(structurePages);
-
-		expect(grouped.size).toBe(3);
-		expect(grouped.get("landing")).toHaveLength(1);
-		expect(grouped.get("about")).toHaveLength(1);
-		expect(grouped.get("blog")).toHaveLength(3);
-	});
-
-	it("returns empty map for empty input", () => {
-		expect(groupByPageType([]).size).toBe(0);
-	});
-});
-
-// ---------------------------------------------------------------------------
-// selectSamples
-// ---------------------------------------------------------------------------
-
-describe("selectSamples", () => {
-	it("selects richest (most keys) and simplest (fewest keys) per type", () => {
-		const grouped = groupByPageType(structurePages);
-		const samples = selectSamples(grouped, contentMap);
+describe("selectSamplesFromUrls", () => {
+	it("selects richest (most keys) and simplest (fewest keys) per type from sample_urls", () => {
+		const samples = selectSamplesFromUrls(structure, contentPages);
 
 		// Blog: post-1 has 4 keys (richest), post-2 has 2 keys (simplest)
 		const blogSamples = samples.get("blog");
@@ -97,36 +93,39 @@ describe("selectSamples", () => {
 		expect(bs.simplest.url).toBe("/blog/post-2");
 	});
 
-	it("tie-breaking is deterministic (by id order)", () => {
-		// blog/post-2 and a hypothetical post-4 both have 2 keys
-		const pages: PageStructure[] = [
-			{ id: "4", url: "/blog/post-4", pagetype: "blog", title: "Post 4" },
-			{ id: "2", url: "/blog/post-2", pagetype: "blog", title: "Post 2" },
-		];
-		const contents: PageContent[] = [
-			{
-				id: "c4",
-				url: "/blog/post-4",
-				pagetype: "blog",
-				content: { title: "a" },
-			},
-			{
-				id: "c2",
-				url: "/blog/post-2",
-				pagetype: "blog",
-				content: { body: "b" },
-			},
-		];
+	it("falls back to any page of type if no sample_urls match", () => {
+		const structNoSamples: StructureData = {
+			page_types: [
+				{
+					name: "blog",
+					url_pattern: "/blog/{slug}",
+					description: "Blog",
+					sample_urls: ["/blog/nonexistent"],
+					urls: ["/blog/post-1"],
+				},
+			],
+		};
 
-		const grouped = groupByPageType(pages);
-		const cMap = new Map<string, PageContent>();
-		for (const p of contents) cMap.set(p.id, p);
-		const samples = selectSamples(grouped, cMap);
+		const samples = selectSamplesFromUrls(structNoSamples, contentPages);
+		const blogSamples = samples.get("blog");
+		expect(blogSamples).toBeDefined();
+		expect(blogSamples?.richest.pagetype).toBe("blog");
+	});
 
-		// Both have 1 key; id "2" < id "4" so post-2 wins both richest and simplest
-		const blog = samples.get("blog");
-		expect(blog).toBeDefined();
-		expect((blog as NonNullable<typeof blog>).richest.url).toBe("/blog/post-2");
+	it("returns empty map when no pages match any type", () => {
+		const emptyStruct: StructureData = {
+			page_types: [
+				{
+					name: "missing",
+					url_pattern: "/missing",
+					description: "Missing",
+					sample_urls: [],
+					urls: [],
+				},
+			],
+		};
+		const samples = selectSamplesFromUrls(emptyStruct, contentPages);
+		expect(samples.size).toBe(0);
 	});
 });
 
@@ -297,8 +296,7 @@ describe("classifyUrls", () => {
 
 describe("buildReducedTree", () => {
 	it("builds correct file tree from samples", () => {
-		const grouped = groupByPageType(structurePages);
-		const samples = selectSamples(grouped, contentMap);
+		const samples = selectSamplesFromUrls(structure, contentPages);
 
 		const rewritten = new Map<string, Record<string, unknown>>();
 		for (const p of contentPages) {
@@ -339,7 +337,10 @@ describe("buildReducedTree", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildReducedMeta", () => {
-	const schema: SchemaData = {
+	const resolvedSchema: Record<
+		string,
+		{ type: string; properties: Record<string, unknown> }
+	> = {
 		blog: {
 			type: "object",
 			properties: {
@@ -355,14 +356,7 @@ describe("buildReducedMeta", () => {
 	};
 
 	it("produces ReducedMeta conforming to type contract", () => {
-		const grouped = groupByPageType(structurePages);
-		const meta = buildReducedMeta(
-			grouped,
-			contentPages,
-			schema,
-			"https://example.com",
-			"2026-03-03T15:15:59.216Z",
-		);
+		const meta = buildReducedMeta(structure, contentPages, resolvedSchema);
 
 		// source fields
 		expect(meta.source.total_pages).toBe(5);
@@ -389,15 +383,8 @@ describe("buildReducedMeta", () => {
 		expect(Array.isArray(meta.pagination_candidates)).toBe(true);
 	});
 
-	it("extracts schema_keys from schema.json", () => {
-		const grouped = groupByPageType(structurePages);
-		const meta = buildReducedMeta(
-			grouped,
-			contentPages,
-			schema,
-			"https://example.com",
-			"2026-01-01T00:00:00.000Z",
-		);
+	it("extracts schema_keys from resolved schema", () => {
+		const meta = buildReducedMeta(structure, contentPages, resolvedSchema);
 
 		const blogType = meta.page_types.find((pt) => pt.pagetype === "blog");
 		expect(blogType?.schema_keys).toContain("title");
@@ -405,91 +392,43 @@ describe("buildReducedMeta", () => {
 		expect(blogType?.schema_keys).toContain("author");
 	});
 
-	it("derives routes from actual page URLs (not placeholder)", () => {
-		const grouped = groupByPageType(structurePages);
-		const meta = buildReducedMeta(
-			grouped,
-			contentPages,
-			schema,
-			"https://example.com",
-			"2026-01-01T00:00:00.000Z",
-		);
+	it("derives routes from url_pattern via convertUrlPattern", () => {
+		const meta = buildReducedMeta(structure, contentPages, resolvedSchema);
 
 		const blogType = meta.page_types.find((pt) => pt.pagetype === "blog");
-		// Multi-page type → dynamic route with [slug]
-		expect(blogType?.route).toContain("[slug]");
-		// Should NOT be the placeholder /reduced/blog
-		expect(blogType?.route).not.toBe("/reduced/blog");
+		// url_pattern "/blog/{slug}" → "/blog/[slug]"
+		expect(blogType?.route).toBe("/blog/[slug]");
 
 		const landingType = meta.page_types.find((pt) => pt.pagetype === "landing");
-		// Single-page type → static route
 		expect(landingType?.route).toBe("/");
 	});
 
-	it("extracts slug_param from dynamic routes", () => {
-		const grouped = groupByPageType(structurePages);
-		const meta = buildReducedMeta(
-			grouped,
-			contentPages,
-			schema,
-			"https://example.com",
-			"2026-01-01T00:00:00.000Z",
-		);
+	it("extracts slug_param from url_pattern", () => {
+		const meta = buildReducedMeta(structure, contentPages, resolvedSchema);
 
 		const blogType = meta.page_types.find((pt) => pt.pagetype === "blog");
 		expect(blogType?.slug_param).toBe("slug");
+
+		const landingType = meta.page_types.find((pt) => pt.pagetype === "landing");
+		expect(landingType?.slug_param).toBeUndefined();
 	});
 
-	it("detects pagination candidates", () => {
-		const manyPages: PageStructure[] = Array.from({ length: 11 }, (_, i) => ({
-			id: String(i),
-			url: `/blog/post-${i}`,
-			pagetype: "blog",
-			title: `Post ${i}`,
-		}));
-		const manyContents: PageContent[] = manyPages.map((p) => ({
-			id: `c${p.id}`,
-			url: p.url,
-			pagetype: p.pagetype,
-			content: { title: `Post ${p.id}` },
-		}));
-
-		const grouped = groupByPageType(manyPages);
-		const meta = buildReducedMeta(
-			grouped,
-			manyContents,
-			{},
-			"https://example.com",
-			"2026-01-01T00:00:00.000Z",
-		);
+	it("detects pagination candidates (3+ urls)", () => {
+		const meta = buildReducedMeta(structure, contentPages, resolvedSchema);
 
 		expect(meta.pagination_candidates.length).toBeGreaterThan(0);
 		expect(meta.pagination_candidates[0].pagetype).toBe("blog");
 	});
 
 	it("computes own_keys as type-specific keys not in global_keys", () => {
-		const grouped = groupByPageType(structurePages);
-		const meta = buildReducedMeta(
-			grouped,
-			contentPages,
-			schema,
-			"https://example.com",
-			"2026-01-01T00:00:00.000Z",
-		);
+		const meta = buildReducedMeta(structure, contentPages, resolvedSchema);
 
 		const aboutType = meta.page_types.find((pt) => pt.pagetype === "about");
 		expect(Array.isArray(aboutType?.own_keys)).toBe(true);
 	});
 
 	it("handles empty schema gracefully", () => {
-		const grouped = groupByPageType(structurePages);
-		const meta = buildReducedMeta(
-			grouped,
-			contentPages,
-			{},
-			"https://example.com",
-			"2026-01-01T00:00:00.000Z",
-		);
+		const meta = buildReducedMeta(structure, contentPages, {});
 
 		for (const pt of meta.page_types) {
 			expect(pt.schema_keys).toEqual([]);

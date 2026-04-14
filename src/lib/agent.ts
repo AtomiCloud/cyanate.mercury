@@ -68,7 +68,22 @@ interface StreamState {
 	startTime: number;
 }
 
+export interface AgentQueryResult {
+	output: string;
+	turns: number;
+	inputTokens: number;
+	outputTokens: number;
+	cost: number;
+}
+
 export async function agentQuery(opts: AgentQueryOptions): Promise<string> {
+	const result = await agentQueryWithMetrics(opts);
+	return result.output;
+}
+
+export async function agentQueryWithMetrics(
+	opts: AgentQueryOptions,
+): Promise<AgentQueryResult> {
 	const {
 		prompt,
 		systemPrompt,
@@ -124,7 +139,13 @@ export async function agentQuery(opts: AgentQueryOptions): Promise<string> {
 	try {
 		await consumeStream(iterator, state, stepName, timeoutMs, log, logEvent);
 		log.completeStep(state.totalCost);
-		return state.output;
+		return {
+			output: state.output,
+			turns: state.turnCount,
+			inputTokens: state.totalInputTokens,
+			outputTokens: state.totalOutputTokens,
+			cost: state.totalCost,
+		};
 	} finally {
 		await iterator.return?.();
 	}
@@ -324,6 +345,17 @@ function createFallbackLogger(
 			console.error(`  [FAILED] ${stepName}: ${e}`);
 		},
 		skipStep() {},
+		startSegment() {},
+		finishSegment() {
+			return {
+				steps: 0,
+				turns: 0,
+				inputTokens: 0,
+				outputTokens: 0,
+				cost: 0,
+				duration: 0,
+			};
+		},
 		flush() {},
 		destroy() {
 			clearInterval(hb);

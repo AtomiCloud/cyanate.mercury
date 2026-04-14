@@ -1,141 +1,211 @@
 import { describe, expect, it } from "bun:test";
-import type { MeasurementData, PatternsManifest } from "./merge.js";
+import type { PageComponentExtraction, PatternsManifest } from "./merge.js";
 import {
-	aggregateFingerprint,
 	assembleDesignTokens,
 	buildPatternsManifest,
-	buildTypographyScale,
 	clusterSpacing,
-	deduplicateColors,
 	deduplicateComponents,
+	deepMerge,
+	extractGradientsFromColors,
+	flattenColors,
+	flattenSpacing,
+	normalizeGradients,
+	normalizeRawTokens,
+	walkNumericLeaves,
+	walkOklchLeaves,
+	walkTypographyLeaves,
 } from "./merge.js";
+
+// ---------------------------------------------------------------------------
+// walkNumericLeaves
+// ---------------------------------------------------------------------------
+
+describe("walkNumericLeaves", () => {
+	it("extracts numeric leaves with dotted paths", () => {
+		const result = walkNumericLeaves(
+			{ hero: { paddingTop: 160, paddingBottom: 128 }, card: { padding: 32 } },
+			"",
+		);
+		expect(result).toContainEqual({ name: "hero.paddingTop", value: 160 });
+		expect(result).toContainEqual({ name: "card.padding", value: 32 });
+	});
+
+	it("parses px string leaves", () => {
+		const result = walkNumericLeaves({ gap: "16px", margin: "24px" }, "");
+		expect(result).toContainEqual({ name: "gap", value: 16 });
+		expect(result).toContainEqual({ name: "margin", value: 24 });
+	});
+
+	it("skips non-numeric, non-px values", () => {
+		const result = walkNumericLeaves(
+			{ font: "Inter", visible: true, rem: "1rem" },
+			"",
+		);
+		expect(result).toEqual([]);
+	});
+
+	it("handles empty object", () => {
+		expect(walkNumericLeaves({}, "")).toEqual([]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// walkOklchLeaves
+// ---------------------------------------------------------------------------
+
+describe("walkOklchLeaves", () => {
+	it("extracts OKLCH color strings", () => {
+		const result = walkOklchLeaves(
+			{
+				background: { light: "oklch(1 0 0)", dark: "oklch(0.1 0.01 286)" },
+				text: { primary: "oklch(0.1 0.01 286)" },
+			},
+			"",
+		);
+		expect(result).toContainEqual({
+			name: "background.light",
+			value: "oklch(1 0 0)",
+		});
+		expect(result).toContainEqual({
+			name: "text.primary",
+			value: "oklch(0.1 0.01 286)",
+		});
+	});
+
+	it("skips non-OKLCH strings", () => {
+		const result = walkOklchLeaves({ bg: "#fff", name: "primary" }, "");
+		expect(result).toEqual([]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// walkTypographyLeaves
+// ---------------------------------------------------------------------------
+
+describe("walkTypographyLeaves", () => {
+	it("extracts families, sizes, and weights", () => {
+		const result = walkTypographyLeaves({
+			fontFamilies: { sans: "Inter", mono: "Fira Code" },
+			heading: { h1: { size: "72px", weight: 700 } },
+			body: { size: "16px", weight: 400 },
+		});
+		expect(result.families).toContain("Inter");
+		expect(result.families).toContain("Fira Code");
+		expect(result.sizes).toContain("72px");
+		expect(result.sizes).toContain("16px");
+		expect(result.weights).toContain(700);
+		expect(result.weights).toContain(400);
+	});
+
+	it("empty object returns empty arrays", () => {
+		const result = walkTypographyLeaves({});
+		expect(result.families).toEqual([]);
+		expect(result.sizes).toEqual([]);
+		expect(result.weights).toEqual([]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// flattenColors
+// ---------------------------------------------------------------------------
+
+describe("flattenColors", () => {
+	it("passes through flat OKLCH strings", () => {
+		const result = flattenColors({
+			primary: "oklch(0.5 0.1 200)",
+			bg: "oklch(0.98 0.005 250)",
+		});
+		expect(result).toEqual({
+			primary: "oklch(0.5 0.1 200)",
+			bg: "oklch(0.98 0.005 250)",
+		});
+	});
+
+	it("flattens nested color objects", () => {
+		const result = flattenColors({
+			gray: {
+				"50": "oklch(0.98 0 0)",
+				"900": "oklch(0.15 0.01 250)",
+			},
+		});
+		expect(result["gray.50"]).toBe("oklch(0.98 0 0)");
+		expect(result["gray.900"]).toBe("oklch(0.15 0.01 250)");
+	});
+
+	it("handles mixed flat and nested", () => {
+		const result = flattenColors({
+			primary: "oklch(0.5 0.1 200)",
+			scale: { light: "oklch(0.9 0 0)" },
+		});
+		expect(result.primary).toBe("oklch(0.5 0.1 200)");
+		expect(result["scale.light"]).toBe("oklch(0.9 0 0)");
+	});
+
+	it("preserves non-OKLCH nested values for validator to catch", () => {
+		const result = flattenColors({
+			gray: {
+				"50": "#f9fafb",
+				"900": "oklch(0.15 0.01 250)",
+			},
+		});
+		// Both values should be flattened — the hex value is preserved
+		// so the downstream OKLCH validator can reject it with actionable feedback
+		expect(result["gray.50"]).toBe("#f9fafb");
+		expect(result["gray.900"]).toBe("oklch(0.15 0.01 250)");
+	});
+
+	it("handles empty object", () => {
+		expect(flattenColors({})).toEqual({});
+	});
+});
 
 // ---------------------------------------------------------------------------
 // clusterSpacing
 // ---------------------------------------------------------------------------
 
 describe("clusterSpacing", () => {
-	it("clusters raw px values to nearest scale anchor", () => {
-		const measurements: MeasurementData[] = [
-			{
-				pageId: "1",
-				pageType: "landing",
-				spacing: [
-					{ name: "xs", value: "4px" },
-					{ name: "sm", value: "5px" },
-					{ name: "md", value: "8px" },
-					{ name: "lg", value: "15px" },
-					{ name: "xl", value: "16px" },
-					{ name: "2xl", value: "32px" },
-				],
-			},
-		];
-
-		const result = clusterSpacing(measurements);
+	it("clusters raw numeric values to nearest scale anchor", () => {
+		const result = clusterSpacing({
+			xs: 4,
+			sm: 5,
+			md: 8,
+			lg: 15,
+			xl: 16,
+			"2xl": 32,
+		});
 		const values = Object.values(result);
 
 		expect(values).toContain("4px");
 		expect(values).toContain("8px");
 		expect(values).toContain("16px");
 		expect(values).toContain("32px");
-		// 5px snaps to 4px, 15px snaps to 16px
+		// 5 snaps to 4, 15 snaps to 16
 		expect(result.sm).toBe("4px");
 		expect(result.lg).toBe("16px");
 	});
 
-	it("returns empty record for no measurements", () => {
-		expect(clusterSpacing([])).toEqual({});
+	it("returns empty record for empty object", () => {
+		expect(clusterSpacing({})).toEqual({});
 	});
 
-	it("ignores non-px values", () => {
-		const measurements: MeasurementData[] = [
-			{
-				pageId: "1",
-				pageType: "landing",
-				spacing: [{ name: "rem", value: "1rem" }],
-			},
-		];
-		expect(clusterSpacing(measurements)).toEqual({});
-	});
-});
-
-// ---------------------------------------------------------------------------
-// deduplicateColors
-// ---------------------------------------------------------------------------
-
-describe("deduplicateColors", () => {
-	it("merges similar OKLCH values within threshold", () => {
-		const measurements: MeasurementData[] = [
-			{
-				pageId: "1",
-				pageType: "landing",
-				colors: [
-					{ name: "primary", value: "oklch(0.2 0.15 250)" },
-					{ name: "primary-hover", value: "oklch(0.21 0.14 250)" },
-					{ name: "accent", value: "oklch(0.8 0.2 150)" },
-				],
-			},
-		];
-
-		const result = deduplicateColors(measurements);
-		// primary-hover should be merged with primary (very similar)
-		expect(result.primary).toBe("oklch(0.2 0.15 250)");
-		expect(result.accent).toBe("oklch(0.8 0.2 150)");
-		// primary-hover should not appear (merged into primary)
-		expect(result["primary-hover"]).toBeUndefined();
+	it("handles nested spacing objects", () => {
+		const result = clusterSpacing({
+			hero: { paddingTop: 128, gap: 24 },
+			card: { padding: 32 },
+		});
+		expect(result["hero.paddingTop"]).toBe("128px");
+		expect(result["hero.gap"]).toBe("24px");
+		expect(result["card.padding"]).toBe("32px");
 	});
 
-	it("preserves distinct OKLCH values", () => {
-		const measurements: MeasurementData[] = [
-			{
-				pageId: "1",
-				pageType: "landing",
-				colors: [
-					{ name: "dark", value: "oklch(0.1 0.1 250)" },
-					{ name: "light", value: "oklch(0.9 0.05 250)" },
-				],
-			},
-		];
-
-		const result = deduplicateColors(measurements);
-		expect(Object.keys(result)).toHaveLength(2);
-	});
-
-	it("returns empty for no measurements", () => {
-		expect(deduplicateColors([])).toEqual({});
-	});
-});
-
-// ---------------------------------------------------------------------------
-// buildTypographyScale
-// ---------------------------------------------------------------------------
-
-describe("buildTypographyScale", () => {
-	it("extracts and deduplicates font sizes within tolerance", () => {
-		const measurements: MeasurementData[] = [
-			{
-				pageId: "1",
-				pageType: "landing",
-				typography: [
-					{ fontFamily: "Inter", fontSize: "16px", fontWeight: 400 },
-					{ fontFamily: "Inter", fontSize: "15.5px", fontWeight: 400 },
-					{ fontFamily: "Inter", fontSize: "32px", fontWeight: 700 },
-					{ fontFamily: "Inter", fontSize: "14px", fontWeight: 400 },
-				],
-			},
-		];
-
-		const result = buildTypographyScale(measurements);
-		// 15.5px should be deduped with 16px (within 1px tolerance)
-		expect(Object.keys(result.fontSize).length).toBeLessThanOrEqual(3);
-		expect(result.fontFamily.Inter).toBe("Inter");
-	});
-
-	it("returns empty for no measurements", () => {
-		const result = buildTypographyScale([]);
-		expect(result.fontFamily).toEqual({});
-		expect(result.fontSize).toEqual({});
-		expect(result.fontWeight).toEqual({});
+	it("handles px string values in nested objects", () => {
+		const result = clusterSpacing({
+			gap: "16px",
+			margin: "1rem",
+		});
+		expect(result.gap).toBe("16px");
+		// 1rem is not a px value, should be ignored
+		expect(result.margin).toBeUndefined();
 	});
 });
 
@@ -144,116 +214,50 @@ describe("buildTypographyScale", () => {
 // ---------------------------------------------------------------------------
 
 describe("deduplicateComponents", () => {
-	it("merges same structure across pages into single recipe", () => {
-		const measurements: MeasurementData[] = [
+	it("merges same properties across pages into single recipe", () => {
+		const extractions: PageComponentExtraction[] = [
 			{
-				pageId: "1",
 				pageType: "landing",
-				components: [
-					{
-						name: "Button",
-						structure: "inline-flex",
-						properties: { padding: "8px 16px", borderRadius: "8px" },
-						variant: "primary",
-					},
-				],
+				components: {
+					Button: { padding: "8px 16px", borderRadius: "8px" },
+				},
 			},
 			{
-				pageId: "2",
 				pageType: "about",
-				components: [
-					{
-						name: "Button",
-						structure: "inline-flex",
-						properties: { padding: "8px 16px", borderRadius: "8px" },
-						variant: "secondary",
-					},
-				],
+				components: {
+					Button: { padding: "8px 16px", borderRadius: "8px" },
+				},
 			},
 		];
 
-		const result = deduplicateComponents(measurements);
+		const result = deduplicateComponents(extractions);
 		expect(result.Button).toBeDefined();
 		expect(result.Button.base).toEqual({
 			padding: "8px 16px",
 			borderRadius: "8px",
 		});
-		expect(result.Button.variants.primary).toBeDefined();
-		expect(result.Button.variants.secondary).toBeDefined();
+		// Second page with same props → added as variant
+		expect(result.Button.variants.about).toBeDefined();
 	});
 
-	it("returns empty for no measurements", () => {
+	it("keeps different components separate", () => {
+		const extractions: PageComponentExtraction[] = [
+			{
+				pageType: "landing",
+				components: {
+					Button: { padding: "8px" },
+					Card: { padding: "16px", shadow: "md" },
+				},
+			},
+		];
+
+		const result = deduplicateComponents(extractions);
+		expect(result.Button).toBeDefined();
+		expect(result.Card).toBeDefined();
+	});
+
+	it("returns empty for no extractions", () => {
 		expect(deduplicateComponents([])).toEqual({});
-	});
-});
-
-// ---------------------------------------------------------------------------
-// aggregateFingerprint
-// ---------------------------------------------------------------------------
-
-describe("aggregateFingerprint", () => {
-	it("single page returns passthrough", () => {
-		const fps = [
-			{
-				dimensions: {
-					ornament: 0.3,
-					playfulness: 0.7,
-					warmth: 0.5,
-					density: 0.6,
-					motion: 0.4,
-					depth: 0.2,
-					darkness: 0.8,
-					formality: 0.1,
-				},
-				weight: 1,
-			},
-		];
-
-		const result = aggregateFingerprint(fps);
-		expect(result.ornament).toBe(0.3);
-		expect(result.playfulness).toBe(0.7);
-	});
-
-	it("weighted average across multiple pages", () => {
-		const fps = [
-			{
-				dimensions: {
-					ornament: 0,
-					playfulness: 0,
-					warmth: 0,
-					density: 0,
-					motion: 0,
-					depth: 0,
-					darkness: 0,
-					formality: 0,
-				},
-				weight: 1,
-			},
-			{
-				dimensions: {
-					ornament: 1,
-					playfulness: 1,
-					warmth: 1,
-					density: 1,
-					motion: 1,
-					depth: 1,
-					darkness: 1,
-					formality: 1,
-				},
-				weight: 3,
-			},
-		];
-
-		const result = aggregateFingerprint(fps);
-		// Weighted average: (0*1 + 1*3) / 4 = 0.75
-		expect(result.ornament).toBeCloseTo(0.75, 2);
-		expect(result.playfulness).toBeCloseTo(0.75, 2);
-	});
-
-	it("empty input returns neutral defaults", () => {
-		const result = aggregateFingerprint([]);
-		expect(result.ornament).toBe(0.5);
-		expect(result.formality).toBe(0.5);
 	});
 });
 
@@ -333,5 +337,317 @@ describe("buildPatternsManifest", () => {
 
 	it("returns empty for no extractions", () => {
 		expect(buildPatternsManifest([])).toEqual({});
+	});
+});
+
+describe("extractGradientsFromColors", () => {
+	const makeTokens = (
+		colors: Record<string, string>,
+		gradients: Record<string, unknown> = {},
+	) =>
+		({
+			atomic: {
+				colors,
+				typography: { fontFamily: {}, fontSize: {}, fontWeight: {} },
+				spacing: {},
+				borderRadius: {},
+				shadows: {},
+			},
+			gradients,
+			layout: {
+				grid: { columns: {}, gutter: {} },
+				container: { maxWidth: {} },
+				breakpoints: {},
+				sections: {},
+				density: { mode: "" },
+				rhythm: { baseUnit: "", verticalRhythm: {} },
+			},
+			componentSpacing: {},
+			motion: {
+				duration: {},
+				easing: {},
+				state: { hover: {}, focus: {}, active: {}, disabled: {} },
+				scroll: {},
+				skeleton: {},
+			},
+			surfaces: { glass: {}, texture: {}, imageTreatment: {} },
+			visualIdentity: {
+				colorDistribution: { dominant: {}, secondary: {}, accent: {} },
+				borders: {},
+			},
+		}) as ReturnType<typeof extractGradientsFromColors>;
+
+	it("moves linear-gradient from colors to gradients", () => {
+		const input = makeTokens({
+			primary: "oklch(0.5 0.1 180)",
+			hero: "linear-gradient(180deg, oklch(0.5 0.1 180), oklch(0.8 0.05 200))",
+		});
+		const result = extractGradientsFromColors(input);
+
+		expect(result.atomic.colors).toEqual({ primary: "oklch(0.5 0.1 180)" });
+		expect(result.gradients.hero).toBeDefined();
+		expect(result.gradients.hero.type).toBe("linear");
+		expect(result.gradients.hero.angle).toBe("180deg");
+		expect(result.gradients.hero.stops).toHaveLength(2);
+	});
+
+	it("moves radial-gradient from colors to gradients", () => {
+		const input = makeTokens({
+			bg: "radial-gradient(circle, oklch(0.9 0 0), oklch(0.1 0 0))",
+		});
+		const result = extractGradientsFromColors(input);
+
+		expect(result.atomic.colors).toEqual({});
+		expect(result.gradients.bg).toBeDefined();
+		expect(result.gradients.bg.type).toBe("radial");
+	});
+
+	it("leaves non-gradient OKLCH values in colors", () => {
+		const input = makeTokens({
+			primary: "oklch(0.5 0.1 180)",
+			secondary: "oklch(50% 0.2 260)",
+		});
+		const result = extractGradientsFromColors(input);
+
+		expect(result.atomic.colors).toEqual({
+			primary: "oklch(0.5 0.1 180)",
+			secondary: "oklch(50% 0.2 260)",
+		});
+		expect(Object.keys(result.gradients)).toHaveLength(0);
+	});
+
+	it("preserves existing gradients", () => {
+		const existing = {
+			old: { type: "linear", stops: [{ color: "red" }] },
+		};
+		const input = makeTokens(
+			{ hero: "linear-gradient(90deg, oklch(0.5 0.1 0))" },
+			existing,
+		);
+		const result = extractGradientsFromColors(input);
+
+		expect(result.gradients.old).toBeDefined();
+		expect(result.gradients.hero).toBeDefined();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// flattenSpacing
+// ---------------------------------------------------------------------------
+
+describe("flattenSpacing", () => {
+	it("passes through flat string values", () => {
+		const result = flattenSpacing({ sm: "8px", md: "16px", lg: "24px" });
+		expect(result).toEqual({ sm: "8px", md: "16px", lg: "24px" });
+	});
+
+	it("flattens nested objects to dot-delimited keys", () => {
+		const result = flattenSpacing({
+			scale: { "0": "0px", "1": "4px", "2": "8px" },
+			hero: { paddingTop: "96px" },
+		});
+		expect(result["scale.0"]).toBe("0px");
+		expect(result["scale.1"]).toBe("4px");
+		expect(result["hero.paddingTop"]).toBe("96px");
+	});
+
+	it("handles mixed flat and nested values", () => {
+		const result = flattenSpacing({
+			baseUnit: "4px",
+			scale: { "1": "4px" },
+		});
+		expect(result.baseUnit).toBe("4px");
+		expect(result["scale.1"]).toBe("4px");
+	});
+
+	it("skips non-string, non-object leaves", () => {
+		const result = flattenSpacing({
+			valid: "8px",
+			number: 42 as unknown as string,
+			arr: ["a"] as unknown as string,
+		});
+		expect(result).toEqual({ valid: "8px" });
+	});
+
+	it("handles empty object", () => {
+		expect(flattenSpacing({})).toEqual({});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// normalizeGradients
+// ---------------------------------------------------------------------------
+
+describe("normalizeGradients", () => {
+	it("parses raw CSS linear-gradient strings into GradientDef", () => {
+		const result = normalizeGradients({
+			hero: "linear-gradient(180deg, oklch(0.2 0.04 270), oklch(0.1 0.02 200))",
+		});
+		expect(result.hero).toBeDefined();
+		expect(result.hero.type).toBe("linear");
+		expect(result.hero.angle).toBe("180deg");
+		expect(result.hero.stops).toHaveLength(2);
+	});
+
+	it("parses conic-gradient strings", () => {
+		const result = normalizeGradients({
+			sweep: "conic-gradient(from 45deg, red, blue)",
+		});
+		expect(result.sweep).toBeDefined();
+		expect(result.sweep.type).toBe("conic");
+	});
+
+	it("parses radial-gradient strings", () => {
+		const result = normalizeGradients({
+			mesh: "radial-gradient(ellipse at 30% 20%, oklch(0.35 0.15 270), transparent 70%)",
+		});
+		expect(result.mesh).toBeDefined();
+		expect(result.mesh.type).toBe("radial");
+	});
+
+	it("passes through existing GradientDef objects", () => {
+		const existing = {
+			type: "linear",
+			angle: "90deg",
+			stops: [{ color: "oklch(0.5 0.1 200)", position: "0%" }],
+		};
+		const result = normalizeGradients({ hero: existing });
+		expect(result.hero).toBe(existing);
+	});
+
+	it("skips non-gradient values", () => {
+		const result = normalizeGradients({
+			hero: "linear-gradient(180deg, red, blue)",
+			bad: "oklch(0.5 0.1 200)",
+			worse: 42,
+		});
+		expect(result.hero).toBeDefined();
+		expect(result.bad).toBeUndefined();
+		expect(result.worse).toBeUndefined();
+	});
+
+	it("handles empty object", () => {
+		expect(normalizeGradients({})).toEqual({});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// flattenSpacing — depth guard
+// ---------------------------------------------------------------------------
+
+describe("flattenSpacing — max depth guard", () => {
+	it("stops recursing beyond MAX_WALK_DEPTH (10)", () => {
+		// Build a 12-level nested object
+		let obj: Record<string, unknown> = { leaf: "val" };
+		for (let i = 0; i < 12; i++) {
+			obj = { nested: obj };
+		}
+		const result = flattenSpacing(obj);
+		// Should have some keys from the top levels but not reach the leaf
+		const keys = Object.keys(result);
+		expect(keys.every((k) => k !== "leaf")).toBe(true);
+		expect(keys.every((k) => !k.endsWith(".leaf"))).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// deepMerge
+// ---------------------------------------------------------------------------
+
+describe("deepMerge", () => {
+	it("merges flat objects, source wins", () => {
+		const result = deepMerge({ a: "1", b: "2" }, { b: "3", c: "4" });
+		expect(result).toEqual({ a: "1", b: "3", c: "4" });
+	});
+
+	it("deep merges nested objects", () => {
+		const target = { nested: { a: "1", b: "2" } };
+		const source = { nested: { b: "3", c: "4" } };
+		const result = deepMerge(target, source);
+		expect(result).toEqual({ nested: { a: "1", b: "3", c: "4" } });
+	});
+
+	it("source overwrites target for non-object values", () => {
+		const result = deepMerge({ x: "old" }, { x: "new" });
+		expect(result).toEqual({ x: "new" });
+	});
+
+	it("arrays are replaced, not merged", () => {
+		const result = deepMerge({ arr: [1, 2] }, { arr: [3] });
+		expect(result).toEqual({ arr: [3] });
+	});
+
+	it("undefined values in source are skipped", () => {
+		const result = deepMerge({ a: "keep" }, { a: undefined });
+		expect(result).toEqual({ a: "keep" });
+	});
+});
+
+// ---------------------------------------------------------------------------
+// normalizeRawTokens
+// ---------------------------------------------------------------------------
+
+describe("normalizeRawTokens", () => {
+	it("returns a valid DesignTokensV2 shape from minimal input", () => {
+		const raw = {
+			atomic: {
+				colors: { primary: "oklch(0.5 0.2 250)" },
+				typography: {
+					fontFamily: { sans: "Inter" },
+					fontSize: { base: "16px" },
+					fontWeight: { regular: 400 },
+				},
+				spacing: { sm: "8px", md: "16px" },
+			},
+		};
+		const result = normalizeRawTokens(raw);
+		expect(result.atomic.colors.primary).toBe("oklch(0.5 0.2 250)");
+		expect(result.gradients).toBeDefined();
+		expect(result.layout).toBeDefined();
+		expect(result.layout.grid).toBeDefined();
+		expect(result.motion).toBeDefined();
+		expect(result.surfaces).toBeDefined();
+		expect(result.visualIdentity).toBeDefined();
+	});
+
+	it("normalizes gradient strings into GradientDef objects", () => {
+		const raw = {
+			atomic: {
+				colors: {},
+				typography: { fontFamily: {}, fontSize: {}, fontWeight: {} },
+				spacing: {},
+			},
+			gradients: {
+				hero: "linear-gradient(90deg, red, blue)",
+			},
+		};
+		const result = normalizeRawTokens(raw);
+		expect(typeof result.gradients.hero).toBe("object");
+		expect(result.gradients.hero.type).toBe("linear");
+	});
+
+	it("scaffolds missing top-level keys", () => {
+		const result = normalizeRawTokens({});
+		expect(result.layout.grid.columns).toBeDefined();
+		expect(result.componentSpacing).toBeDefined();
+		expect(result.motion.duration).toBeDefined();
+	});
+
+	it("moves gradient strings from colors to gradients layer", () => {
+		const raw = {
+			atomic: {
+				colors: {
+					primary: "oklch(0.5 0.2 250)",
+					heroGrad:
+						"linear-gradient(90deg, oklch(0.5 0.2 250), oklch(0.3 0.1 200))",
+				},
+				typography: { fontFamily: {}, fontSize: {}, fontWeight: {} },
+				spacing: {},
+			},
+		};
+		const result = normalizeRawTokens(raw);
+		expect(result.atomic.colors.heroGrad).toBeUndefined();
+		expect(result.gradients.heroGrad).toBeDefined();
+		expect(result.gradients.heroGrad.type).toBe("linear");
 	});
 });
