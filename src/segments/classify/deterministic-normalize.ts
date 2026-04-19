@@ -1,5 +1,5 @@
 /**
- * Deterministic pre-pass for A0 normalization.
+ * Deterministic pre-pass for the merged A0 normalize-and-noise phase.
  *
  * Walks every leaf in a page's content and resolves the obvious cases in
  * code — typeof-match, strict ISO, pure-number strings, yes/no/true/false,
@@ -8,11 +8,17 @@
  * currency-ish without a symbol) is handed back as a list of leaves for the
  * LLM batch pass.
  *
+ * Noise is attached inline when the value matches a deterministic signature
+ * from `lib/noise-signatures.ts` (null/empty/"N/A"/...). The LLM pass in
+ * `llm-normalize.ts` is responsible for catching remaining scraper artifacts
+ * on ambiguous leaves while it decides their type.
+ *
  * Rules are conservative: when in doubt, prefer ambiguous over wrong. A
  * wrong deterministic call silently corrupts downstream output; an
  * ambiguous one is just an extra LLM call.
  */
 
+import { detectNoiseSignature } from "./lib/noise-signatures.js";
 import { collectAllLeafPaths, readPath } from "./lib/path-utils.js";
 import type { NormalizationEntry, NormType } from "./per-page-classify.js";
 
@@ -37,7 +43,12 @@ const DATE_WORDS =
 
 function classifyPrimitive(v: unknown): NormalizationEntry | null {
 	if (v === null || v === undefined) {
-		return { original: v, normalized: v, type: "null" };
+		return {
+			original: v,
+			normalized: v,
+			type: "null",
+			noise: { signature: "null-literal" },
+		};
 	}
 	if (typeof v === "number" && Number.isFinite(v)) {
 		return { original: v, normalized: v, type: "number" };
@@ -90,9 +101,6 @@ function classifyStringTautological(s: string): NormalizationEntry | null {
 			return { original: s, normalized: n, type: "currency" };
 		}
 	}
-	if (s.trim() === "") {
-		return { original: s, normalized: s, type: "string" };
-	}
 	return null;
 }
 
@@ -109,6 +117,15 @@ function classifyLeaf(v: unknown): NormalizationEntry | "ambiguous" {
 	if (empty) return empty;
 
 	if (typeof v === "string") {
+		const sig = detectNoiseSignature(v);
+		if (sig) {
+			return {
+				original: v,
+				normalized: v,
+				type: "string",
+				noise: { signature: sig },
+			};
+		}
 		const taut = classifyStringTautological(v);
 		if (taut) return taut;
 		if (shouldBailToAmbiguous(v)) return "ambiguous";

@@ -1,14 +1,14 @@
 /**
  * Classify segment registration.
  *
- * Stage 1 pipeline (current):
+ * Pipeline wired so far:
  *   1. classify-prepare            (programmatic — write per-page content.json inputs)
- *   2. per-page-value-normalize    (value-normalize fan-out + apply)
+ *   2. per-page-value-normalize    (merged value-normalize + noise detection;
+ *                                   every leaf is visited by the LLM at most once)
  *
- * Stages 2–5 add phases 3 (noise-trim), 4 (chunk-remap), 5 (fate-scope),
- * 6 (shape-and-kind). Stage 6 re-introduces `page-classifications.json` in
- * `extractOutput` with the new `PageClassification[]` shape. See
- * `CLASSIFY-REWRITE-PROGRESS.md`.
+ * Stages 3–5 add phases 4 (chunk-remap), 5 (fate-scope), 6 (shape-and-kind).
+ * Stage 6 re-introduces `page-classifications.json` in `extractOutput` with
+ * the new `PageClassification[]` shape. See `CLASSIFY-REWRITE-PROGRESS.md`.
  */
 
 import { cp, mkdir } from "node:fs/promises";
@@ -24,7 +24,7 @@ const classifySegment: SegmentDef = {
 	id: "classify",
 	name: "Classify",
 	description:
-		"Per-page AI classification — value normalization (phases 3–6 land in follow-up stages)",
+		"Per-page AI classification — merged value normalization + noise detection (phases 4–6 land in follow-up stages)",
 	depends: ["prepare"],
 	phases: [classifyPreparePhase, perPageValueNormalizePhase],
 	mergeInputs: async (workdir, deps) => {
@@ -51,7 +51,7 @@ const classifySegment: SegmentDef = {
 	extractOutput: async (workdir, outputDir) => {
 		await mkdir(outputDir, { recursive: true });
 
-		// Stage 1: only pass through prepare outputs that downstream segments
+		// Pre-Stage-6: only pass through prepare outputs that downstream segments
 		// still depend on. `page-classifications.json` + coverage report are
 		// re-introduced in Stage 6 once the full block-level pipeline exists.
 		const files = ["asset-manifest.json", "prepared-content.json"];

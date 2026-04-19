@@ -1,11 +1,14 @@
 /**
- * Batched per-leaf LLM normalization.
+ * Batched per-leaf LLM normalize-and-noise pass.
  *
  * Ambiguous leaves are chunked into batches of BATCH_SIZE and each batch is
  * sent to the Anthropic-compatible Messages endpoint as a single one-shot
- * call. On parse/validation failure, the batch retries up to MAX_BATCH_ATTEMPTS
- * times with the failed entries listed in a rejection preface. Token usage is
- * aggregated per batch and surfaced through the logger's Active pane.
+ * call. Each leaf gets **one** LLM visit that decides BOTH its type and
+ * whether the value is a scraper artifact (breadcrumb, cookie banner, debug
+ * output, leaked chrome). On parse/validation failure, the batch retries up
+ * to MAX_BATCH_ATTEMPTS times with the failed entries listed in a rejection
+ * preface. Token usage is aggregated per batch and surfaced through the
+ * logger's Active pane.
  *
  * We bypass the Claude Agent SDK here because each call is a stateless
  * classification — no tools, no multi-turn reasoning, no subprocess needed.
@@ -125,11 +128,11 @@ export function buildBatchPrompt(
 		? `\nPREVIOUS ATTEMPT REJECTED:\n${rejectionContext}\n`
 		: "";
 
-	return `You are typing field values for page "${page.url}" (pagetype: ${page.pagetype}).
+	return `You are classifying field values for page "${page.url}" (pagetype: ${page.pagetype}). For each leaf, decide (a) its type + normalized value AND (b) whether the value is a scraper artifact that should be dropped before CMS classification.
 
 Valid types: string | number | boolean | datetime | currency | string[] | null | object | array | unchanged
 
-Rules (pick the most specific that applies):
+Type rules (pick the most specific that applies):
 - number: numeric value
 - boolean: true/false
 - datetime: ISO-8601 string (convert natural-language dates to "YYYY-MM-DDTHH:mm:ssZ")
@@ -138,11 +141,19 @@ Rules (pick the most specific that applies):
 - null: null or undefined
 - unchanged: plain string that needs no normalization
 
+Noise rules — set isNoise=true ONLY when the VALUE itself is clearly not real page content:
+- leaked breadcrumbs ("Home > Blog > This post")
+- cookie banner / GDPR boilerplate text
+- debug output, timing markers, internal IDs leaked into content
+- generic chrome fragments that duplicate a header/footer already classified on a peer page
+When in doubt, leave isNoise=false — false positives discard real content.
+When isNoise=true, include a short (<120 char) "reason" explaining why. Omit reason otherwise.
+
 LEAVES (${leaves.length}):
 ${blocks}
 
 OUTPUT: Reply with ONE JSON array, no prose, no code fences. One object per leaf, in the same order, each with the leaf's path verbatim:
-[{"path": "<leaf-path>", "type": "<type>", "normalized": <value>}, ...]
+[{"path": "<leaf-path>", "type": "<type>", "normalized": <value>, "isNoise": <bool>, "reason": "<why, only if isNoise=true>"}, ...]
 ${rejection}`;
 }
 
@@ -150,8 +161,63 @@ ${rejection}`;
 // response parsing + validation
 // ---------------------------------------------------------------------------
 
+interface RawEntry {
+	type: unknown;
+	normalized: unknown;
+	isNoise?: unknown;
+	reason?: unknown;
+}
+
+function validateNormalizedShape(
+	t: NormType,
+	normalized: unknown,
+): string | null {
+	if (
+		(t === "number" || t === "currency") &&
+		normalized !== null &&
+		typeof normalized !== "number"
+	) {
+		return `type "${t}" requires numeric normalized, got ${typeof normalized}`;
+	}
+	if (
+		t === "boolean" &&
+		normalized !== null &&
+		typeof normalized !== "boolean"
+	) {
+		return `type "boolean" requires boolean normalized, got ${typeof normalized}`;
+	}
+	if (t === "string[]" && !Array.isArray(normalized)) {
+		return 'type "string[]" requires array normalized';
+	}
+	if (t === "datetime" && typeof normalized === "string") {
+		const d = new Date(normalized);
+		if (Number.isNaN(d.getTime())) return "datetime is not parseable";
+	}
+	return null;
+}
+
+function applyNoiseMark(
+	base: NormalizationEntry,
+	isNoise: unknown,
+	reason: unknown,
+): NormalizationEntry | string {
+	if (isNoise === true) {
+		if (typeof reason !== "string" || reason.trim() === "") {
+			return "isNoise=true requires a non-empty reason";
+		}
+		return {
+			...base,
+			noise: { signature: "llm", reason: reason.trim() },
+		};
+	}
+	if (isNoise !== undefined && isNoise !== false) {
+		return "isNoise must be true or false";
+	}
+	return base;
+}
+
 function validateEntry(
-	entry: { type: unknown; normalized: unknown },
+	entry: RawEntry,
 	original: unknown,
 ): NormalizationEntry | string {
 	if (typeof entry.type !== "string") return "type is not a string";
@@ -160,29 +226,16 @@ function validateEntry(
 	}
 	const t = entry.type as NormType;
 
-	if (
-		(t === "number" || t === "currency") &&
-		entry.normalized !== null &&
-		typeof entry.normalized !== "number"
-	) {
-		return `type "${t}" requires numeric normalized, got ${typeof entry.normalized}`;
-	}
-	if (
-		t === "boolean" &&
-		entry.normalized !== null &&
-		typeof entry.normalized !== "boolean"
-	) {
-		return `type "boolean" requires boolean normalized, got ${typeof entry.normalized}`;
-	}
-	if (t === "string[]" && !Array.isArray(entry.normalized)) {
-		return 'type "string[]" requires array normalized';
-	}
-	if (t === "datetime" && typeof entry.normalized === "string") {
-		const d = new Date(entry.normalized);
-		if (Number.isNaN(d.getTime())) return "datetime is not parseable";
-	}
+	const shapeErr = validateNormalizedShape(t, entry.normalized);
+	if (shapeErr) return shapeErr;
 
-	return { original, normalized: entry.normalized, type: t };
+	const base: NormalizationEntry = {
+		original,
+		normalized: entry.normalized,
+		type: t,
+	};
+
+	return applyNoiseMark(base, entry.isNoise, entry.reason);
 }
 
 export interface BatchParseResult {
@@ -190,16 +243,19 @@ export interface BatchParseResult {
 	unresolved: Array<{ path: string; reason: string }>;
 }
 
-function indexResponseByPath(
-	arr: unknown[],
-): Map<string, { type: unknown; normalized: unknown }> {
-	const byPath = new Map<string, { type: unknown; normalized: unknown }>();
+function indexResponseByPath(arr: unknown[]): Map<string, RawEntry> {
+	const byPath = new Map<string, RawEntry>();
 	for (const item of arr) {
 		if (!item || typeof item !== "object" || Array.isArray(item)) continue;
 		const obj = item as Record<string, unknown>;
 		if (typeof obj.path !== "string") continue;
 		if (!("type" in obj) || !("normalized" in obj)) continue;
-		byPath.set(obj.path, { type: obj.type, normalized: obj.normalized });
+		byPath.set(obj.path, {
+			type: obj.type,
+			normalized: obj.normalized,
+			isNoise: obj.isNoise,
+			reason: obj.reason,
+		});
 	}
 	return byPath;
 }

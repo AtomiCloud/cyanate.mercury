@@ -11,7 +11,13 @@ import { createHash } from "node:crypto";
 import { extractJsonObject } from "../../lib/json-extract.js";
 import type { PreparedPage } from "../prepare/ingest.js";
 import type { UnitMissing } from "./fan-out.js";
-import { collectAllLeafPaths, deepEqual, readPath } from "./lib/path-utils.js";
+import type { NoiseSignature } from "./lib/noise-signatures.js";
+import {
+	collectAllLeafPaths,
+	deepEqual,
+	readPath,
+	setPathCreating,
+} from "./lib/path-utils.js";
 import type { ClassifyUnit } from "./types.js";
 
 function extractObject(text: string): Record<string, unknown> | null {
@@ -51,10 +57,23 @@ export const VALID_NORM_TYPES: readonly NormType[] = [
 	"unchanged",
 ];
 
+/**
+ * `noise` is attached when a leaf should be dropped before downstream
+ * classification (phase 4+). `signature` is one of the deterministic
+ * `NoiseSignature` tags when matched by `lib/noise-signatures.ts`, or
+ * `"llm"` when the batch LLM flagged the leaf as a scraper artifact.
+ * `reason` is required for `"llm"` entries and optional for deterministic.
+ */
+export interface NoiseMark {
+	signature: NoiseSignature | "llm";
+	reason?: string;
+}
+
 export interface NormalizationEntry {
 	original: unknown;
 	normalized: unknown;
 	type: NormType;
+	noise?: NoiseMark;
 }
 
 export interface PageNormalization {
@@ -279,6 +298,65 @@ export function applyAllNormalizations(
 		setPathValue(cloned, path, entry.normalized);
 	}
 	return cloned;
+}
+
+// ---------------------------------------------------------------------------
+// Noise partition — split a PageNormalization into kept leaves vs noise log
+// so downstream phases see only substantive content.
+// ---------------------------------------------------------------------------
+
+export interface KeptLeaf {
+	path: string;
+	value: unknown;
+}
+
+export interface NoiseEntry {
+	path: string;
+	signature: NoiseSignature | "llm";
+	reason?: string;
+}
+
+export interface NoisePartition {
+	kept: KeptLeaf[];
+	noise: NoiseEntry[];
+}
+
+/**
+ * Walk a normalization and split into:
+ *   - kept: leaves without a noise mark, carrying the normalized value
+ *   - noise: leaves with a noise mark, preserving signature + reason
+ *
+ * The normalized values for kept leaves are read from `normalizedContent`
+ * (the output of `applyAllNormalizations`) so callers get the post-transform
+ * values, not the raw originals.
+ */
+export function partitionByNoise(
+	normalization: PageNormalization,
+	normalizedContent: Record<string, unknown>,
+): NoisePartition {
+	const kept: KeptLeaf[] = [];
+	const noise: NoiseEntry[] = [];
+	for (const [path, entry] of Object.entries(normalization.entries)) {
+		if (entry.noise) {
+			const { signature, reason } = entry.noise;
+			noise.push(reason ? { path, signature, reason } : { path, signature });
+		} else {
+			kept.push({ path, value: readPath(normalizedContent, path) });
+		}
+	}
+	return { kept, noise };
+}
+
+/**
+ * Rebuild a per-page content tree from a flat list of kept leaves.
+ * Used to emit `trimmed-content.json` — the post-noise-trim view of a page.
+ */
+export function stitchKeptLeaves(kept: KeptLeaf[]): Record<string, unknown> {
+	const tree: Record<string, unknown> = {};
+	for (const { path, value } of kept) {
+		setPathCreating(tree, path, value);
+	}
+	return tree;
 }
 
 // ---------------------------------------------------------------------------

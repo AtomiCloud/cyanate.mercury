@@ -8,9 +8,12 @@ Each stage must leave the repo in a **green** state (lint+typecheck+knip pass,
 unit tests pass). New phases 3–6 are added one at a time so each can be
 exercised against a real run before moving on.
 
-**Current state**: mid-Stage 0. `per-page-classify.ts` has been trimmed but
-`phases.io.ts` still references deleted helpers — repo is RED right now.
-First action is to get Stage 1 green.
+**Current state**: Stage 1 complete. Stage 2 superseded — the old phase 3
+(`per-page-noise-trim`) has been **dissolved into phase 2
+(`per-page-value-normalize`)** so every leaf is visited by the LLM at most
+once. Deterministic noise signatures are attached inline during the
+deterministic pre-pass; ambiguous leaves now get one merged LLM call that
+judges both type and `isNoise`. `phases/noise-trim.ts` has been deleted.
 
 ---
 
@@ -19,8 +22,8 @@ First action is to get Stage 1 green.
 Files that everything else depends on.
 
 - [x] `types.ts` — minimal (`ClassifyUnit` only); block-level types re-added per stage
-- [x] `lib/path-utils.ts` — renamed from `coverage.ts`; imports in `deterministic-normalize.ts` and `llm-normalize.ts` updated
-- [ ] `lib/noise-signatures.ts` — re-introduced in Stage 2 (phase 3 consumer)
+- [x] `lib/path-utils.ts` — renamed from `coverage.ts`; `setPathCreating` added in Stage 2 for leaf-tree stitch-back
+- [x] `lib/noise-signatures.ts` — landed in Stage 2 (deterministic classifier)
 - [ ] `lib/block-ops.ts` — re-introduced in Stage 3 (phase 4 consumer)
 - [x] `per-page-classify.ts` — trimmed to normalize-only (role/subclass helpers deleted)
 
@@ -50,18 +53,28 @@ prepare's files without producing a `page-classifications.json`.
 
 ---
 
-## Stage 2 — Phase 3: `per-page-noise-trim`
+## Stage 2 — Phase 3 dissolved into Phase 2 (merged normalize + noise)
 
-- [ ] Create `phases/noise-trim.ts`
-  - Step 3a `noise-detect` (agent fan-out): deterministic signatures + LLM additions → writes `noise-trim/attempt-N/kept-leaves.json` + `noise-log.json` per unit
-  - Step 3b `apply-noise-trim` (programmatic): promote winning attempt to `noise-trim/output/`, verify `kept + noise == total leaves`
-- [ ] Register phase 3 in `phases.io.ts` re-exports + `index.ts` phase list
-- [ ] Add `classify.per-page-noise-trim.noise-detect` profile placeholder to `cui.yaml`
-- [ ] Unit tests: `phases/noise-trim.test.ts` (signature matching, LLM parse, merge, gate logic)
+**Rationale**: per-leaf normalization and per-leaf noise detection were both
+touching every ambiguous leaf with a separate LLM call. That was paying for
+the leaf twice. The merged design visits each leaf **at most once**: the
+deterministic pre-pass attaches obvious noise signatures inline, and the
+ambiguous-leaf LLM batch returns `{type, normalized, isNoise, reason?}` per
+leaf in a single prompt.
+
+- [x] `NormalizationEntry` extended with optional `noise?: { signature, reason? }`
+- [x] `deterministic-normalize.ts` attaches `noise` for deterministic signatures (null, empty, whitespace-only, "null"/"undefined"/"N/A"/"(no data)")
+- [x] `llm-normalize.ts` prompt + parser extended with `isNoise`/`reason` — invalid `isNoise=true` without `reason` rejects the entry
+- [x] Phase 2 `apply-normalizations` step now emits 4 files under `normalize/output/`:
+  - `normalization.json`, `normalized-content.json`, `kept-leaves.json`, `noise-log.json`, `trimmed-content.json`
+- [x] Partition + stitch helpers (`partitionByNoise`, `stitchKeptLeaves`) live in `per-page-classify.ts`
+- [x] `lib/noise-signatures.ts` + `lib/path-utils.ts` `setPathCreating` still carry their weight (reused by the merged phase)
+- [x] `phases/noise-trim.ts` + `phases/noise-trim.test.ts` deleted; `phases.io.ts` and `index.ts` updated
 
 **Verification**:
-- `bun run check` green, `bun test` green
-- `./src/cli.ts run --start-segment classify` — reaches phase 3, produces `noise-trim/output/*` per page; gate passes on example/physio
+- [x] `direnv exec . bun run check` — lint + typecheck + knip clean ✅
+- [x] `direnv exec . bun test` — 623/623 tests pass ✅
+- [ ] `./src/cli.ts run --start-segment classify` — **pending user manual test** (reaches phase 2, produces `normalize/output/{normalization,normalized-content,trimmed-content,kept-leaves,noise-log}.json` per page)
 
 ---
 

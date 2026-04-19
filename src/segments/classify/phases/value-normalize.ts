@@ -1,17 +1,24 @@
 /**
  * Phase 2 — `per-page-value-normalize`
  *
+ * Merged normalize-and-noise pass. The old phase 3 (`per-page-noise-trim`)
+ * has been folded into this phase so every leaf is visited by the LLM **at
+ * most once**. Deterministic noise signatures (null/empty/"N/A"/...) are
+ * attached inline by `deterministic-normalize.ts`; ambiguous leaves get one
+ * LLM call that returns `{type, normalized, isNoise, reason?}` — type + noise
+ * judged together.
+ *
  * Two steps:
  *   - `a0-normalize`          (agent fan-out): deterministic pre-pass +
- *                             per-leaf LLM batch for ambiguous leaves.
- *                             Winning attempt per unit promotes to
- *                             `normalize/output/normalization.json`.
- *   - `apply-normalizations`  (programmatic): derive per-unit
- *                             `normalize/output/normalized-content.json`
- *                             by applying each entry's normalization.
+ *                             per-leaf merged LLM batch. Winning attempt per
+ *                             unit promotes to `normalize/output/normalization.json`.
+ *   - `apply-normalizations`  (programmatic): derives per-unit
+ *                             `normalize/output/normalized-content.json`,
+ *                             `normalize/output/trimmed-content.json`,
+ *                             `normalize/output/kept-leaves.json`, and
+ *                             `normalize/output/noise-log.json`.
  *
- * Renamed from `per-page-normalize` in the previous layout. Profile key in
- * `cui.yaml` moves with it: `classify.per-page-value-normalize.a0-normalize`.
+ * Profile key in `cui.yaml`: `classify.per-page-value-normalize.a0-normalize`.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -32,6 +39,8 @@ import {
 	type NormalizationEntry,
 	type PageNormalization,
 	parseNormalizationFromAgent,
+	partitionByNoise,
+	stitchKeptLeaves,
 } from "../per-page-classify.js";
 import type { ClassifyUnit } from "../types.js";
 
@@ -104,18 +113,20 @@ function summarizeCheck(check: NormalizationCheck, url: string): string {
 
 export const perPageValueNormalizePhase: PhaseDef = {
 	id: "per-page-value-normalize",
-	name: "Per-page value normalize",
+	name: "Per-page value normalize + noise trim",
 	description:
-		"Value normalization per page with per-attempt papertrail; writes normalize/output/normalization.json on success",
+		"Merged type + noise classification per page with per-attempt papertrail; writes normalize/output/{normalization,normalized-content,trimmed-content,kept-leaves,noise-log}.json on success",
 	maxRetries: 2,
 	steps: [
 		agentFanOutStep({
 			id: "a0-normalize",
-			name: "Normalize values",
+			name: "Normalize values and detect noise",
 			description:
-				"Per-page fan-out: deterministic pre-pass + per-leaf LLM calls for ambiguous leaves; papertrail under classify-input/<hash>/normalize/attempt-<N>/",
+				"Per-page fan-out: deterministic pre-pass + merged LLM batch that judges type + noise in one call; papertrail under classify-input/<hash>/normalize/attempt-<N>/",
 			run: async (ctx) => {
 				const start = Date.now();
+				let totalInputTokens = 0;
+				let totalOutputTokens = 0;
 				try {
 					const { pages } = await readJson<{ pages: PreparedPage[] }>(
 						ctx.workdir,
@@ -178,9 +189,20 @@ export const perPageValueNormalizePhase: PhaseDef = {
 						};
 
 						const check = checkNormalization(stitched, unit.page.content);
+						const noiseCount = Object.values(entries).filter(
+							(e) => e.noise !== undefined,
+						).length;
 						await writeFile(
 							join(attemptDir, "verdict.json"),
-							JSON.stringify({ ...check, llmFailures: llm.failed }, null, 2),
+							JSON.stringify(
+								{
+									...check,
+									llmFailures: llm.failed,
+									noiseCount,
+								},
+								null,
+								2,
+							),
 						);
 
 						if (!check.valid || llm.failed.length > 0) {
@@ -240,9 +262,9 @@ export const perPageValueNormalizePhase: PhaseDef = {
 
 		programmaticStep({
 			id: "apply-normalizations",
-			name: "Apply normalizations",
+			name: "Apply normalizations + emit trimmed content",
 			description:
-				"Derive normalize/output/normalized-content.json per hash from content.json + normalize/output/normalization.json",
+				"Derive normalize/output/{normalized-content,trimmed-content,kept-leaves,noise-log}.json per hash from content.json + normalization.json",
 			run: async (ctx) => {
 				const start = Date.now();
 				try {
@@ -278,6 +300,30 @@ export const perPageValueNormalizePhase: PhaseDef = {
 									url: page.url,
 									pagetype: page.pagetype,
 									content: normalizedContent,
+								},
+								null,
+								2,
+							),
+						);
+
+						const { kept, noise } = partitionByNoise(norm, normalizedContent);
+						const trimmedContent = stitchKeptLeaves(kept);
+
+						await writeFile(
+							join(outputDir, "kept-leaves.json"),
+							JSON.stringify(kept, null, 2),
+						);
+						await writeFile(
+							join(outputDir, "noise-log.json"),
+							JSON.stringify(noise, null, 2),
+						);
+						await writeFile(
+							join(outputDir, "trimmed-content.json"),
+							JSON.stringify(
+								{
+									url: page.url,
+									pagetype: page.pagetype,
+									content: trimmedContent,
 								},
 								null,
 								2,

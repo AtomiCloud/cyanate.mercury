@@ -117,6 +117,64 @@ function objectsEqual(
 	return true;
 }
 
+/**
+ * Write `value` at `path` into `root`, auto-vivifying intermediate containers
+ * as objects or arrays depending on whether the next token is numeric.
+ *
+ * Used to rebuild a per-page content tree from a flat list of leaf paths
+ * (e.g., phase 2 `apply-normalizations` stitches kept leaves into
+ * `trimmed-content.json`).
+ */
+export function setPathCreating(
+	root: Record<string, unknown>,
+	path: string,
+	value: unknown,
+): void {
+	const tokens = parsePath(path);
+	if (!tokens || tokens.length === 0) return;
+
+	let current: Record<string, unknown> | unknown[] = root;
+	for (let i = 0; i < tokens.length - 1; i++) {
+		const token = tokens[i];
+		const nextIsNumber = typeof tokens[i + 1] === "number";
+		const child = readChild(current, token);
+		if (child === undefined) {
+			const fresh: Record<string, unknown> | unknown[] = nextIsNumber ? [] : {};
+			writeChild(current, token, fresh);
+			current = fresh;
+		} else {
+			current = child as Record<string, unknown> | unknown[];
+		}
+	}
+	writeChild(current, tokens[tokens.length - 1], value);
+}
+
+function readChild(
+	container: Record<string, unknown> | unknown[],
+	token: PathToken,
+): unknown {
+	if (typeof token === "number") {
+		return Array.isArray(container) ? container[token] : undefined;
+	}
+	return Array.isArray(container)
+		? undefined
+		: (container as Record<string, unknown>)[token];
+}
+
+function writeChild(
+	container: Record<string, unknown> | unknown[],
+	token: PathToken,
+	value: unknown,
+): void {
+	if (typeof token === "number") {
+		if (Array.isArray(container)) container[token] = value;
+		return;
+	}
+	if (!Array.isArray(container)) {
+		(container as Record<string, unknown>)[token] = value;
+	}
+}
+
 /** Structural equality for JSON-like values. */
 export function deepEqual(a: unknown, b: unknown): boolean {
 	if (a === b) return true;

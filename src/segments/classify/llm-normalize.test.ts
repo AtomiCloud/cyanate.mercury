@@ -202,6 +202,18 @@ describe("buildBatchPrompt", () => {
 		expect(prompt).toContain('"type"');
 		expect(prompt).toContain('"normalized"');
 	});
+
+	test("prompt explains noise detection rules and isNoise/reason schema", () => {
+		const prompt = buildBatchPrompt(
+			samplePage,
+			sampleLeaves,
+			samplePage.content,
+		);
+		expect(prompt).toContain("scraper artifact");
+		expect(prompt).toContain("breadcrumb");
+		expect(prompt).toContain("isNoise");
+		expect(prompt).toContain("reason");
+	});
 });
 
 describe("parseBatchResponse", () => {
@@ -290,6 +302,58 @@ describe("parseBatchResponse", () => {
 			expect.arrayContaining(["price", "hero.subtitle"]),
 		);
 	});
+
+	test("isNoise=true flows through to resolved entry with noise mark", () => {
+		const leaves: AmbiguousLeaf[] = [
+			{ path: "hero.breadcrumb", original: "Home > About > Team" },
+			{ path: "price", original: "$49.99" },
+		];
+		const out = JSON.stringify([
+			{
+				path: "hero.breadcrumb",
+				type: "unchanged",
+				normalized: "Home > About > Team",
+				isNoise: true,
+				reason: "leaked breadcrumb chrome",
+			},
+			{
+				path: "price",
+				type: "currency",
+				normalized: 49.99,
+				isNoise: false,
+			},
+		]);
+		const result = parseBatchResponse(out, leaves);
+		expect(result.unresolved).toEqual([]);
+		expect(result.resolved["hero.breadcrumb"]).toEqual({
+			original: "Home > About > Team",
+			normalized: "Home > About > Team",
+			type: "unchanged",
+			noise: { signature: "llm", reason: "leaked breadcrumb chrome" },
+		});
+		expect(result.resolved.price).toEqual({
+			original: "$49.99",
+			normalized: 49.99,
+			type: "currency",
+		});
+	});
+
+	test("isNoise=true without reason → entry unresolved", () => {
+		const out = JSON.stringify([
+			{
+				path: "price",
+				type: "currency",
+				normalized: 49.99,
+				isNoise: true,
+			},
+		]);
+		const result = parseBatchResponse(out, [
+			{ path: "price", original: "$49.99" },
+		]);
+		expect(result.resolved).toEqual({});
+		expect(result.unresolved[0]?.path).toBe("price");
+		expect(result.unresolved[0]?.reason).toMatch(/reason/);
+	});
 });
 
 describe("validateEntry", () => {
@@ -334,6 +398,81 @@ describe("validateEntry", () => {
 			original: "",
 			normalized: null,
 			type: "number",
+		});
+	});
+
+	test("isNoise=true with reason attaches noise mark", () => {
+		const r = validateEntry(
+			{
+				type: "unchanged",
+				normalized: "Home > Blog > Post",
+				isNoise: true,
+				reason: "leaked breadcrumb",
+			},
+			"Home > Blog > Post",
+		);
+		expect(r).toEqual({
+			original: "Home > Blog > Post",
+			normalized: "Home > Blog > Post",
+			type: "unchanged",
+			noise: { signature: "llm", reason: "leaked breadcrumb" },
+		});
+	});
+
+	test("isNoise=true without reason → error", () => {
+		const r = validateEntry(
+			{ type: "unchanged", normalized: "x", isNoise: true },
+			"x",
+		);
+		expect(typeof r).toBe("string");
+		expect(r).toMatch(/reason/);
+	});
+
+	test("isNoise=true with empty reason → error", () => {
+		const r = validateEntry(
+			{ type: "unchanged", normalized: "x", isNoise: true, reason: "   " },
+			"x",
+		);
+		expect(typeof r).toBe("string");
+		expect(r).toMatch(/reason/);
+	});
+
+	test("isNoise=false (or omitted) → no noise mark", () => {
+		expect(
+			validateEntry(
+				{ type: "unchanged", normalized: "Premier Clinic", isNoise: false },
+				"Premier Clinic",
+			),
+		).toEqual({
+			original: "Premier Clinic",
+			normalized: "Premier Clinic",
+			type: "unchanged",
+		});
+	});
+
+	test("isNoise with non-boolean → error", () => {
+		const r = validateEntry(
+			{ type: "unchanged", normalized: "x", isNoise: "maybe" },
+			"x",
+		);
+		expect(typeof r).toBe("string");
+	});
+
+	test("reason is trimmed on the noise mark", () => {
+		const r = validateEntry(
+			{
+				type: "unchanged",
+				normalized: "x",
+				isNoise: true,
+				reason: "  leaked breadcrumb  ",
+			},
+			"x",
+		);
+		expect(r).toEqual({
+			original: "x",
+			normalized: "x",
+			type: "unchanged",
+			noise: { signature: "llm", reason: "leaked breadcrumb" },
 		});
 	});
 });

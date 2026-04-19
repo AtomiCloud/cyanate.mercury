@@ -8,6 +8,8 @@ import {
 	getClassifyUnits,
 	type PageNormalization,
 	parseNormalizationFromAgent,
+	partitionByNoise,
+	stitchKeptLeaves,
 } from "./per-page-classify.js";
 
 // ---------------------------------------------------------------------------
@@ -441,6 +443,118 @@ describe("applyAllNormalizations", () => {
 		};
 		expect(result.items[0].price).toBe(1);
 		expect(result.items[1].price).toBe(2);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// partitionByNoise
+// ---------------------------------------------------------------------------
+
+describe("partitionByNoise", () => {
+	it("splits entries into kept (no noise mark) and noise (has mark)", () => {
+		const norm: PageNormalization = {
+			url: "/x/",
+			pagetype: "x",
+			entries: {
+				title: { original: "Hello", normalized: "Hello", type: "unchanged" },
+				empty: {
+					original: "",
+					normalized: "",
+					type: "string",
+					noise: { signature: "empty-string" },
+				},
+				price: { original: "$10", normalized: 10, type: "currency" },
+				leaked: {
+					original: "Home > X",
+					normalized: "Home > X",
+					type: "unchanged",
+					noise: { signature: "llm", reason: "breadcrumb" },
+				},
+			},
+		};
+		const normalizedContent = {
+			title: "Hello",
+			empty: "",
+			price: 10,
+			leaked: "Home > X",
+		};
+		const { kept, noise } = partitionByNoise(norm, normalizedContent);
+
+		expect(kept).toHaveLength(2);
+		expect(kept.find((k) => k.path === "title")?.value).toBe("Hello");
+		expect(kept.find((k) => k.path === "price")?.value).toBe(10);
+
+		expect(noise).toHaveLength(2);
+		expect(noise.find((n) => n.path === "empty")?.signature).toBe(
+			"empty-string",
+		);
+		expect(noise.find((n) => n.path === "empty")?.reason).toBeUndefined();
+		expect(noise.find((n) => n.path === "leaked")?.signature).toBe("llm");
+		expect(noise.find((n) => n.path === "leaked")?.reason).toBe("breadcrumb");
+	});
+
+	it("reads kept values from normalizedContent, not entry.original", () => {
+		const norm: PageNormalization = {
+			url: "/x/",
+			pagetype: "x",
+			entries: {
+				price: { original: "$10", normalized: 10, type: "currency" },
+			},
+		};
+		const normalizedContent = { price: 10 };
+		const { kept } = partitionByNoise(norm, normalizedContent);
+		expect(kept[0].value).toBe(10);
+	});
+
+	it("handles empty entries", () => {
+		const norm: PageNormalization = {
+			url: "/x/",
+			pagetype: "x",
+			entries: {},
+		};
+		const result = partitionByNoise(norm, {});
+		expect(result.kept).toEqual([]);
+		expect(result.noise).toEqual([]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// stitchKeptLeaves
+// ---------------------------------------------------------------------------
+
+describe("stitchKeptLeaves", () => {
+	it("rebuilds a flat object tree", () => {
+		const tree = stitchKeptLeaves([
+			{ path: "title", value: "Hello" },
+			{ path: "count", value: 5 },
+		]);
+		expect(tree).toEqual({ title: "Hello", count: 5 });
+	});
+
+	it("rebuilds nested paths", () => {
+		const tree = stitchKeptLeaves([
+			{ path: "hero.title", value: "Hi" },
+			{ path: "hero.subtitle", value: "Sub" },
+			{ path: "footer.copy", value: "© 2026" },
+		]);
+		expect(tree).toEqual({
+			hero: { title: "Hi", subtitle: "Sub" },
+			footer: { copy: "© 2026" },
+		});
+	});
+
+	it("rebuilds array-indexed paths", () => {
+		const tree = stitchKeptLeaves([
+			{ path: "items[0].name", value: "a" },
+			{ path: "items[1].name", value: "b" },
+		]);
+		expect(tree).toEqual({
+			items: [{ name: "a" }, { name: "b" }],
+		});
+	});
+
+	it("returns empty object for empty input", () => {
+		expect(stitchKeptLeaves([])).toEqual({});
 	});
 });
 

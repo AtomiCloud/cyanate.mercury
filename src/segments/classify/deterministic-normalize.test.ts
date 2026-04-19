@@ -20,11 +20,12 @@ describe("classifyLeaf — tautological cases", () => {
 		});
 	});
 
-	test("null → null", () => {
+	test("null → null with noise mark", () => {
 		expect(classifyLeaf(null)).toEqual({
 			original: null,
 			normalized: null,
 			type: "null",
+			noise: { signature: "null-literal" },
 		});
 	});
 
@@ -108,11 +109,39 @@ describe("classifyLeaf — tautological cases", () => {
 		});
 	});
 
-	test("empty string → string unchanged", () => {
+	test("empty string → string with empty-string noise mark", () => {
 		expect(classifyLeaf("")).toEqual({
 			original: "",
 			normalized: "",
 			type: "string",
+			noise: { signature: "empty-string" },
+		});
+	});
+
+	test("whitespace-only string → string with whitespace-only noise mark", () => {
+		expect(classifyLeaf("   \t")).toEqual({
+			original: "   \t",
+			normalized: "   \t",
+			type: "string",
+			noise: { signature: "whitespace-only" },
+		});
+	});
+
+	test('"null" string → string with null-string noise mark', () => {
+		expect(classifyLeaf("null")).toEqual({
+			original: "null",
+			normalized: "null",
+			type: "string",
+			noise: { signature: "null-string" },
+		});
+	});
+
+	test('"N/A" string → string with na-string noise mark', () => {
+		expect(classifyLeaf("N/A")).toEqual({
+			original: "N/A",
+			normalized: "N/A",
+			type: "string",
+			noise: { signature: "na-string" },
 		});
 	});
 });

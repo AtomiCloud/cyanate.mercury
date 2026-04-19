@@ -5,9 +5,11 @@
  * registration in `index.ts` and existing importers don't need to know about
  * the directory structure.
  *
- * Stage 1 (current): only phases 1 (prepare) + 2 (value-normalize) are wired.
- * Phases 3–6 (noise-trim, chunk-remap, fate-scope, shape-and-kind) land in
- * subsequent stages — see `CLASSIFY-REWRITE-PROGRESS.md`.
+ * Wired so far: phases 1 (prepare) and 2 (value-normalize, which now also
+ * carries the deterministic + LLM noise detection formerly in phase 3 —
+ * every leaf is visited by the LLM at most once).
+ * Phases 4–6 (chunk-remap, fate-scope, shape-and-kind) land in subsequent
+ * stages — see `CLASSIFY-REWRITE-PROGRESS.md`.
  */
 
 export { classifyPreparePhase } from "./phases/prepare.js";
