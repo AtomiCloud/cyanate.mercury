@@ -1,24 +1,34 @@
 /**
- * Pipeline logger — TUI dashboard for interactive mode, verbose logs for non-interactive.
+ * Pipeline logger — Ink-backed TUI for interactive mode, verbose logs for
+ * non-interactive.
+ *
+ * Multi-slot: every call to `startStep` returns a `StepHandle` that must be
+ * passed to `updateTurn`/`completeStep`/`failStep`. Many steps can be in flight
+ * concurrently (per-leaf LLM calls, parallel reviewers, fan-out workers).
+ *
+ * Queue depth (LLM calls waiting on the agent.ts semaphore) is polled via
+ * `setQueueDepthProvider`.
  */
 
-// ANSI escape codes
-const C = {
-	reset: "\x1b[0m",
-	green: "\x1b[32m",
-	red: "\x1b[31m",
-	yellow: "\x1b[33m",
-	gray: "\x1b[90m",
-	dim: "\x1b[2m",
-	bold: "\x1b[1m",
-	clearLine: "\x1b[2K",
-	moveUp: (n: number) => `\x1b[${n}A`,
-	cursorHide: "\x1b[?25l",
-	cursorShow: "\x1b[?25h",
-	eraseDown: "\x1b[J",
-};
+import { type Instance, render } from "ink";
+import { createElement } from "react";
+import {
+	Dashboard,
+	type DashboardProps,
+	formatCost,
+	formatDuration,
+	formatTokens,
+	type StepMeta,
+	type StepView,
+} from "./logger-ui.js";
 
-export interface SegmentStats {
+export type { StepMeta } from "./logger-ui.js";
+
+const SEGMENT_TOTAL = 4;
+
+const MAX_NOTES = 20;
+
+interface SegmentStats {
 	steps: number;
 	turns: number;
 	inputTokens: number;
@@ -27,60 +37,37 @@ export interface SegmentStats {
 	duration: number;
 }
 
+/**
+ * Opaque handle returned by `startStep`. Pass it back to
+ * `updateTurn`/`completeStep`/`failStep`/`skipStep` so concurrent steps don't
+ * clobber each other.
+ */
+export interface StepHandle {
+	readonly id: string;
+}
+
 export interface PipelineLogger {
-	startStep(name: string): void;
-	updateTurn(turn: number, inputTokens: number, outputTokens: number): void;
-	completeStep(cost?: number): void;
-	failStep(error: string): void;
-	skipStep(): void;
-	/** Start tracking stats for a new segment. */
+	startStep(name: string, meta?: StepMeta): StepHandle;
+	updateTurn(
+		handle: StepHandle,
+		turn: number,
+		inputTokens: number,
+		outputTokens: number,
+	): void;
+	completeStep(handle: StepHandle, cost?: number): void;
+	failStep(handle: StepHandle, error: string): void;
+	skipStep(handle: StepHandle): void;
+	/** One-off info line — no lifecycle, just surfaces text in the UI/stderr. */
+	note(message: string): void;
+	/** Supplies the live queue depth (e.g. `() => semaphore.pending`). */
+	setQueueDepthProvider(provider: () => number): void;
 	startSegment(segmentId: string): void;
-	/** Print accumulated segment stats and reset counters. */
 	finishSegment(
 		segmentId: string,
 		status: "completed" | "failed",
 	): SegmentStats;
 	flush(): void;
 	destroy(): void;
-}
-
-// ---------------------------------------------------------------------------
-// Formatting helpers
-// ---------------------------------------------------------------------------
-
-function formatTokens(n: number): string {
-	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-	if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-	return String(n);
-}
-
-function formatCost(usd: number): string {
-	if (usd < 0.01) return "<$0.01";
-	return `$${usd.toFixed(2)}`;
-}
-
-function formatDuration(ms: number): string {
-	if (ms < 1000) return `${ms.toFixed(0)}ms`;
-	const secs = ms / 1000;
-	if (secs < 60) return `${secs.toFixed(1)}s`;
-	const mins = Math.floor(secs / 60);
-	const rem = Math.round(secs % 60);
-	return `${mins}m${rem.toString().padStart(2, "0")}s`;
-}
-
-function pad(
-	s: string,
-	width: number,
-	align: "left" | "right" = "left",
-): string {
-	const str = String(s);
-	if (str.length >= width) return str.slice(0, width);
-	const p = " ".repeat(width - str.length);
-	return align === "left" ? str + p : p + str;
-}
-
-function truncate(s: string, width: number): string {
-	return s.length > width ? `${s.slice(0, width - 1)}…` : s;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,34 +82,31 @@ export function createPipelineLogger(opts: {
 	return new NonInteractiveLogger();
 }
 
-// ---------------------------------------------------------------------------
-// Step display state
-// ---------------------------------------------------------------------------
-
-interface StepDisplay {
-	name: string;
-	status: "running" | "completed" | "failed" | "skipped";
-	turns: number;
-	inputTokens: number;
-	outputTokens: number;
-	cost: number;
-	duration: number;
-	error?: string;
+let stepIdCounter = 0;
+function nextStepId(): string {
+	stepIdCounter += 1;
+	return `s${stepIdCounter}`;
 }
 
 // ---------------------------------------------------------------------------
 // Non-interactive (verbose console)
 // ---------------------------------------------------------------------------
 
+interface ActiveEntry {
+	id: string;
+	name: string;
+	startTime: number;
+	turns: number;
+	inputTokens: number;
+	outputTokens: number;
+	cost: number;
+}
+
 class NonInteractiveLogger implements PipelineLogger {
-	private currentStep = "";
-	private startTime = 0;
-	private turns = 0;
-	private inputTokens = 0;
-	private outputTokens = 0;
-	private cost = 0;
-	private heartbeat: ReturnType<typeof setInterval> | null = null;
+	private active = new Map<string, ActiveEntry>();
 	private stepCount = 0;
+	private heartbeat: ReturnType<typeof setInterval> | null = null;
+	private queueDepthProvider: () => number = () => 0;
 
 	// Segment-level accumulators
 	private segStart = 0;
@@ -132,59 +116,103 @@ class NonInteractiveLogger implements PipelineLogger {
 	private segOutputTokens = 0;
 	private segCost = 0;
 
-	startStep(name: string): void {
-		this.stepCount++;
-		this.currentStep = name;
-		this.startTime = Date.now();
-		this.turns = 0;
-		this.inputTokens = 0;
-		this.outputTokens = 0;
-		this.cost = 0;
+	setQueueDepthProvider(provider: () => number): void {
+		this.queueDepthProvider = provider;
+	}
 
+	startStep(name: string, _meta?: StepMeta): StepHandle {
+		this.stepCount += 1;
+		const id = nextStepId();
+		const entry: ActiveEntry = {
+			id,
+			name,
+			startTime: Date.now(),
+			turns: 0,
+			inputTokens: 0,
+			outputTokens: 0,
+			cost: 0,
+		};
+		this.active.set(id, entry);
+		console.log(`  ▶ [${this.stepCount}] ${name}`);
+		this.ensureHeartbeat();
+		return { id };
+	}
+
+	private ensureHeartbeat(): void {
+		if (this.heartbeat) return;
 		this.heartbeat = setInterval(() => {
-			const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(0);
-			console.log(
-				`  [heartbeat] [${this.stepCount}] ${this.currentStep}: turn ${this.turns}, ` +
-					`${formatTokens(this.inputTokens)} in / ${formatTokens(this.outputTokens)} out, ` +
-					`${formatCost(this.cost)}, ${elapsed}s`,
+			if (this.active.size === 0) {
+				if (this.heartbeat) clearInterval(this.heartbeat);
+				this.heartbeat = null;
+				return;
+			}
+			const queued = this.queueDepthProvider();
+			const totalIn = [...this.active.values()].reduce(
+				(s, a) => s + a.inputTokens,
+				0,
 			);
-		}, 30000);
+			const totalOut = [...this.active.values()].reduce(
+				(s, a) => s + a.outputTokens,
+				0,
+			);
+			console.log(
+				`  [heartbeat] in-flight ${this.active.size} · queued ${queued} · ` +
+					`${formatTokens(totalIn)} in / ${formatTokens(totalOut)} out`,
+			);
+		}, 30_000);
 	}
 
-	updateTurn(turns: number, inputTokens: number, outputTokens: number): void {
-		this.turns = turns;
-		this.inputTokens = inputTokens;
-		this.outputTokens = outputTokens;
+	updateTurn(
+		handle: StepHandle,
+		turns: number,
+		inputTokens: number,
+		outputTokens: number,
+	): void {
+		const entry = this.active.get(handle.id);
+		if (!entry) return;
+		entry.turns = turns;
+		entry.inputTokens = inputTokens;
+		entry.outputTokens = outputTokens;
 	}
 
-	completeStep(cost?: number): void {
-		if (this.heartbeat) clearInterval(this.heartbeat);
-		if (cost !== undefined) this.cost = cost;
-		const duration = Date.now() - this.startTime;
+	completeStep(handle: StepHandle, cost?: number): void {
+		const entry = this.active.get(handle.id);
+		if (!entry) return;
+		if (cost !== undefined) entry.cost = cost;
+		const duration = Date.now() - entry.startTime;
 		console.log(
-			`  ✓ [${this.stepCount}] ${this.currentStep}: ${this.turns} turns, ` +
-				`${formatTokens(this.inputTokens)} in, ${formatTokens(this.outputTokens)} out, ` +
-				`${formatCost(this.cost)}, ${formatDuration(duration)}`,
+			`  ✓ [${entry.id}] ${entry.name}: ${entry.turns} turns, ` +
+				`${formatTokens(entry.inputTokens)} in, ${formatTokens(entry.outputTokens)} out, ` +
+				`${formatCost(entry.cost)}, ${formatDuration(duration)}`,
 		);
-		// Accumulate into segment totals
-		this.segSteps++;
-		this.segTurns += this.turns;
-		this.segInputTokens += this.inputTokens;
-		this.segOutputTokens += this.outputTokens;
-		this.segCost += this.cost;
+		this.segSteps += 1;
+		this.segTurns += entry.turns;
+		this.segInputTokens += entry.inputTokens;
+		this.segOutputTokens += entry.outputTokens;
+		this.segCost += entry.cost;
+		this.active.delete(handle.id);
 	}
 
-	failStep(error: string): void {
-		if (this.heartbeat) clearInterval(this.heartbeat);
-		const duration = Date.now() - this.startTime;
+	failStep(handle: StepHandle, error: string): void {
+		const entry = this.active.get(handle.id);
+		if (!entry) return;
+		const duration = Date.now() - entry.startTime;
 		console.error(
-			`  ✗ [${this.stepCount}] ${this.currentStep}: ${error} (${formatDuration(duration)})`,
+			`  ✗ [${entry.id}] ${entry.name}: ${error} (${formatDuration(duration)})`,
 		);
-		this.segSteps++;
+		this.segSteps += 1;
+		this.active.delete(handle.id);
 	}
 
-	skipStep(): void {
-		console.log(`  – [${this.stepCount}] ${this.currentStep}`);
+	skipStep(handle: StepHandle): void {
+		const entry = this.active.get(handle.id);
+		if (!entry) return;
+		console.log(`  – [${entry.id}] ${entry.name}`);
+		this.active.delete(handle.id);
+	}
+
+	note(message: string): void {
+		console.log(`  · ${message}`);
 	}
 
 	startSegment(segmentId: string): void {
@@ -221,48 +249,20 @@ class NonInteractiveLogger implements PipelineLogger {
 	flush(): void {}
 	destroy(): void {
 		if (this.heartbeat) clearInterval(this.heartbeat);
+		this.heartbeat = null;
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Interactive (TUI dashboard with ANSI cursor control)
+// Interactive (Ink-backed TUI dashboard)
 // ---------------------------------------------------------------------------
-
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-/** Count newline characters in a write chunk. */
-function countNewlines(chunk: unknown): number {
-	if (typeof chunk === "string") {
-		let n = 0;
-		for (let i = 0; i < chunk.length; i++) {
-			if (chunk.charCodeAt(i) === 10) n++;
-		}
-		return n;
-	}
-	if (Buffer.isBuffer(chunk)) {
-		let n = 0;
-		for (let i = 0; i < chunk.length; i++) {
-			if (chunk[i] === 10) n++;
-		}
-		return n;
-	}
-	return 0;
-}
 
 class InteractiveLogger implements PipelineLogger {
-	private steps: StepDisplay[] = [];
-	private currentStep: StepDisplay | null = null;
-	private startTime = 0;
-	private spinnerFrame = 0;
-	private spinnerInterval: ReturnType<typeof setInterval> | null = null;
-	private linesUsed = 0;
-	private renderScheduled = false;
-	/** Lines written to stdout/stderr by external code between renders. */
-	private extraLines = 0;
-	/** True while render() is executing — suppresses external line counting. */
-	private rendering = false;
-	private origStdoutWrite: typeof process.stdout.write;
-	private origStderrWrite: typeof process.stderr.write;
+	private completed: StepView[] = [];
+	private active = new Map<string, StepView>();
+	private notes: string[] = [];
+	private instance: Instance;
+	private queueDepthProvider: () => number = () => 0;
 
 	// Segment-level accumulators
 	private segStart = 0;
@@ -272,43 +272,81 @@ class InteractiveLogger implements PipelineLogger {
 	private segOutputTokens = 0;
 	private segCost = 0;
 
+	// Progress counters
+	private segmentIndex = 0;
+	private phaseIndex: number | null = null;
+	private phaseTotal: number | null = null;
+	private seenPhases = new Set<string>();
+	private idleSince: number | null = Date.now();
+
+	private liveTimer: ReturnType<typeof setInterval> | null = null;
+
 	constructor(private runId?: string) {
-		// Intercept stdout/stderr so we can track lines written by external
-		// code (agent SDK, console.warn, etc.) that shift the cursor down.
-		this.origStdoutWrite = process.stdout.write.bind(process.stdout);
-		this.origStderrWrite = process.stderr.write.bind(process.stderr);
-
-		const boundOut = this.origStdoutWrite;
-		const boundErr = this.origStderrWrite;
-
-		process.stdout.write = ((
-			chunk: Uint8Array | string,
-			...args: unknown[]
-		) => {
-			if (!this.rendering) this.extraLines += countNewlines(chunk);
-			return (boundOut as (...a: unknown[]) => boolean)(chunk, ...args);
-		}) as typeof process.stdout.write;
-
-		process.stderr.write = ((
-			chunk: Uint8Array | string,
-			...args: unknown[]
-		) => {
-			if (!this.rendering) this.extraLines += countNewlines(chunk);
-			return (boundErr as (...a: unknown[]) => boolean)(chunk, ...args);
-		}) as typeof process.stderr.write;
-
-		process.stdout.write(C.cursorHide);
+		this.instance = render(this.element());
+		this.liveTimer = setInterval(() => this.rerender(), 1000);
 	}
 
-	startStep(name: string): void {
-		// Finalize previous running step
-		if (this.currentStep?.status === "running") {
-			this.currentStep.status = "completed";
-			this.steps.push(this.currentStep);
-		}
+	setQueueDepthProvider(provider: () => number): void {
+		this.queueDepthProvider = provider;
+	}
 
-		this.startTime = Date.now();
-		this.currentStep = {
+	private element() {
+		const totalCost = this.completed.reduce((sum, s) => sum + s.cost, 0);
+		const totalSteps = this.completed.length;
+		const queueDepth = this.queueDepthProvider();
+		const activeList = [...this.active.values()].sort(
+			(a, b) => a.startedAt - b.startedAt,
+		);
+		const isIdle = activeList.length === 0 && queueDepth === 0;
+		const props: DashboardProps = {
+			runId: this.runId,
+			completed: this.completed,
+			active: activeList,
+			queueDepth,
+			notes: this.notes,
+			segmentIndex: this.segmentIndex,
+			segmentTotal: SEGMENT_TOTAL,
+			phaseIndex: this.phaseIndex,
+			phaseTotal: this.phaseTotal,
+			totalCost,
+			totalSteps,
+			idleSince: isIdle ? this.idleSince : null,
+		};
+		return createElement(Dashboard, props);
+	}
+
+	private rerender(): void {
+		// Refresh each active step's duration so elapsed counters tick.
+		const now = Date.now();
+		for (const step of this.active.values()) {
+			step.duration = now - step.startedAt;
+		}
+		this.instance.rerender(this.element());
+	}
+
+	/** Extract "segment/phase/..." prefix from a step label. */
+	private trackPhase(name: string): void {
+		const slash = name.indexOf("/");
+		if (slash === -1) return;
+		const segmentId = name.slice(0, slash);
+		const rest = name.slice(slash + 1);
+		const nextSlash = rest.indexOf("/");
+		const phaseId =
+			nextSlash === -1 ? rest.split(" ")[0] : rest.slice(0, nextSlash);
+		if (!phaseId) return;
+		const key = `${segmentId}/${phaseId}`;
+		if (this.seenPhases.has(key)) return;
+		this.seenPhases.add(key);
+		this.phaseIndex = (this.phaseIndex ?? 0) + 1;
+	}
+
+	startStep(name: string, meta?: StepMeta): StepHandle {
+		this.trackPhase(name);
+		const id = nextStepId();
+		const now = Date.now();
+		this.idleSince = null;
+		this.active.set(id, {
+			id,
 			name,
 			status: "running",
 			turns: 0,
@@ -316,81 +354,91 @@ class InteractiveLogger implements PipelineLogger {
 			outputTokens: 0,
 			cost: 0,
 			duration: 0,
-		};
-
-		// Only one spinner interval — restart if already running
-		if (this.spinnerInterval) clearInterval(this.spinnerInterval);
-		this.spinnerInterval = setInterval(() => {
-			if (!this.currentStep) return;
-			this.spinnerFrame = (this.spinnerFrame + 1) % SPINNER_FRAMES.length;
-			this.currentStep.duration = Date.now() - this.startTime;
-			this.scheduleRender();
-		}, 200);
-
-		this.render();
+			startedAt: now,
+			kind: meta?.kind,
+			parallel: meta?.parallel,
+		});
+		this.rerender();
+		return { id };
 	}
 
 	updateTurn(
-		_turns: number,
-		_inputTokens: number,
-		_outputTokens: number,
+		handle: StepHandle,
+		turns: number,
+		inputTokens: number,
+		outputTokens: number,
 	): void {
-		if (!this.currentStep) return;
-		this.currentStep.turns = _turns;
-		this.currentStep.inputTokens = _inputTokens;
-		this.currentStep.outputTokens = _outputTokens;
-		this.currentStep.duration = Date.now() - this.startTime;
-		this.scheduleRender();
+		const step = this.active.get(handle.id);
+		if (!step) return;
+		step.turns = turns;
+		step.inputTokens = inputTokens;
+		step.outputTokens = outputTokens;
+		step.duration = Date.now() - step.startedAt;
+		this.rerender();
 	}
 
-	completeStep(cost?: number): void {
-		if (this.spinnerInterval) clearInterval(this.spinnerInterval);
-		this.spinnerInterval = null;
-		if (!this.currentStep) return;
-		this.currentStep.status = "completed";
-		if (cost !== undefined) this.currentStep.cost = cost;
-		this.currentStep.duration = Date.now() - this.startTime;
-		// Accumulate into segment totals
-		this.segSteps++;
-		this.segTurns += this.currentStep.turns;
-		this.segInputTokens += this.currentStep.inputTokens;
-		this.segOutputTokens += this.currentStep.outputTokens;
-		this.segCost += this.currentStep.cost;
-		this.steps.push(this.currentStep);
-		this.currentStep = null;
-		this.render();
+	completeStep(handle: StepHandle, cost?: number): void {
+		const step = this.active.get(handle.id);
+		if (!step) return;
+		step.status = "completed";
+		if (cost !== undefined) step.cost = cost;
+		step.duration = Date.now() - step.startedAt;
+		this.segSteps += 1;
+		this.segTurns += step.turns;
+		this.segInputTokens += step.inputTokens;
+		this.segOutputTokens += step.outputTokens;
+		this.segCost += step.cost;
+		this.completed = [...this.completed, step];
+		this.active.delete(handle.id);
+		this.maybeMarkIdle();
+		this.rerender();
 	}
 
-	failStep(error: string): void {
-		if (this.spinnerInterval) clearInterval(this.spinnerInterval);
-		this.spinnerInterval = null;
-		if (!this.currentStep) return;
-		this.currentStep.status = "failed";
-		this.currentStep.error = error;
-		this.currentStep.duration = Date.now() - this.startTime;
-		this.segSteps++;
-		this.steps.push(this.currentStep);
-		this.currentStep = null;
-		this.render();
+	failStep(handle: StepHandle, error: string): void {
+		const step = this.active.get(handle.id);
+		if (!step) return;
+		step.status = "failed";
+		step.error = error;
+		step.duration = Date.now() - step.startedAt;
+		this.segSteps += 1;
+		this.completed = [...this.completed, step];
+		this.active.delete(handle.id);
+		this.maybeMarkIdle();
+		this.rerender();
 	}
 
-	skipStep(): void {
-		if (this.currentStep) {
-			this.currentStep.status = "skipped";
-			this.currentStep.duration = 0;
-			this.steps.push(this.currentStep);
-			this.currentStep = null;
-			this.render();
-		}
+	skipStep(handle: StepHandle): void {
+		const step = this.active.get(handle.id);
+		if (!step) return;
+		step.status = "skipped";
+		step.duration = 0;
+		this.completed = [...this.completed, step];
+		this.active.delete(handle.id);
+		this.maybeMarkIdle();
+		this.rerender();
 	}
 
-	startSegment(_segmentId: string): void {
+	note(message: string): void {
+		this.notes = [...this.notes, message].slice(-MAX_NOTES);
+		this.rerender();
+	}
+
+	private maybeMarkIdle(): void {
+		if (this.active.size === 0) this.idleSince = Date.now();
+	}
+
+	startSegment(segmentId: string): void {
 		this.segStart = Date.now();
 		this.segSteps = 0;
 		this.segTurns = 0;
 		this.segInputTokens = 0;
 		this.segOutputTokens = 0;
 		this.segCost = 0;
+		this.segmentIndex += 1;
+		this.phaseIndex = null;
+		this.phaseTotal = null;
+		this.seenPhases.clear();
+		this.note(`segment: ${segmentId}`);
 	}
 
 	finishSegment(
@@ -398,18 +446,10 @@ class InteractiveLogger implements PipelineLogger {
 		status: "completed" | "failed",
 	): SegmentStats {
 		const duration = Date.now() - this.segStart;
-		// In interactive mode, just push a summary step row
 		const icon = status === "completed" ? "✓" : "✗";
-		this.steps.push({
-			name: `${icon} ${segmentId} summary`,
-			status: status === "completed" ? "completed" : "failed",
-			turns: this.segTurns,
-			inputTokens: this.segInputTokens,
-			outputTokens: this.segOutputTokens,
-			cost: this.segCost,
-			duration,
-		});
-		this.render();
+		this.note(
+			`${icon} ${segmentId}: ${this.segSteps} steps, ${formatCost(this.segCost)}, ${formatDuration(duration)}`,
+		);
 		return {
 			steps: this.segSteps,
 			turns: this.segTurns,
@@ -421,149 +461,12 @@ class InteractiveLogger implements PipelineLogger {
 	}
 
 	flush(): void {
-		this.render();
+		this.rerender();
 	}
 
 	destroy(): void {
-		if (this.spinnerInterval) clearInterval(this.spinnerInterval);
-		this.spinnerInterval = null;
-		if (this.currentStep) {
-			this.currentStep.status = "completed";
-			this.currentStep.duration = Date.now() - this.startTime;
-			this.steps.push(this.currentStep);
-			this.currentStep = null;
-		}
-		this.render();
-		// Restore original write functions before final write
-		process.stdout.write = this.origStdoutWrite;
-		process.stderr.write = this.origStderrWrite;
-		process.stdout.write(`${C.cursorShow}\n`);
-	}
-
-	// --- Render scheduling ---
-	// Batch renders: if updateTurn fires rapidly, only render once per frame.
-
-	private scheduleRender(): void {
-		if (this.renderScheduled) return;
-		this.renderScheduled = true;
-		// Use setImmediate to batch multiple updates within a single tick
-		setImmediate(() => {
-			this.renderScheduled = false;
-			this.render();
-		});
-	}
-
-	// --- Render ---
-
-	private render(): void {
-		this.rendering = true;
-
-		const allSteps = [...this.steps];
-		if (this.currentStep) allSteps.push(this.currentStep);
-
-		// How many lines the running step block takes (header + metrics sub-line)
-		const runningLines = this.currentStep ? 2 : 0;
-		// Header (run ID) + column header + steps + running block
-		const totalLines = 1 + 1 + allSteps.length + runningLines;
-
-		// Move cursor up to overwrite previous render + any external output
-		const moveBy = this.linesUsed + this.extraLines;
-		this.extraLines = 0;
-		if (moveBy > 0) {
-			process.stdout.write(C.moveUp(moveBy));
-		}
-
-		// Clear everything below cursor
-		process.stdout.write(C.eraseDown);
-
-		// Header
-		if (this.runId) {
-			process.stdout.write(
-				`  ${C.bold}${C.dim}mecury ${this.runId}${C.reset}\n`,
-			);
-		} else {
-			process.stdout.write("\n");
-		}
-
-		// Column headers
-		process.stdout.write(
-			`  ${C.dim}  #  NAME                                    STATUS                             ELAPSED${C.reset}\n`,
-		);
-
-		// Step rows
-		for (let i = 0; i < allSteps.length; i++) {
-			this.renderStepRow(allSteps[i], i);
-		}
-
-		// Running step: spinner + metrics
-		if (this.currentStep) {
-			const stepNum = this.steps.length + 1;
-			const spinner = SPINNER_FRAMES[this.spinnerFrame];
-			const elapsed = formatDuration(this.currentStep.duration);
-			process.stdout.write(
-				`  ${C.yellow}${spinner}${C.reset}  ${C.dim}step ${stepNum} of ?${C.reset}  ${elapsed} elapsed\n`,
-			);
-			const metrics = `    ${C.dim}turn ${this.currentStep.turns}  ·  ${formatTokens(this.currentStep.inputTokens)} in  ${formatTokens(this.currentStep.outputTokens)} out  ·  ${formatCost(this.currentStep.cost)}${C.reset}`;
-			process.stdout.write(`${metrics}\n`);
-		}
-
-		this.linesUsed = totalLines;
-		this.rendering = false;
-	}
-
-	private renderStepRow(step: StepDisplay, index: number): void {
-		const icon = this.statusIcon(step);
-		const color = this.statusColor(step);
-		const ordinal = pad(`${index + 1}`, 3, "right");
-		const name = pad(truncate(step.name, 40), 40);
-		const elapsed = pad(formatDuration(step.duration), 8);
-
-		if (step.status === "completed") {
-			const detail = `${step.turns}t · ${formatTokens(step.inputTokens)}/${formatTokens(step.outputTokens)} · ${formatCost(step.cost)}`;
-			process.stdout.write(
-				`  ${color}${icon}${C.reset}  ${C.dim}${ordinal}${C.reset}  ${name}  ${pad(truncate(detail, 33), 33)}${C.dim}${elapsed}${C.reset}\n`,
-			);
-		} else if (step.status === "failed") {
-			const err = step.error ? truncate(step.error, 33) : "failed";
-			process.stdout.write(
-				`  ${color}${icon}${C.reset}  ${C.dim}${ordinal}${C.reset}  ${name}  ${C.red}${pad(err, 33)}${C.reset}${C.dim}${elapsed}${C.reset}\n`,
-			);
-		} else if (step.status === "skipped") {
-			process.stdout.write(
-				`  ${color}${icon}${C.reset}  ${C.dim}${ordinal}${C.reset}  ${C.dim}${name}  ${pad("skipped", 33)}${elapsed}${C.reset}\n`,
-			);
-		} else {
-			// running
-			const detail = `${step.turns}t · ${formatTokens(step.inputTokens)}/${formatTokens(step.outputTokens)} · ${formatCost(step.cost)}`;
-			process.stdout.write(
-				`  ${color}${icon}${C.reset}  ${C.dim}${ordinal}${C.reset}  ${name}  ${pad(truncate(detail, 33), 33)}${C.dim}${elapsed}${C.reset}\n`,
-			);
-		}
-	}
-
-	private statusIcon(step: StepDisplay): string {
-		switch (step.status) {
-			case "completed":
-				return "✓";
-			case "failed":
-				return "✗";
-			case "skipped":
-				return "–";
-			case "running":
-				return SPINNER_FRAMES[this.spinnerFrame];
-		}
-	}
-
-	private statusColor(step: StepDisplay): string {
-		switch (step.status) {
-			case "completed":
-				return C.green;
-			case "failed":
-				return C.red;
-			case "skipped":
-				return C.gray;
-			case "running":
-				return C.yellow;
-		}
+		if (this.liveTimer) clearInterval(this.liveTimer);
+		this.liveTimer = null;
+		this.instance.unmount();
 	}
 }

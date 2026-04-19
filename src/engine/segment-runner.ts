@@ -217,7 +217,7 @@ async function runPhaseWithRetries(
 	);
 	const effectiveMaxRetries = hasNonDeterministic ? phase.maxRetries : 0;
 	if (!hasNonDeterministic && phase.maxRetries > 0) {
-		logger.startStep(
+		logger.note(
 			`Phase "${phase.id}" has no agent/reviewer steps — clamping retries to 0 (no agent to adjust behavior between attempts)`,
 		);
 	}
@@ -294,7 +294,7 @@ async function runPhaseWithRetries(
 			};
 		}
 
-		logger.startStep(
+		logger.note(
 			`Retrying ${segment.id}/${phase.id} (attempt ${retries + 1}/${effectiveMaxRetries + 1})`,
 		);
 	}

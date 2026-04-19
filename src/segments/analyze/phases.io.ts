@@ -634,7 +634,7 @@ export const discoverComponentsPhase: PhaseDef = {
 					const componentPages = catalog.componentPages ?? [];
 
 					if (componentPages.length === 0) {
-						ctx.logger.startStep(
+						ctx.logger.note(
 							"No matched pages for component extraction — skipping",
 						);
 						// Write empty recipes so downstream steps don't fail
@@ -703,7 +703,7 @@ Rules:
 								success: true,
 							};
 						} catch (err) {
-							ctx.logger.failStep(
+							ctx.logger.note(
 								`Component extraction failed for ${page.sourceType}: ${String(err)}`,
 							);
 							return {

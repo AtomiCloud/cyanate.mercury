@@ -81,7 +81,7 @@ export function generateCollectionEntries(
  * For richtext-dominant types: composes HTML body + extracts scalar metadata.
  * For structured types: preserves nested objects/repeaters with resolved image URLs.
  */
-export function buildEntryJson(
+function buildEntryJson(
 	page: PageContent,
 	coll: Registry["collections"][string],
 	collName: string,
@@ -409,63 +409,6 @@ function extractObject(value: unknown): Record<string, unknown> | null {
 function normalizeNavData(source: unknown): Record<string, unknown> {
 	if (Array.isArray(source)) return { items: source };
 	return extractObject(source) ?? {};
-}
-
-// ---------------------------------------------------------------------------
-// generateSingletons
-// ---------------------------------------------------------------------------
-
-/**
- * Generate singleton content files for single-instance page types (landing, about, etc.).
- *
- * Each singleton is seeded as `src/content/<pagetype>/default.json` with a glob() loader.
- * Richtext fields are composed into a `body` HTML string.
- */
-export function generateSingletons(
-	classifiedModel: ClassifiedContentModel,
-	pageContents: PageContent[],
-	assetManifest?: Record<string, string>,
-): Array<{ path: string; content: string }> {
-	const files: Array<{ path: string; content: string }> = [];
-
-	for (const cpt of classifiedModel.page_types) {
-		if (!cpt.is_singleton) continue;
-
-		const pages = pageContents.filter((p) => p.pagetype === cpt.pagetype);
-		if (pages.length === 0) continue;
-
-		const data = buildSingletonData(cpt, pages[0], assetManifest);
-
-		files.push({
-			path: `src/content/${cpt.pagetype}/default.json`,
-			content: formatJson(data),
-		});
-	}
-
-	return files;
-}
-
-/** Build the data object for a singleton page type. Reuses buildEntryJson logic. */
-function buildSingletonData(
-	cpt: ClassifiedPageType,
-	page: PageContent,
-	assetManifest?: Record<string, string>,
-): Record<string, unknown> {
-	const dummyColl = {
-		source_pagetype: cpt.pagetype,
-		slug_field: "",
-		listable_by: [] as string[],
-	};
-	const data = buildEntryJson(
-		page,
-		dummyColl,
-		cpt.pagetype,
-		cpt,
-		assetManifest,
-	);
-	// Override id to "default" for singletons
-	data.id = "default";
-	return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -871,11 +814,10 @@ import Layout from "${"../".repeat(depth)}layouts/${layout}.astro";
 			});
 		}
 
-		if (listing.paginated) {
-			files.push(
-				...generatePaginationRoute(listingName, listing, layout, collName),
-			);
-		}
+		// Always generate pagination routes — UI hides controls when totalPages === 1
+		files.push(
+			...generatePaginationRoute(listingName, listing, layout, collName),
+		);
 	}
 
 	return files;
@@ -1071,164 +1013,6 @@ function getDefaultLayout(registry: Registry, pagetype: string): string {
 		if (layout.page_types.includes(pagetype)) return layoutName;
 	}
 	return "default";
-}
-
-// ---------------------------------------------------------------------------
-// CMS content model and asset manifest generation
-// ---------------------------------------------------------------------------
-
-/** CMS adapter types (mirrors template/astro-project/cms/adapter.ts). */
-interface CmsFieldDef {
-	name: string;
-	type: string;
-	required: boolean;
-	fields?: CmsFieldDef[];
-	target?: string;
-}
-
-interface CmsCollectionDef {
-	name: string;
-	type: "collection" | "singleton" | "global";
-	fields: CmsFieldDef[];
-	slugField?: string;
-}
-
-interface CmsContentModel {
-	collections: CmsCollectionDef[];
-}
-
-interface CmsAssetManifest {
-	entries: Array<{ localPath: string; originalUrl: string }>;
-}
-
-/**
- * Generate CMS-format content-model.json from registry + classified content model.
- * Maps field_classifications → FieldDef[] using CMS adapter types.
- */
-export function generateCmsContentModel(
-	registry: Registry,
-	classifiedModel: ClassifiedContentModel,
-): CmsContentModel {
-	const collections: CmsCollectionDef[] = [];
-
-	// Multi-instance collections
-	for (const [collName, coll] of Object.entries(registry.collections)) {
-		const classified = classifiedModel.page_types.find(
-			(c) => c.pagetype === coll.source_pagetype,
-		);
-		const fields = classified
-			? buildCmsFields(classified)
-			: [{ name: "body", type: "richtext", required: false }];
-
-		collections.push({
-			name: collName,
-			type: "collection",
-			fields,
-			slugField: coll.slug_field ?? "slug",
-		});
-	}
-
-	// Singletons
-	for (const cpt of classifiedModel.page_types) {
-		if (!cpt.is_singleton) continue;
-		// Skip if already registered as a collection
-		if (registry.collections[cpt.pagetype]) continue;
-
-		const fields = buildCmsFields(cpt);
-		collections.push({
-			name: cpt.pagetype,
-			type: "singleton",
-			fields,
-		});
-	}
-
-	return { collections };
-}
-
-/** Create a CmsFieldDef from a FieldClassification. */
-function classificationToField(fc: FieldClassification): CmsFieldDef {
-	const field: CmsFieldDef = {
-		name: fc.field_path,
-		type: fc.type,
-		required: false,
-	};
-	if (fc.type === "relationship" && fc.target_collection) {
-		field.target = fc.target_collection;
-	}
-	if (fc.type === "object" || fc.type === "repeater") {
-		field.fields = [];
-	}
-	return field;
-}
-
-/** Attach dot-path child classifications to their parent CmsFieldDef. */
-function attachChildFields(
-	topFields: Map<string, CmsFieldDef>,
-	classifications: FieldClassification[],
-): void {
-	for (const fc of classifications) {
-		if (!fc.field_path.includes(".")) continue;
-		const parts = fc.field_path.split(".");
-		const parentKey = parts[0];
-
-		let parent = topFields.get(parentKey);
-		if (!parent) {
-			parent = { name: parentKey, type: "object", required: false, fields: [] };
-			topFields.set(parentKey, parent);
-		}
-		if (!parent.fields) parent.fields = [];
-
-		const child: CmsFieldDef = {
-			name: parts.slice(1).join("."),
-			type: fc.type,
-			required: false,
-		};
-		if (fc.type === "relationship" && fc.target_collection) {
-			child.target = fc.target_collection;
-		}
-		parent.fields.push(child);
-	}
-}
-
-/** Build CMS FieldDef[] from a classified page type, with nested fields for object/repeater. */
-function buildCmsFields(classified: ClassifiedPageType): CmsFieldDef[] {
-	const topFields = new Map<string, CmsFieldDef>();
-
-	// First pass: create top-level fields
-	for (const fc of classified.field_classifications) {
-		if (fc.field_path.includes(".")) continue;
-		if (topFields.has(fc.field_path)) continue;
-		topFields.set(fc.field_path, classificationToField(fc));
-	}
-
-	// Second pass: attach dot-path children to their parent
-	attachChildFields(topFields, classified.field_classifications);
-
-	// Add body field if page has body_compose
-	if (classified.body_compose && !topFields.has("body")) {
-		topFields.set("body", { name: "body", type: "richtext", required: false });
-	}
-
-	return [...topFields.values()];
-}
-
-/**
- * Generate CMS-format asset-manifest.json from the pipeline's flat map.
- * Transforms Record<originalUrl, filename> → { entries: [{localPath, originalUrl}] }
- */
-export function generateCmsAssetManifest(
-	assetManifest: Record<string, string>,
-): CmsAssetManifest {
-	const entries: CmsAssetManifest["entries"] = [];
-
-	for (const [originalUrl, filename] of Object.entries(assetManifest)) {
-		entries.push({
-			localPath: `public/images/${filename}`,
-			originalUrl,
-		});
-	}
-
-	return { entries };
 }
 
 // ---------------------------------------------------------------------------

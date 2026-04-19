@@ -14,7 +14,7 @@
  * copying from THIS failed iteration and passes rejection context.
  */
 
-import type { PipelineLogger } from "../lib/logger.js";
+import type { PipelineLogger, StepHandle } from "../lib/logger.js";
 import type { MetricsWriter } from "./metrics.js";
 import { resolveProfile } from "./profile.js";
 import { createIterationState, writePipelineState } from "./state.js";
@@ -81,8 +81,7 @@ export async function runPhase(opts: PhaseRunOptions): Promise<PhaseRunResult> {
 	await writePipelineState(segmentDir, opts.pipelineState);
 
 	const phaseStart = Date.now();
-	logger.startStep(`${segmentId}/${phase.id} (iteration ${iterationIndex})`);
-	logger.completeStep();
+	logger.note(`${segmentId}/${phase.id} (iteration ${iterationIndex})`);
 
 	const allReviews: Review[] = [];
 
@@ -124,7 +123,10 @@ async function executeStep(
 	await writePipelineState(opts.segmentDir, opts.pipelineState);
 
 	const stepLabel = `${opts.segmentId}/${opts.phase.id}/${step.id}`;
-	opts.logger.startStep(stepLabel);
+	const stepHandle = opts.logger.startStep(stepLabel, {
+		kind: step.type,
+		parallel: step.parallel,
+	});
 
 	const profile = resolveProfile(
 		opts.config,
@@ -174,11 +176,18 @@ async function executeStep(
 	});
 
 	if (result.status === "reject") {
-		return handleRejection(stepState, result, iterState, allReviews, opts);
+		return handleRejection(
+			stepState,
+			result,
+			iterState,
+			allReviews,
+			opts,
+			stepHandle,
+		);
 	}
 
 	if (result.status === "fail") {
-		return handleFailure(stepState, result, iterState, opts);
+		return handleFailure(stepState, result, iterState, opts, stepHandle);
 	}
 
 	stepState.status = "passed";
@@ -186,7 +195,7 @@ async function executeStep(
 		stepState.reviews = result.reviews;
 		allReviews.push(...result.reviews);
 	}
-	opts.logger.completeStep();
+	opts.logger.completeStep(stepHandle);
 	await writePipelineState(opts.segmentDir, opts.pipelineState);
 	return null;
 }
@@ -214,13 +223,14 @@ function handleRejection(
 	iterState: IterationState,
 	allReviews: Review[],
 	opts: PhaseRunOptions,
+	handle: StepHandle,
 ): PhaseRunResult {
 	stepState.status = "rejected";
 	stepState.reviews = result.reviews;
 	if (result.reviews) allReviews.push(...result.reviews);
 	skipPending(iterState);
 	const context = aggregateRejectionContext(allReviews);
-	opts.logger.failStep(context);
+	opts.logger.failStep(handle, context);
 	return finishIterationSync(iterState, allReviews, "rejected", opts);
 }
 
@@ -229,11 +239,12 @@ function handleFailure(
 	result: StepResult,
 	iterState: IterationState,
 	opts: PhaseRunOptions,
+	handle: StepHandle,
 ): PhaseRunResult {
 	stepState.status = "failed";
 	stepState.error = result.error;
 	skipPending(iterState);
-	opts.logger.failStep(result.error ?? "unknown error");
+	opts.logger.failStep(handle, result.error ?? "unknown error");
 	return finishIterationSync(iterState, [], "failed", opts, result.error);
 }
 
@@ -282,10 +293,9 @@ async function finishIteration(
 	await writePipelineState(segmentDir, opts.pipelineState);
 	if (phaseStart) {
 		const elapsed = Date.now() - phaseStart;
-		logger.startStep(
+		logger.note(
 			`${opts.segmentId}/${opts.phase.id} done (${formatPhaseDuration(elapsed)})`,
 		);
-		logger.completeStep();
 	}
 	return { status, iteration: iterState, reviews };
 }

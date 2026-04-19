@@ -18,6 +18,7 @@ import type { DagRunResult } from "./engine/dag.js";
 import { runDag } from "./engine/dag.js";
 import { registry } from "./engine/registry.js";
 import { readRunState } from "./engine/state.js";
+import { currentQueueDepth } from "./lib/agent.js";
 import { createPipelineLogger } from "./lib/logger.js";
 
 const program = new Command()
@@ -36,14 +37,19 @@ program
 		"--dep <mapping...>",
 		"Map dependency outputs (format: segmentId=path)",
 	)
+	.option("--input <path>", "Override cui.yaml input path")
+	.option("--reference <url>", "Override cui.yaml reference URL")
 	.option("--config <path>", "Path to cui.yaml", "cui.yaml")
 	.option("--non-interactive", "Verbose logging mode", false)
 	.action(async (opts) => {
 		const config = loadConfig(opts.config);
+		if (opts.input) config.input = opts.input;
+		if (opts.reference) config.reference = opts.reference;
 		const logger = createPipelineLogger({
 			interactive: !opts.nonInteractive,
 			runId: "pending",
 		});
+		logger.setQueueDepthProvider(currentQueueDepth);
 
 		const depOverrides = parseDepFlags(opts.dep);
 		await resolveInteractiveDeps(opts, depOverrides);
@@ -93,13 +99,31 @@ program
 			process.exit(1);
 		}
 
-		const config = loadConfig(opts.config);
+		// Prefer the exact config the prior run used (post-identity-inheritance,
+		// with LLM profiles / heartbeat / reviewer_matrix etc. frozen at run
+		// start). Fall back to cui.yaml + identity override for legacy runs
+		// that predate RunState.config.
+		const effectiveConfig = runState.config
+			? runState.config
+			: runState.identity
+				? {
+						...loadConfig(opts.config),
+						input: runState.identity.input,
+						reference: runState.identity.reference,
+					}
+				: loadConfig(opts.config);
+
 		const logger = createPipelineLogger({
 			interactive: !opts.nonInteractive,
 			runId: runState.runId,
 		});
+		logger.setQueueDepthProvider(currentQueueDepth);
 
-		const depOverrides: Record<string, string> = {};
+		// Rebuild dep map: completed segments from this run + any --dep
+		// overrides from the original launch (for cross-run deps).
+		const depOverrides: Record<string, string> = {
+			...(runState.depOverrides ?? {}),
+		};
 		for (const [id, s] of Object.entries(runState.segments)) {
 			if (s.status === "completed" && s.outputDir) {
 				depOverrides[id] = s.outputDir;
@@ -108,7 +132,7 @@ program
 
 		const result = await runDag({
 			registry,
-			config,
+			config: effectiveConfig,
 			logger,
 			rootDir: resolve(runDir, ".."),
 			startSegment: failedSegment[0],
@@ -206,6 +230,26 @@ program
 			parsed,
 		);
 		console.log(formatTable(result));
+	});
+
+// --- check command ---
+
+const check = program
+	.command("check")
+	.description("Self-verification CLIs the pipeline agents can invoke");
+
+check
+	.command("normalization <unit-dir>")
+	.description(
+		"Verify a per-page A0 normalization artifact against its source content.json",
+	)
+	.action(async (unitDirArg: string) => {
+		const unitDir = resolve(unitDirArg);
+		const { checkNormalizationCli } = await import(
+			"./segments/classify/check-cli.js"
+		);
+		const exitCode = await checkNormalizationCli(unitDir);
+		process.exit(exitCode);
 	});
 
 // --- Helpers ---

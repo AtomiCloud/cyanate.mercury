@@ -334,23 +334,6 @@ function walkForUnresolvedInternal(
 }
 
 // ---------------------------------------------------------------------------
-// updatePageUrls
-// ---------------------------------------------------------------------------
-
-/**
- * Update the `url` field of each PreparedPage to the final URL.
- */
-export function updatePageUrls(
-	pages: PreparedPage[],
-	urlMap: Record<string, string>,
-): PreparedPage[] {
-	return pages.map((page) => ({
-		...page,
-		url: urlMap[page.url] ?? page.url,
-	}));
-}
-
-// ---------------------------------------------------------------------------
 // rewriteAllContent
 // ---------------------------------------------------------------------------
 

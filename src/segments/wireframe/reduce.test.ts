@@ -4,7 +4,6 @@ import {
 	buildAssetManifest,
 	buildReducedMeta,
 	buildReducedTree,
-	classifyUrls,
 	contentAddressedName,
 	rewriteInternalLinks,
 	selectSamplesFromUrls,
@@ -256,37 +255,6 @@ describe("rewriteInternalLinks", () => {
 		expect(result.links[0].url).toBe("/about");
 		expect(result.links[1].url).toBe("https://other.com");
 		expect(result.nested.deep.url).toBe("/about");
-	});
-});
-
-// ---------------------------------------------------------------------------
-// classifyUrls
-// ---------------------------------------------------------------------------
-
-describe("classifyUrls", () => {
-	it("classifies mixed URLs correctly", () => {
-		const urls = [
-			"https://example.com/page",
-			"https://example.com/wp-content/uploads/img.png",
-			"https://other.com/external",
-			"https://example.com/about",
-		];
-
-		const result = classifyUrls(urls, "https://example.com");
-		expect(result.internal).toHaveLength(2);
-		expect(result.cms).toHaveLength(1);
-		expect(result.external).toHaveLength(1);
-	});
-
-	it("uses custom CMS patterns", () => {
-		const urls = ["https://example.com/api/v1/content"];
-		const result = classifyUrls(urls, "https://example.com", ["/api/"]);
-		expect(result.cms).toHaveLength(1);
-	});
-
-	it("handles empty input", () => {
-		const result = classifyUrls([], "https://example.com");
-		expect(result).toEqual({ internal: [], external: [], cms: [] });
 	});
 });
 

@@ -18,15 +18,50 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { CuiConfig, LLMProfile } from "../engine/types.js";
-import type { PipelineLogger } from "./logger.js";
+import type { PipelineLogger, StepHandle } from "./logger.js";
+import { Semaphore } from "./semaphore.js";
 
 const DEFAULT_HEARTBEAT_TIMEOUT = 900_000; // 15 min
 const DEFAULT_HEARTBEAT_INTERVAL = 30_000; // 30s
 
+/**
+ * Default cap on concurrent Claude SDK query() calls.
+ *
+ * Each query() spawns a Claude Code subprocess that holds its own internal
+ * mutex. Running too many in parallel reliably triggers the SDK's
+ * "Lock is already released" error under resource pressure. This cap
+ * applies globally across the whole run — all fan-outs (per-page, per-leaf,
+ * reviewer matrices) share the same queue. Override via
+ * `config.concurrency.maxQueries` in cui.yaml.
+ */
+const DEFAULT_MAX_CONCURRENT_QUERIES = 10;
+
+/**
+ * Module-singleton query semaphore. Lazily initialized from the first call's
+ * config so cui.yaml can tune it per-run. Pipeline is single-process, so one
+ * instance is shared by every caller of agentQueryWithMetrics.
+ */
+let querySemaphore: Semaphore | null = null;
+
+function getQuerySemaphore(config?: CuiConfig): Semaphore {
+	if (querySemaphore) return querySemaphore;
+	const cap = config?.concurrency?.maxQueries ?? DEFAULT_MAX_CONCURRENT_QUERIES;
+	querySemaphore = new Semaphore(cap);
+	return querySemaphore;
+}
+
+/**
+ * Number of Claude SDK calls currently waiting for a semaphore slot. Safe to
+ * call before the semaphore is initialized (returns 0).
+ */
+export function currentQueueDepth(): number {
+	return querySemaphore?.pending ?? 0;
+}
+
 /** Frozen snapshot of process.env at module load time. */
 const frozenProcessEnv: Record<string, string | undefined> = { ...process.env };
 
-export interface AgentQueryOptions {
+interface AgentQueryOptions {
 	prompt: string;
 	systemPrompt?: string;
 	cwd: string;
@@ -68,7 +103,7 @@ interface StreamState {
 	startTime: number;
 }
 
-export interface AgentQueryResult {
+interface AgentQueryResult {
 	output: string;
 	turns: number;
 	inputTokens: number;
@@ -100,54 +135,78 @@ export async function agentQueryWithMetrics(
 	const intervalMs = config?.heartbeat?.interval ?? DEFAULT_HEARTBEAT_INTERVAL;
 	const eventsFile = config?.logging?.eventsFile ?? "agent-events.jsonl";
 
-	const result = query({
-		prompt,
-		options: {
-			systemPrompt,
-			tools: tools ?? DEFAULT_TOOLS,
-			cwd,
-			settingSources: ["local"],
-			permissionMode: "bypassPermissions",
-			allowDangerouslySkipPermissions: true,
-			maxTurns: maxTurns ?? profile.maxTurns,
-			env: { ...frozenProcessEnv, ...profileToEnv(profile) },
-		},
-	});
+	// Global concurrency gate — bounds the total number of live Claude SDK
+	// subprocesses regardless of how wide any caller's fan-out is.
+	const release = await getQuerySemaphore(config).acquire();
 
 	const log = logger || createFallbackLogger(stepName, startTime, intervalMs);
-	const eventLog = join(cwd, eventsFile);
-	const logEvent = (event: Record<string, unknown>) => {
-		appendFile(
-			eventLog,
-			`${JSON.stringify({ t: new Date().toISOString(), ...event })}\n`,
-			"utf-8",
-		).catch(() => {});
-	};
-
-	const state: StreamState = {
-		output: "",
-		turnCount: 0,
-		totalInputTokens: 0,
-		totalOutputTokens: 0,
-		totalCost: 0,
-		lastHeartbeatAt: Date.now(),
-		startTime,
-	};
-
-	const iterator = result[Symbol.asyncIterator]();
+	// Each Claude SDK call is a step of its own: parallel leaves, reviewers,
+	// and fan-out workers must each appear in the Active pane with their own
+	// token totals.
+	const handle = log.startStep(stepName, { kind: "agent" });
 
 	try {
-		await consumeStream(iterator, state, stepName, timeoutMs, log, logEvent);
-		log.completeStep(state.totalCost);
-		return {
-			output: state.output,
-			turns: state.turnCount,
-			inputTokens: state.totalInputTokens,
-			outputTokens: state.totalOutputTokens,
-			cost: state.totalCost,
+		const result = query({
+			prompt,
+			options: {
+				systemPrompt,
+				tools: tools ?? DEFAULT_TOOLS,
+				cwd,
+				settingSources: ["local"],
+				permissionMode: "bypassPermissions",
+				allowDangerouslySkipPermissions: true,
+				maxTurns: maxTurns ?? profile.maxTurns,
+				env: { ...frozenProcessEnv, ...profileToEnv(profile) },
+			},
+		});
+
+		const eventLog = join(cwd, eventsFile);
+		const logEvent = (event: Record<string, unknown>) => {
+			appendFile(
+				eventLog,
+				`${JSON.stringify({ t: new Date().toISOString(), ...event })}\n`,
+				"utf-8",
+			).catch(() => {});
 		};
+
+		const state: StreamState = {
+			output: "",
+			turnCount: 0,
+			totalInputTokens: 0,
+			totalOutputTokens: 0,
+			totalCost: 0,
+			lastHeartbeatAt: Date.now(),
+			startTime,
+		};
+
+		const iterator = result[Symbol.asyncIterator]();
+
+		try {
+			await consumeStream(
+				iterator,
+				state,
+				stepName,
+				timeoutMs,
+				log,
+				handle,
+				logEvent,
+			);
+			log.completeStep(handle, state.totalCost);
+			return {
+				output: state.output,
+				turns: state.turnCount,
+				inputTokens: state.totalInputTokens,
+				outputTokens: state.totalOutputTokens,
+				cost: state.totalCost,
+			};
+		} catch (err) {
+			log.failStep(handle, err instanceof Error ? err.message : String(err));
+			throw err;
+		} finally {
+			await iterator.return?.();
+		}
 	} finally {
-		await iterator.return?.();
+		release();
 	}
 }
 
@@ -157,6 +216,7 @@ async function consumeStream(
 	stepName: string,
 	timeoutMs: number,
 	log: PipelineLogger,
+	handle: StepHandle,
 	logEvent: (event: Record<string, unknown>) => void,
 ): Promise<void> {
 	while (true) {
@@ -168,7 +228,14 @@ async function consumeStream(
 			logEvent,
 		);
 		if (next.done) break;
-		processMessage(next.value as SDKMessage, state, stepName, log, logEvent);
+		processMessage(
+			next.value as SDKMessage,
+			state,
+			stepName,
+			log,
+			handle,
+			logEvent,
+		);
 	}
 }
 
@@ -177,10 +244,11 @@ function processMessage(
 	state: StreamState,
 	stepName: string,
 	log: PipelineLogger,
+	handle: StepHandle,
 	logEvent: (event: Record<string, unknown>) => void,
 ): void {
 	if (msg.type === "assistant") {
-		handleAssistant(msg as SDKAssistantMessage, state, log, logEvent);
+		handleAssistant(msg as SDKAssistantMessage, state, log, handle, logEvent);
 	} else if (msg.type === "tool_progress") {
 		handleToolProgress(
 			msg as unknown as SDKToolProgressMessage,
@@ -196,6 +264,7 @@ function handleAssistant(
 	msg: SDKAssistantMessage,
 	state: StreamState,
 	log: PipelineLogger,
+	handle: StepHandle,
 	logEvent: (event: Record<string, unknown>) => void,
 ): void {
 	state.turnCount++;
@@ -235,6 +304,7 @@ function handleAssistant(
 	});
 
 	log.updateTurn(
+		handle,
 		state.turnCount,
 		state.totalInputTokens,
 		state.totalOutputTokens,
@@ -255,6 +325,7 @@ function handleToolProgress(
 	state.lastHeartbeatAt = Date.now();
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: stream result handling with multiple message types
 function handleResult(
 	msg: SDKResultMessage,
 	state: StreamState,
@@ -264,6 +335,24 @@ function handleResult(
 		state.output = msg.result;
 		state.turnCount = msg.num_turns || state.turnCount;
 		state.totalCost = msg.total_cost_usd || 0;
+
+		// The result message carries authoritative usage totals. Prefer these
+		// over accumulated streaming values — some providers don't populate
+		// per-turn usage but always include it in the result.
+		const usage = msg.usage;
+		if (usage) {
+			const input =
+				(usage.input_tokens || 0) +
+				(usage.cache_read_input_tokens || 0) +
+				(usage.cache_creation_input_tokens || 0);
+			const output = usage.output_tokens || 0;
+			// Use whichever is larger: accumulated streaming or result totals.
+			// This handles both providers that report per-turn and those that
+			// only report at the end.
+			if (input > state.totalInputTokens) state.totalInputTokens = input;
+			if (output > state.totalOutputTokens) state.totalOutputTokens = output;
+		}
+
 		state.lastHeartbeatAt = Date.now();
 		return;
 	}
@@ -330,9 +419,12 @@ function createFallbackLogger(
 			`  [heartbeat] ${stepName}: turn ${turns}, ${inputTokens} in / ${outputTokens} out, ${elapsed}s`,
 		);
 	}, intervalMs);
+	const handle: StepHandle = { id: `fallback-${stepName}` };
 	return {
-		startStep() {},
-		updateTurn(t, i, o) {
+		startStep() {
+			return handle;
+		},
+		updateTurn(_h, t, i, o) {
 			turns = t;
 			inputTokens = i;
 			outputTokens = o;
@@ -340,11 +432,15 @@ function createFallbackLogger(
 		completeStep() {
 			clearInterval(hb);
 		},
-		failStep(e) {
+		failStep(_h, e) {
 			clearInterval(hb);
 			console.error(`  [FAILED] ${stepName}: ${e}`);
 		},
 		skipStep() {},
+		note(message) {
+			console.log(`  · ${message}`);
+		},
+		setQueueDepthProvider() {},
 		startSegment() {},
 		finishSegment() {
 			return {
@@ -361,17 +457,4 @@ function createFallbackLogger(
 			clearInterval(hb);
 		},
 	};
-}
-
-export function extractErrors(output: string): string[] {
-	const errors: string[] = [];
-	for (const line of output.split("\n")) {
-		if (
-			line.toLowerCase().includes("error") ||
-			line.toLowerCase().includes("failed")
-		) {
-			errors.push(line.trim());
-		}
-	}
-	return errors.slice(0, 10);
 }

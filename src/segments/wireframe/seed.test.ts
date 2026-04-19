@@ -3,13 +3,10 @@ import type { PageContent, Registry } from "../../types.js";
 import type { ContentModelOutput } from "./classify.js";
 import type { ClassifiedContentModel } from "./content-model.js";
 import {
-	generateCmsAssetManifest,
-	generateCmsContentModel,
 	generateCollectionEntries,
 	generateContentConfig,
 	generateGlobals,
 	generateRouteFiles,
-	generateSingletons,
 	validateSeedCompleteness,
 } from "./seed.js";
 
@@ -538,7 +535,6 @@ describe("generateRouteFiles", () => {
 				blog_index: {
 					route: "/articles",
 					queries: [{ collection: "blog" }],
-					paginated: false,
 				},
 			},
 			static_pages: [],
@@ -562,7 +558,6 @@ describe("generateRouteFiles", () => {
 				content_listing: {
 					route: "/content",
 					queries: [{ collection: "posts" }],
-					paginated: false,
 				},
 			},
 			static_pages: [],
@@ -594,7 +589,6 @@ describe("generateRouteFiles", () => {
 				articles: {
 					route: "/articles",
 					queries: [],
-					paginated: false,
 				},
 			},
 			static_pages: [],
@@ -623,7 +617,6 @@ describe("generateRouteFiles", () => {
 				articles: {
 					route: "/articles",
 					queries: [],
-					paginated: false,
 				},
 			},
 			static_pages: [],
@@ -654,7 +647,6 @@ describe("generateRouteFiles", () => {
 				articles: {
 					route: "/articles",
 					queries: [],
-					paginated: false,
 				},
 			},
 			static_pages: [],
@@ -686,7 +678,6 @@ describe("generateRouteFiles", () => {
 				articles: {
 					route: "/articles",
 					queries: [],
-					paginated: false,
 				},
 			},
 			static_pages: [],
@@ -713,7 +704,7 @@ describe("generateRouteFiles", () => {
 		expect(pagRoute?.content ?? "").toContain('getCollection("blog")');
 	});
 
-	it("non-paginated listing does NOT generate pagination sub-route", () => {
+	it("listing always generates pagination sub-route regardless of paginated flag", () => {
 		const reg: Registry = {
 			layouts: {
 				default: { description: "Default", page_types: ["blog"] },
@@ -729,7 +720,6 @@ describe("generateRouteFiles", () => {
 				blog_index: {
 					route: "/blog",
 					queries: [{ collection: "blog" }],
-					paginated: false,
 				},
 			},
 			static_pages: [],
@@ -737,7 +727,7 @@ describe("generateRouteFiles", () => {
 
 		const files = generateRouteFiles(reg);
 		const pagRoute = files.find((f) => f.path.includes("page/[page]"));
-		expect(pagRoute).toBeUndefined();
+		expect(pagRoute).toBeDefined();
 	});
 });
 
@@ -1148,97 +1138,6 @@ describe("validateSeedCompleteness", () => {
 });
 
 // ---------------------------------------------------------------------------
-// generateSingletons
-// ---------------------------------------------------------------------------
-
-describe("generateSingletons", () => {
-	const classifiedModel: ClassifiedContentModel = {
-		page_types: [
-			{
-				pagetype: "landing",
-				is_singleton: true,
-				field_classifications: [
-					{ field_path: "hero.headline", type: "string" },
-					{ field_path: "hero.body", type: "richtext" },
-				],
-				body_compose: {
-					field: "hero",
-					render_as: "div",
-					children: [
-						{ field: "headline", render_as: "h1" },
-						{ field: "body", render_as: "p" },
-					],
-				},
-			},
-			{
-				pagetype: "blog",
-				is_singleton: false,
-				field_classifications: [],
-			},
-		],
-	};
-
-	const singletonPages: PageContent[] = [
-		{
-			id: "landing-1",
-			url: "https://example.com/",
-			pagetype: "landing",
-			content: {
-				hero: { headline: "Welcome", body: "Hello world" },
-				title: "Home",
-			},
-		},
-	];
-
-	it("generates singleton files in src/content/{pagetype}/default.json", () => {
-		const files = generateSingletons(classifiedModel, singletonPages);
-		expect(files).toHaveLength(1);
-		expect(files[0].path).toBe("src/content/landing/default.json");
-	});
-
-	it("writes plain object (not array-wrapped)", () => {
-		const files = generateSingletons(classifiedModel, singletonPages);
-		const parsed = JSON.parse(files[0].content);
-		expect(Array.isArray(parsed)).toBe(false);
-		expect(parsed.id).toBe("default");
-	});
-
-	it("composes richtext body from body_compose spec", () => {
-		const files = generateSingletons(classifiedModel, singletonPages);
-		const parsed = JSON.parse(files[0].content);
-		expect(parsed.body).toContain("<h1>Welcome</h1>");
-		expect(parsed.body).toContain("<p>Hello world</p>");
-	});
-
-	it("includes scalar fields in singleton data", () => {
-		const files = generateSingletons(classifiedModel, singletonPages);
-		const parsed = JSON.parse(files[0].content);
-		expect(parsed.title).toBe("Home");
-		expect(parsed.pagetype).toBe("landing");
-		expect(parsed.url).toBe("https://example.com/");
-	});
-
-	it("skips non-singleton page types", () => {
-		const files = generateSingletons(classifiedModel, [
-			...singletonPages,
-			{
-				id: "b1",
-				url: "https://example.com/blog/post",
-				pagetype: "blog",
-				content: { title: "Post" },
-			},
-		]);
-		expect(files).toHaveLength(1);
-		expect(files[0].path).toContain("landing");
-	});
-
-	it("skips singleton page types with no matching pages", () => {
-		const files = generateSingletons(classifiedModel, []);
-		expect(files).toHaveLength(0);
-	});
-});
-
-// ---------------------------------------------------------------------------
 // generateCollectionEntries with classified model (richtext composition)
 // ---------------------------------------------------------------------------
 
@@ -1499,161 +1398,5 @@ describe("generateContentConfig with classified model", () => {
 		expect(config).toContain("navigation: defineCollection");
 		// No file() loader
 		expect(config).not.toContain("file(");
-	});
-});
-
-// ---------------------------------------------------------------------------
-// generateCmsContentModel
-// ---------------------------------------------------------------------------
-
-describe("generateCmsContentModel", () => {
-	it("produces CMS-format content model with typed fields", () => {
-		const classifiedModel: ClassifiedContentModel = {
-			page_types: [
-				{
-					pagetype: "blog",
-					is_singleton: false,
-					field_classifications: [
-						{ field_path: "title", type: "string" },
-						{ field_path: "hero_image", type: "image" },
-						{
-							field_path: "body",
-							type: "richtext",
-							compose_spec: { field: "body", render_as: "div" },
-						},
-					],
-					body_compose: { field: "body", render_as: "div" },
-				},
-			],
-		};
-
-		const result = generateCmsContentModel(registry, classifiedModel);
-		expect(result.collections).toHaveLength(1);
-
-		const blogColl = result.collections[0];
-		expect(blogColl.name).toBe("blog");
-		expect(blogColl.type).toBe("collection");
-		expect(blogColl.slugField).toBe("title");
-
-		const fieldNames = blogColl.fields.map((f) => f.name);
-		expect(fieldNames).toContain("title");
-		expect(fieldNames).toContain("hero_image");
-		expect(fieldNames).toContain("body");
-
-		const bodyField = blogColl.fields.find((f) => f.name === "body");
-		expect(bodyField?.type).toBe("richtext");
-	});
-
-	it("produces nested fields for object/repeater types", () => {
-		const classifiedModel: ClassifiedContentModel = {
-			page_types: [
-				{
-					pagetype: "blog",
-					is_singleton: false,
-					field_classifications: [
-						{ field_path: "title", type: "string" },
-						{ field_path: "hero_section", type: "object" },
-						{ field_path: "hero_section.headline", type: "string" },
-						{ field_path: "hero_section.subheadline", type: "string" },
-						{ field_path: "hero_section.background_image", type: "image" },
-						{ field_path: "features", type: "repeater" },
-						{ field_path: "features.title", type: "string" },
-						{ field_path: "features.description", type: "string" },
-					],
-				},
-			],
-		};
-
-		const result = generateCmsContentModel(registry, classifiedModel);
-		const blogColl = result.collections[0];
-
-		const heroField = blogColl.fields.find((f) => f.name === "hero_section");
-		expect(heroField?.type).toBe("object");
-		expect(heroField?.fields).toHaveLength(3);
-		expect(heroField?.fields?.map((f) => f.name)).toEqual([
-			"headline",
-			"subheadline",
-			"background_image",
-		]);
-		expect(heroField?.fields?.[2].type).toBe("image");
-
-		const featuresField = blogColl.fields.find((f) => f.name === "features");
-		expect(featuresField?.type).toBe("repeater");
-		expect(featuresField?.fields).toHaveLength(2);
-		expect(featuresField?.fields?.map((f) => f.name)).toEqual([
-			"title",
-			"description",
-		]);
-	});
-
-	it("creates parent for children without explicit parent classification", () => {
-		const classifiedModel: ClassifiedContentModel = {
-			page_types: [
-				{
-					pagetype: "blog",
-					is_singleton: false,
-					field_classifications: [
-						{ field_path: "seo.title", type: "string" },
-						{ field_path: "seo.description", type: "string" },
-					],
-				},
-			],
-		};
-
-		const result = generateCmsContentModel(registry, classifiedModel);
-		const blogColl = result.collections[0];
-
-		const seoField = blogColl.fields.find((f) => f.name === "seo");
-		expect(seoField?.type).toBe("object");
-		expect(seoField?.fields).toHaveLength(2);
-	});
-
-	it("includes singletons as singleton type", () => {
-		const classifiedModel: ClassifiedContentModel = {
-			page_types: [
-				{
-					pagetype: "landing",
-					is_singleton: true,
-					field_classifications: [{ field_path: "hero", type: "object" }],
-				},
-			],
-		};
-
-		const result = generateCmsContentModel(
-			{ ...registry, collections: {} },
-			classifiedModel,
-		);
-		const landing = result.collections.find((c) => c.name === "landing");
-		expect(landing).toBeDefined();
-		expect(landing?.type).toBe("singleton");
-	});
-});
-
-// ---------------------------------------------------------------------------
-// generateCmsAssetManifest
-// ---------------------------------------------------------------------------
-
-describe("generateCmsAssetManifest", () => {
-	it("transforms flat map to CMS format", () => {
-		const manifest = {
-			"https://example.com/hero.jpg": "abc123.jpg",
-			"https://example.com/logo.png": "def456.png",
-		};
-
-		const result = generateCmsAssetManifest(manifest);
-		expect(result.entries).toHaveLength(2);
-		expect(result.entries).toContainEqual({
-			localPath: "public/images/abc123.jpg",
-			originalUrl: "https://example.com/hero.jpg",
-		});
-		expect(result.entries).toContainEqual({
-			localPath: "public/images/def456.png",
-			originalUrl: "https://example.com/logo.png",
-		});
-	});
-
-	it("handles empty manifest", () => {
-		const result = generateCmsAssetManifest({});
-		expect(result.entries).toHaveLength(0);
 	});
 });

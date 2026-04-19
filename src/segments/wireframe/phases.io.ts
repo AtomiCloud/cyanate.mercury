@@ -30,17 +30,9 @@ import {
 import { Semaphore } from "../../lib/semaphore.js";
 import { agentStep, programmaticStep, reviewerStep } from "../../steps/step.js";
 import type { PageContent, SchemaData, StructureData } from "../../types.js";
-import type {
-	ArchitectureClassification,
-	ConflictReport,
-	ContentModelClassification,
-	ContentModelOutput,
-	InteractionClassification,
-} from "./classify.js";
+import type { ContentModelOutput } from "./classify.js";
 import {
 	buildComponentManifestFromFiles,
-	crossValidateClassifiers,
-	detectConflicts,
 	validateComponentManifestRefs,
 	validateContentModelRefs,
 	validateRegistryCompleteness,
@@ -50,10 +42,52 @@ import {
 	buildAssetManifest,
 	buildReducedMeta,
 	buildReducedTree,
-	groupByPageType,
 	rewriteInternalLinks,
-	selectSamples,
+	selectSamplesFromUrls,
 } from "./reduce.js";
+
+// ---------------------------------------------------------------------------
+// Local classifier output shapes (raw JSON produced by AI classifiers).
+// These are shapes of on-disk artifacts produced by the 3 parallel classifiers
+// in Phase 2, not re-exports of pure-module types.
+// ---------------------------------------------------------------------------
+
+interface ArchitectureClassification {
+	layouts?: Record<
+		string,
+		{
+			description?: string;
+			page_types?: string[];
+		}
+	>;
+	routes?: Array<{ pattern: string; pageType: string }>;
+}
+
+interface ContentModelClassification {
+	collections?: Record<
+		string,
+		{
+			source_pagetype: string;
+			slug_field: string;
+		}
+	>;
+	listings?: Record<
+		string,
+		{
+			route: string;
+		}
+	>;
+}
+
+interface InteractionClassification {
+	patterns?: Array<{
+		id: string;
+		type: string;
+		pageType: string;
+		description: string;
+	}>;
+}
+
 import {
 	generateCollectionEntries,
 	generateContentConfig,
@@ -179,27 +213,22 @@ export const reducePhase: PhaseDef = {
 					const pages = content.pages;
 					const siteUrl = structure.site_url ?? ctx.config.input;
 
-					// Build content map for selectSamples
-					const contentMap = new Map<string, PageContent>();
-					for (const p of pages) contentMap.set(p.id, p);
-
-					// Pure: group by page type
-					const grouped = groupByPageType(structure.pages);
-
 					// Pure: select richest + simplest per type
-					const samples = selectSamples(grouped, contentMap);
+					const samples = selectSamplesFromUrls(structure, pages);
 
 					// Pure: build asset manifest
 					const assetManifest = buildAssetManifest(pages);
 
 					// Pure: build route map for link rewriting
 					const routeMap = new Map<string, string>();
-					for (const page of structure.pages) {
-						try {
-							const path = new URL(page.url, siteUrl).pathname;
-							routeMap.set(path, path);
-						} catch {
-							routeMap.set(page.url, page.url);
+					for (const pt of structure.page_types) {
+						for (const url of pt.urls) {
+							try {
+								const path = new URL(url, siteUrl).pathname;
+								routeMap.set(path, path);
+							} catch {
+								routeMap.set(url, url);
+							}
 						}
 					}
 
@@ -237,19 +266,19 @@ export const reducePhase: PhaseDef = {
 					await downloadAssetImages(assetManifest, imagesDir);
 
 					// Build reduced metadata (conforming to ReducedMeta type)
-					const scrapedAt = structure.scraped_at ?? new Date().toISOString();
 					const metadata = buildReducedMeta(
-						grouped,
+						structure,
 						pages,
-						schema ?? {},
-						siteUrl,
-						scrapedAt,
+						(schema?.pages ?? {}) as Record<
+							string,
+							{ type: string; properties: Record<string, unknown> }
+						>,
 					);
 
 					await writeJson(ctx.workdir, "reduced-meta.json", metadata);
 
-					ctx.logger.startStep(
-						`Reduced ${pages.length} pages into ${grouped.size} types`,
+					ctx.logger.note(
+						`Reduced ${pages.length} pages into ${structure.page_types.length} types`,
 					);
 
 					return { status: "pass", duration: Date.now() - start };
@@ -392,8 +421,7 @@ Output a JSON object:
   },
   "listings": {
     "<listing_name>": {
-      "route": "/<route>",
-      "paginated": true
+      "route": "/<route>"
     }
   }
 }
@@ -520,25 +548,7 @@ Output ONLY the JSON.`,
 						};
 					}
 
-					const knownPageTypes = reducedMeta.page_types.map((p) => p.pagetype);
 					const allErrors: string[] = [];
-
-					// Cross-validate
-					const cvResult = crossValidateClassifiers(
-						arch,
-						cm,
-						interaction,
-						knownPageTypes,
-					);
-					allErrors.push(...cvResult.errors);
-
-					// Detect conflicts between classifiers
-					const conflicts: ConflictReport = detectConflicts(arch, cm);
-					for (const conflict of conflicts.conflicts) {
-						allErrors.push(
-							`Classifier conflict (${conflict.type}): ${conflict.description}`,
-						);
-					}
 
 					// Validate route patterns
 					if (arch.routes) {
@@ -746,7 +756,6 @@ If rejecting, list specific issues and provide REJECTION CONTEXT with actionable
 		    "<name>": {
 		      "route": "...",
 		      "queries": [...],
-		      "paginated": true,
 		      "searchable": false
 		    }
 		  }
@@ -754,8 +763,8 @@ If rejecting, list specific issues and provide REJECTION CONTEXT with actionable
 
 		Rules:
 		- Every multi-page type should have a collection
-		- Collections with multiple pages should have "paginated": true in their listing
 		- Collection pages get dynamic routes with [slug]
+		- All listings are paginated by default; pagination UI is hidden when only one page exists
 
 		Output ONLY the JSON.`;
 			},
@@ -1056,13 +1065,13 @@ If rejecting, list specific issues and provide REJECTION CONTEXT with actionable
 
 				// No errors — skip entirely, do not spawn agent
 				if (!errors || errors.length === 0) {
-					ctx.logger.startStep(
+					ctx.logger.note(
 						"No registry conflicts found — skipping conflict resolution",
 					);
 					return { status: "pass", duration: Date.now() - start };
 				}
 
-				ctx.logger.startStep(`Resolving ${errors.length} registry conflict(s)`);
+				ctx.logger.note(`Resolving ${errors.length} registry conflict(s)`);
 
 				const registry = await readJson<Record<string, unknown>>(
 					ctx.workdir,
@@ -1181,7 +1190,7 @@ export const seedPhase: PhaseDef = {
 							recursive: true,
 						});
 					} catch (err) {
-						ctx.logger.startStep(
+						ctx.logger.note(
 							`Template copy warning: ${String(err)} — creating minimal project structure`,
 						);
 						// Fallback: create minimal project structure
@@ -1241,7 +1250,7 @@ export const seedPhase: PhaseDef = {
 					);
 
 					// Pure: generate route files
-					const routeFiles = generateRouteFiles(registry, cmOutput);
+					const routeFiles = generateRouteFiles(registry);
 
 					// IO: write route files
 					for (const file of routeFiles) {
@@ -1294,7 +1303,7 @@ export const seedPhase: PhaseDef = {
 						};
 					}
 
-					ctx.logger.startStep(
+					ctx.logger.note(
 						`Seeded ${collectionEntries.length} collection entries, ${routeFiles.length} route files, ${globals.length} global data files`,
 					);
 
@@ -1833,7 +1842,7 @@ export const validatePhase: PhaseDef = {
 						};
 					}
 
-					ctx.logger.startStep(
+					ctx.logger.note(
 						"Wireframe validation passed — all invariants satisfied",
 					);
 

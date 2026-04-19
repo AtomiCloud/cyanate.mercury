@@ -9,7 +9,7 @@ import type { Review, StepResult } from "../engine/types.js";
 // Pure verdict parsing
 // ---------------------------------------------------------------------------
 
-export interface ParsedVerdict {
+interface ParsedVerdict {
 	verdict: "pass" | "reject";
 	findings: string;
 	rejectionContext?: string;

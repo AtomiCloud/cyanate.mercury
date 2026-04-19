@@ -38,7 +38,7 @@ const ReviewerMatrixEntrySchema = z.object({
 	aggregation: z.literal("any_reject").optional(),
 });
 
-export const CuiConfigSchema = z.object({
+const CuiConfigSchema = z.object({
 	input: z.string(),
 	reference: z.string().optional(),
 	defaults: LLMProfileSchema.default({
@@ -61,6 +61,16 @@ export const CuiConfigSchema = z.object({
 	providers: z.record(z.string(), LLMProfileSchema).optional(),
 	reviewer_matrix: z.record(z.string(), ReviewerMatrixEntrySchema).optional(),
 	step_matrix: z.record(z.string(), z.string()).optional(),
+	classify: z
+		.object({
+			localSonicJsUrl: z.string().url(),
+		})
+		.optional(),
+	concurrency: z
+		.object({
+			maxQueries: z.number().int().positive().optional(),
+		})
+		.optional(),
 });
 
 export function loadConfig(configPath: string): CuiConfig {

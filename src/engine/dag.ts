@@ -6,6 +6,7 @@
  */
 
 import type { PipelineLogger } from "../lib/logger.js";
+import { describeIdentityDivergence, resolveIdentity } from "./identity.js";
 import { MetricsWriter } from "./metrics.js";
 import type { SegmentRegistry } from "./registry.js";
 import { runSegment, type SegmentRunResult } from "./segment-runner.js";
@@ -43,11 +44,38 @@ export async function runDag(opts: DagRunOptions): Promise<DagRunResult> {
 
 	validateRegistry(registry);
 
+	// Resolve identity from dep chain (or fall back to cui.yaml).
+	const identity = await resolveIdentity({ config, depOverrides });
+
+	// Build effective config with sealed identity — all downstream steps see
+	// the resolved input/reference, not whatever cui.yaml currently says.
+	const effectiveConfig: CuiConfig = {
+		...config,
+		input: identity.input,
+		reference: identity.reference,
+	};
+
+	// Surface divergence so operators see when cui.yaml was overridden.
+	const divergence = describeIdentityDivergence(identity, {
+		input: config.input,
+		reference: config.reference,
+	});
+	if (divergence) {
+		console.log(`[identity] ${divergence}`);
+	}
+
 	const runId = generateRunId();
 	const runDir = await createRunDir(rootDir, runId);
 	const metrics = new MetricsWriter(runDir);
 	const order = resolveOrder(registry, startSegment);
-	const runState = createRunState(runId, order);
+	const runState = createRunState({
+		runId,
+		segmentIds: order,
+		identity,
+		config: effectiveConfig,
+		startSegment,
+		depOverrides: depOverrides ?? {},
+	});
 	await writeRunState(runDir, runState);
 
 	const outputs: Record<string, string> = { ...depOverrides };
@@ -63,7 +91,7 @@ export async function runDag(opts: DagRunOptions): Promise<DagRunResult> {
 		runState,
 		runDir,
 		registry,
-		config,
+		effectiveConfig,
 		logger,
 		metrics,
 		startSegment,

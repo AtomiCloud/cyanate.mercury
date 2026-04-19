@@ -7,11 +7,15 @@ import { runCheckCommands, runSelfCheckLoop } from "./self-check.js";
 
 function noopLogger(): PipelineLogger {
 	return {
-		startStep() {},
+		startStep() {
+			return { id: "noop" };
+		},
 		updateTurn() {},
 		completeStep() {},
 		failStep() {},
 		skipStep() {},
+		note() {},
+		setQueueDepthProvider() {},
 		startSegment() {},
 		finishSegment() {
 			return {

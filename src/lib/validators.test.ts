@@ -2,15 +2,10 @@ import { describe, expect, test } from "bun:test";
 import type { DesignTokensV2 } from "../types.js";
 import {
 	AssetManifestSchema,
-	ComponentManifestSchema,
 	ComponentRecipesSchema,
 	ContentModelSchema,
 	DesignTokensV2Schema,
 	findLeakedAbsoluteUrls,
-	findTailwindClasses,
-	QualityScoresSchema,
-	ReducedMetaSchema,
-	RegistrySchema,
 	StyleFingerprintSchema,
 	validateAssetIntegrity,
 	validateContentCoverage,
@@ -238,108 +233,6 @@ describe("ComponentRecipesSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// RegistrySchema
-// ---------------------------------------------------------------------------
-
-describe("RegistrySchema", () => {
-	test("valid registry → passes", () => {
-		const result = RegistrySchema.safeParse({
-			layouts: {},
-			collections: {},
-			listings: {},
-			static_pages: [{ pagetype: "home", route: "/" }],
-		});
-		expect(result.success).toBe(true);
-	});
-
-	test("invalid interaction type → fails", () => {
-		const result = RegistrySchema.safeParse({
-			layouts: {},
-			collections: {},
-			listings: {},
-			static_pages: [],
-			interactive_patterns: [
-				{
-					id: "p1",
-					type: "invalid_type" as "fragment",
-					description: "test",
-				},
-			],
-		});
-		expect(result.success).toBe(false);
-	});
-});
-
-// ---------------------------------------------------------------------------
-// ReducedMetaSchema
-// ---------------------------------------------------------------------------
-
-describe("ReducedMetaSchema", () => {
-	test("valid meta → passes", () => {
-		const result = ReducedMetaSchema.safeParse({
-			source: {
-				total_pages: 10,
-				page_types: 3,
-				scraped_at: "2025-01-01",
-				site_url: "https://example.com",
-			},
-			global_keys: ["title", "description"],
-			page_types: [
-				{
-					pagetype: "blog",
-					route: "/blog/:slug",
-					count: 5,
-					multi: true,
-					has_pagination: true,
-					schema_keys: ["title"],
-					own_keys: [],
-				},
-			],
-			pagination_candidates: [],
-		});
-		expect(result.success).toBe(true);
-	});
-});
-
-// ---------------------------------------------------------------------------
-// QualityScoresSchema
-// ---------------------------------------------------------------------------
-
-describe("QualityScoresSchema", () => {
-	test("valid scores → passes", () => {
-		const result = QualityScoresSchema.safeParse({
-			overall: 8.5,
-			dimensions: {
-				layoutConsistency: 9,
-				designTokenUsage: 8,
-				componentComposition: 7,
-				responsiveDesign: 9,
-				semanticHtml: 10,
-				visualAppeal: 8,
-				motionQuality: 7,
-			},
-		});
-		expect(result.success).toBe(true);
-	});
-
-	test("overall > 10 → fails", () => {
-		const result = QualityScoresSchema.safeParse({
-			overall: 15,
-			dimensions: {
-				layoutConsistency: 9,
-				designTokenUsage: 8,
-				componentComposition: 7,
-				responsiveDesign: 9,
-				semanticHtml: 10,
-				visualAppeal: 8,
-				motionQuality: 7,
-			},
-		});
-		expect(result.success).toBe(false);
-	});
-});
-
-// ---------------------------------------------------------------------------
 // ContentModelSchema
 // ---------------------------------------------------------------------------
 
@@ -358,23 +251,6 @@ describe("ContentModelSchema", () => {
 			pages: [{ id: "1", url: "https://example.com/", content: {} }],
 		});
 		expect(result.success).toBe(false);
-	});
-});
-
-// ---------------------------------------------------------------------------
-// ComponentManifestSchema
-// ---------------------------------------------------------------------------
-
-describe("ComponentManifestSchema", () => {
-	test("valid → passes", () => {
-		const result = ComponentManifestSchema.safeParse({
-			Button: {
-				file: "src/components/Button.astro",
-				props: { label: "string" },
-				slots: ["default"],
-			},
-		});
-		expect(result.success).toBe(true);
 	});
 });
 
@@ -917,141 +793,6 @@ describe("findLeakedAbsoluteUrls", () => {
 			},
 			"https://original.com",
 		);
-		expect(result).toEqual([]);
-	});
-});
-
-describe("findTailwindClasses", () => {
-	test("no Tailwind classes → empty array", () => {
-		const result = findTailwindClasses({
-			"Button.astro": '<button class="btn btn-primary">Click</button>',
-		});
-		expect(result).toEqual([]);
-	});
-
-	test("Tailwind classes found → reported", () => {
-		const result = findTailwindClasses({
-			"Card.astro":
-				'<div class="flex items-center gap-4 p-4 rounded-lg">content</div>',
-		});
-		expect(result).toHaveLength(1);
-		expect(result[0].file).toBe("Card.astro");
-		expect(result[0].classes.length).toBeGreaterThan(0);
-	});
-
-	test("variant-prefixed utilities (md:flex, hover:bg-red-500) → detected", () => {
-		const result = findTailwindClasses({
-			"Card.astro":
-				'<div class="md:flex hover:bg-red-500 lg:text-center">content</div>',
-		});
-		expect(result).toHaveLength(1);
-		expect(result[0].classes).toContain("md:flex");
-		expect(result[0].classes).toContain("hover:bg-red-500");
-		expect(result[0].classes).toContain("lg:text-center");
-	});
-
-	test("arbitrary value patterns ([100px], [calc(...)]) → detected as Tailwind", () => {
-		const result = findTailwindClasses({
-			"Card.astro": '<div class="w-[100px] h-[calc(100%-2rem)]">content</div>',
-		});
-		// Arbitrary values with Tailwind prefixes (w-, h-) are Tailwind classes
-		expect(result).toHaveLength(1);
-		expect(result[0].classes).toContain("w-[100px]");
-		expect(result[0].classes).toContain("h-[calc(100%-2rem)]");
-	});
-
-	test("non-component files skipped", () => {
-		const result = findTailwindClasses({
-			"globals.css": ".flex { display: flex; }",
-		});
-		expect(result).toEqual([]);
-	});
-
-	test("className prop also detected", () => {
-		const result = findTailwindClasses({
-			"Comp.tsx": '<div className="flex justify-center">hi</div>',
-		});
-		expect(result).toHaveLength(1);
-	});
-
-	test("multiline class attribute detected", () => {
-		const result = findTailwindClasses({
-			"Card.astro": `<div class="flex\n  items-center\n  gap-4\n  p-4">content</div>`,
-		});
-		expect(result).toHaveLength(1);
-		expect(result[0].classes).toContain("flex");
-		expect(result[0].classes).toContain("items-center");
-		expect(result[0].classes).toContain("gap-4");
-		expect(result[0].classes).toContain("p-4");
-	});
-
-	test("BEM-style class names are not flagged", () => {
-		const result = findTailwindClasses({
-			"Button.astro":
-				'<button class="btn btn-primary btn--large">Click</button>',
-		});
-		expect(result).toEqual([]);
-	});
-
-	test("common semantic class names are not flagged", () => {
-		const result = findTailwindClasses({
-			"Layout.astro": '<div class="hero container wrapper">content</div>',
-		});
-		expect(result).toEqual([]);
-	});
-
-	test("opacity modifier utilities detected (bg-red-500/50)", () => {
-		const result = findTailwindClasses({
-			"Card.astro": '<div class="bg-red-500/50 text-blue-600/75">content</div>',
-		});
-		expect(result).toHaveLength(1);
-		expect(result[0].classes).toContain("bg-red-500/50");
-		expect(result[0].classes).toContain("text-blue-600/75");
-	});
-
-	test("negative values detected (-mt-4, -z-10)", () => {
-		const result = findTailwindClasses({
-			"Card.astro": '<div class="-mt-4 -z-10">content</div>',
-		});
-		expect(result).toHaveLength(1);
-		expect(result[0].classes).toContain("-mt-4");
-		expect(result[0].classes).toContain("-z-10");
-	});
-
-	test("compound variant utilities detected (sm:hover:flex)", () => {
-		const result = findTailwindClasses({
-			"Card.astro":
-				'<div class="sm:hover:flex md:dark:bg-gray-900">content</div>',
-		});
-		expect(result).toHaveLength(1);
-		expect(result[0].classes).toContain("sm:hover:flex");
-		expect(result[0].classes).toContain("md:dark:bg-gray-900");
-	});
-
-	test("w-full and h-screen are detected", () => {
-		const result = findTailwindClasses({
-			"Comp.astro":
-				'<div class="w-full h-screen min-w-0 max-w-prose">content</div>',
-		});
-		expect(result).toHaveLength(1);
-		expect(result[0].classes).toContain("w-full");
-		expect(result[0].classes).toContain("h-screen");
-		expect(result[0].classes).toContain("min-w-0");
-	});
-
-	test("font-bold, font-semibold, font-medium are detected", () => {
-		const result = findTailwindClasses({
-			"Comp.astro": '<span class="font-bold text-lg">text</span>',
-		});
-		expect(result).toHaveLength(1);
-		expect(result[0].classes).toContain("font-bold");
-		expect(result[0].classes).toContain("text-lg");
-	});
-
-	test("common UI class names like 'active' and 'disabled' not flagged", () => {
-		const result = findTailwindClasses({
-			"Nav.astro": '<a class="nav-link active" href="/about">About</a>',
-		});
 		expect(result).toEqual([]);
 	});
 });

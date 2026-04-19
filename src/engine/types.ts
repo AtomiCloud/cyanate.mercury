@@ -189,11 +189,47 @@ export interface PipelineState {
 // Run state (run.json at top level)
 // ---------------------------------------------------------------------------
 
+/**
+ * Identity of a run — sticky across `--dep` and resume.
+ *
+ * Identity captures *what* the pipeline processed, not *how* it processed it.
+ * When a new run uses `--dep <prior-run>`, it inherits the prior run's identity
+ * so artifacts stay consistent across segment boundaries even if `cui.yaml`
+ * has since been edited to point at a different example / reference.
+ */
+export interface RunIdentity {
+	/** Scraper output directory that the prepare segment read from. */
+	input: string;
+	/** Reference website URL that the analyze segment extracted design from. */
+	reference?: string;
+}
+
 export interface RunState {
 	runId: string;
 	status: "running" | "completed" | "failed";
 	startedAt: string;
 	finishedAt?: string;
+	/**
+	 * Sealed identity for this run — written at run start, never mutated.
+	 * Optional on reads to tolerate legacy run.json files predating this field.
+	 */
+	identity?: RunIdentity;
+	/**
+	 * Effective cui.yaml for this run, with input/reference replaced by the
+	 * identity inherited from --dep upstream runs. Written at run start, never
+	 * mutated. Optional for backwards compatibility with legacy run.json files.
+	 */
+	config?: CuiConfig;
+	/**
+	 * The segment this run started from (--segment flag). Undefined means
+	 * started from the DAG root (full pipeline run).
+	 */
+	startSegment?: string;
+	/**
+	 * Resolved --dep overrides the run was launched with, as absolute paths
+	 * keyed by segment id. Empty map for runs launched without --dep.
+	 */
+	depOverrides?: Record<string, string>;
 	segments: Record<
 		string,
 		{
@@ -247,21 +283,21 @@ export interface MergeResult {
 // Config (cui.yaml)
 // ---------------------------------------------------------------------------
 
-export interface HeartbeatConfig {
+interface HeartbeatConfig {
 	/** ms before an agent is considered dead (default: 900000 = 15min) */
 	timeout: number;
 	/** ms between heartbeat logs in non-interactive mode (default: 30000 = 30s) */
 	interval: number;
 }
 
-export interface LoggingConfig {
+interface LoggingConfig {
 	/** Filename for agent event logs (default: "agent-events.jsonl") */
 	eventsFile: string;
 	/** Filename for debug logs (default: "agent-debug.log") */
 	debugFile: string;
 }
 
-export interface ReviewerMatrixEntry {
+interface ReviewerMatrixEntry {
 	/** Provider keys to use for this reviewer */
 	providers: string[];
 	/** How to aggregate: any provider rejects = reject (default), all must pass */
@@ -287,4 +323,14 @@ export interface CuiConfig {
 	reviewer_matrix?: Record<string, ReviewerMatrixEntry>;
 	/** Per-step provider override: stepId → provider key */
 	step_matrix?: Record<string, string>;
+	/** Classify segment config */
+	classify?: {
+		/** Local SonicJS instance URL for Phase 9d roundtrip gate. */
+		localSonicJsUrl: string;
+	};
+	/** Global concurrency controls */
+	concurrency?: {
+		/** Max concurrent Claude SDK query() calls across the entire run. */
+		maxQueries?: number;
+	};
 }

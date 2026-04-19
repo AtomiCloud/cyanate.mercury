@@ -13,8 +13,10 @@ import { randomUUID } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
+	CuiConfig,
 	IterationState,
 	PipelineState,
+	RunIdentity,
 	RunState,
 	StepState,
 } from "./types.js";
@@ -109,15 +111,28 @@ export async function writeRunState(
 	await rename(tmp, target);
 }
 
-export function createRunState(runId: string, segmentIds: string[]): RunState {
+interface CreateRunStateOptions {
+	runId: string;
+	segmentIds: string[];
+	identity: RunIdentity;
+	config?: CuiConfig;
+	startSegment?: string;
+	depOverrides?: Record<string, string>;
+}
+
+export function createRunState(opts: CreateRunStateOptions): RunState {
 	const segments: RunState["segments"] = {};
-	for (const id of segmentIds) {
+	for (const id of opts.segmentIds) {
 		segments[id] = { status: "pending" };
 	}
 	return {
-		runId,
+		runId: opts.runId,
 		status: "running",
 		startedAt: new Date().toISOString(),
+		identity: opts.identity,
+		config: opts.config,
+		startSegment: opts.startSegment,
+		depOverrides: opts.depOverrides,
 		segments,
 	};
 }

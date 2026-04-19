@@ -164,43 +164,6 @@ function rewriteValue(
 }
 
 // ---------------------------------------------------------------------------
-// classifyUrls
-// ---------------------------------------------------------------------------
-
-/**
- * Classify URLs into internal, external, and CMS-specific buckets.
- */
-export function classifyUrls(
-	urls: string[],
-	siteUrl: string,
-	cmsPatterns: string[] = ["/wp-content/", "/wp-admin/", "/wp-json/", "/cms/"],
-): { internal: string[]; external: string[]; cms: string[] } {
-	const origin = (() => {
-		try {
-			return new URL(siteUrl).origin;
-		} catch {
-			return siteUrl;
-		}
-	})();
-
-	const internal: string[] = [];
-	const external: string[] = [];
-	const cms: string[] = [];
-
-	for (const url of urls) {
-		if (cmsPatterns.some((p) => url.includes(p))) {
-			cms.push(url);
-		} else if (url.startsWith(origin)) {
-			internal.push(url);
-		} else {
-			external.push(url);
-		}
-	}
-
-	return { internal, external, cms };
-}
-
-// ---------------------------------------------------------------------------
 // buildReducedTree
 // ---------------------------------------------------------------------------
 

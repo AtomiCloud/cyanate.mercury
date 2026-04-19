@@ -9,8 +9,9 @@ import {
 	buildPageTypeMeta,
 	buildPreparedPages,
 	convertUrlPattern,
-	extractSlugParam,
 	flattenContent,
+	normalizePlaceholderName,
+	normalizeStructurePatterns,
 	resolveSchemaPages,
 	validateContentAgainstSchema,
 } from "./ingest.js";
@@ -378,15 +379,110 @@ describe("convertUrlPattern", () => {
 	});
 });
 
-describe("extractSlugParam", () => {
-	it("extracts from dynamic patterns", () => {
-		expect(extractSlugParam("/team/{slug}/")).toBe("slug");
-		expect(extractSlugParam("/{service}/")).toBe("service");
-		expect(extractSlugParam("/post/{slug}/")).toBe("slug");
+describe("normalizePlaceholderName", () => {
+	it("replaces hyphens inside placeholders with underscores", () => {
+		expect(normalizePlaceholderName("/{service-path}/")).toBe(
+			"/{service_path}/",
+		);
+		expect(normalizePlaceholderName("/{legal-page}/")).toBe("/{legal_page}/");
 	});
 
-	it("returns undefined for static patterns", () => {
-		expect(extractSlugParam("/")).toBeUndefined();
-		expect(extractSlugParam("/about/")).toBeUndefined();
+	it("leaves hyphens in static segments alone", () => {
+		expect(normalizePlaceholderName("/about-us/")).toBe("/about-us/");
+		expect(normalizePlaceholderName("/news-events/")).toBe("/news-events/");
+	});
+
+	it("normalizes only placeholder names, not surrounding path", () => {
+		expect(normalizePlaceholderName("/news-events/{legal-page}/")).toBe(
+			"/news-events/{legal_page}/",
+		);
+	});
+
+	it("is a no-op for identifier-safe patterns", () => {
+		expect(normalizePlaceholderName("/")).toBe("/");
+		expect(normalizePlaceholderName("/team/{slug}/")).toBe("/team/{slug}/");
+		expect(normalizePlaceholderName("/{service}/")).toBe("/{service}/");
+	});
+
+	it("handles multiple placeholders in one pattern", () => {
+		expect(normalizePlaceholderName("/{a-b}/{c-d}/")).toBe("/{a_b}/{c_d}/");
+	});
+});
+
+describe("normalizeStructurePatterns", () => {
+	it("rewrites url_pattern on every page type", () => {
+		const input: StructureData = {
+			site_url: "https://example.com",
+			page_types: [
+				{
+					name: "home",
+					url_pattern: "/",
+					description: "",
+					sample_urls: [],
+					urls: ["/"],
+				},
+				{
+					name: "service",
+					url_pattern: "/{service-path}/",
+					description: "",
+					sample_urls: [],
+					urls: ["/cardiology/"],
+				},
+				{
+					name: "legal",
+					url_pattern: "/{legal-page}/",
+					description: "",
+					sample_urls: [],
+					urls: ["/privacy/"],
+				},
+			],
+		};
+
+		const result = normalizeStructurePatterns(input);
+
+		expect(result.page_types[0].url_pattern).toBe("/");
+		expect(result.page_types[1].url_pattern).toBe("/{service_path}/");
+		expect(result.page_types[2].url_pattern).toBe("/{legal_page}/");
+	});
+
+	it("does not mutate the input", () => {
+		const input: StructureData = {
+			page_types: [
+				{
+					name: "service",
+					url_pattern: "/{service-path}/",
+					description: "",
+					sample_urls: [],
+					urls: [],
+				},
+			],
+		};
+		normalizeStructurePatterns(input);
+		expect(input.page_types[0].url_pattern).toBe("/{service-path}/");
+	});
+
+	it("preserves all other fields", () => {
+		const input: StructureData = {
+			site_url: "https://example.com",
+			scraped_at: "2026-04-13",
+			total_crawled: 10,
+			page_types: [
+				{
+					name: "svc",
+					url_pattern: "/{service-path}/",
+					description: "desc",
+					sample_urls: ["/a/"],
+					urls: ["/a/", "/b/"],
+				},
+			],
+		};
+		const result = normalizeStructurePatterns(input);
+		expect(result.site_url).toBe("https://example.com");
+		expect(result.scraped_at).toBe("2026-04-13");
+		expect(result.total_crawled).toBe(10);
+		expect(result.page_types[0].name).toBe("svc");
+		expect(result.page_types[0].description).toBe("desc");
+		expect(result.page_types[0].sample_urls).toEqual(["/a/"]);
+		expect(result.page_types[0].urls).toEqual(["/a/", "/b/"]);
 	});
 });

@@ -9,13 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-	cleanupForks,
-	computeManifest,
-	createForks,
-	diffFork,
-	mergeForks,
-} from "./fork.js";
+import { computeManifest, createForks, diffFork, mergeForks } from "./fork.js";
 
 describe("fork", () => {
 	let tmpDir: string;
@@ -175,28 +169,6 @@ describe("fork", () => {
 		expect(result.conflicts?.[0].path).toBe("README.md");
 		expect(result.conflicts?.[0].forkIds).toContain("a");
 		expect(result.conflicts?.[0].forkIds).toContain("b");
-	});
-
-	it("cleanupForks removes fork dirs", async () => {
-		const workdir = await makeWorkdir();
-		const plan = await createForks(workdir, ["a", "b"], 3);
-
-		// Verify forks exist
-		for (const fork of plan.forks) {
-			const entries = await readdir(fork.dir);
-			expect(entries.length).toBeGreaterThan(0);
-		}
-
-		await cleanupForks(plan);
-
-		// Verify forks are removed
-		for (const fork of plan.forks) {
-			const exists = await readdir(fork.dir).then(
-				() => true,
-				() => false,
-			);
-			expect(exists).toBe(false);
-		}
 	});
 
 	it("computeManifest skips node_modules and .astro", async () => {

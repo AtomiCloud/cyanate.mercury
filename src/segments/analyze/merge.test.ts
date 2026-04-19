@@ -13,7 +13,6 @@ import {
 	normalizeRawTokens,
 	walkNumericLeaves,
 	walkOklchLeaves,
-	walkTypographyLeaves,
 } from "./merge.js";
 
 // ---------------------------------------------------------------------------
@@ -75,33 +74,6 @@ describe("walkOklchLeaves", () => {
 	it("skips non-OKLCH strings", () => {
 		const result = walkOklchLeaves({ bg: "#fff", name: "primary" }, "");
 		expect(result).toEqual([]);
-	});
-});
-
-// ---------------------------------------------------------------------------
-// walkTypographyLeaves
-// ---------------------------------------------------------------------------
-
-describe("walkTypographyLeaves", () => {
-	it("extracts families, sizes, and weights", () => {
-		const result = walkTypographyLeaves({
-			fontFamilies: { sans: "Inter", mono: "Fira Code" },
-			heading: { h1: { size: "72px", weight: 700 } },
-			body: { size: "16px", weight: 400 },
-		});
-		expect(result.families).toContain("Inter");
-		expect(result.families).toContain("Fira Code");
-		expect(result.sizes).toContain("72px");
-		expect(result.sizes).toContain("16px");
-		expect(result.weights).toContain(700);
-		expect(result.weights).toContain(400);
-	});
-
-	it("empty object returns empty arrays", () => {
-		const result = walkTypographyLeaves({});
-		expect(result.families).toEqual([]);
-		expect(result.sizes).toEqual([]);
-		expect(result.weights).toEqual([]);
 	});
 });
 

@@ -13,7 +13,7 @@ export interface StructureData {
 	page_types: PageType[];
 }
 
-export interface PageType {
+interface PageType {
 	name: string;
 	url_pattern: string;
 	description: string;
@@ -37,7 +37,7 @@ export interface ContentData {
 	page_types: Record<string, { entries: ContentEntry[] }>;
 }
 
-export interface ContentEntry {
+interface ContentEntry {
 	url: string;
 	content: Record<string, unknown>;
 }
@@ -157,7 +157,7 @@ export interface ComponentRecipes {
 	[componentName: string]: ComponentRecipe;
 }
 
-export interface ComponentRecipe {
+interface ComponentRecipe {
 	base: Record<string, unknown>;
 	variants: Record<string, Record<string, unknown>>;
 	states?: Record<string, Record<string, unknown>>;
@@ -180,7 +180,7 @@ export interface ReducedMeta {
 	}>;
 }
 
-export interface PageTypeInfo {
+interface PageTypeInfo {
 	pagetype: string;
 	route: string;
 	count: number;
@@ -223,7 +223,7 @@ export interface Registry {
 				filter?: string;
 				[key: string]: unknown;
 			}>;
-			paginated: boolean;
+			paginated?: boolean;
 			searchable?: boolean;
 			search_fields?: string[];
 		}
@@ -237,7 +237,7 @@ export interface Registry {
 	interactive_patterns?: InteractionPattern[];
 }
 
-export interface InteractionPattern {
+interface InteractionPattern {
 	id: string;
 	type:
 		| "fragment"
@@ -256,15 +256,6 @@ export interface InteractionPattern {
 	description: string;
 }
 
-export interface InteractionManifest {
-	patterns: InteractionPattern[];
-	pages: Array<{
-		route: string;
-		ids: string[];
-		triggers: string[];
-	}>;
-}
-
 // --- Phase 6: Quality ---
 
 export interface QualityScores {
@@ -278,78 +269,4 @@ export interface QualityScores {
 		visualAppeal: number;
 		motionQuality: number;
 	};
-}
-
-export interface TestReport {
-	timestamp: string;
-	pages: Array<{
-		url: string;
-		loadOk: boolean;
-		consoleErrors: string[];
-		brokenLinks: string[];
-	}>;
-	responsive: {
-		mobile375: { passed: boolean; issues: string[] };
-		tablet768: { passed: boolean; issues: string[] };
-		desktop1280: { passed: boolean; issues: string[] };
-	};
-	functional: {
-		linksChecked: number;
-		brokenLinks: string[];
-		buttonsChecked: number;
-		brokenButtons: string[];
-	};
-}
-
-// --- Config types ---
-
-/**
- * @deprecated Use CuiConfig from engine/types.ts instead.
- * This type is kept for backwards compatibility with archived v1 code.
- */
-export interface CuiConfig {
-	/** Path to scraper output directory */
-	input: string;
-	/** Reference website URL for design extraction */
-	reference?: string;
-	/** Default env profile name (e.g., "claude" -> .env.claude) */
-	profile: string;
-	/** Env profile for reviewer agents. Falls back to `profile` if not set. */
-	reviewerProfile?: string;
-	/** Model ID for vision-capable reviewers. */
-	visionModel?: string;
-	/** Per-step overrides keyed by step ID */
-	steps?: Record<string, StepConfigOverride>;
-}
-
-export interface StepConfigOverride {
-	profile?: string;
-	env?: Record<string, string>;
-	skip?: boolean;
-	maxConcurrentPageAgents?: number;
-}
-
-// --- Run metadata ---
-
-export interface RunMetadata {
-	runId: string;
-	status: "running" | "completed" | "failed";
-	config: CuiConfig;
-	inputPath: string;
-	referenceUrl?: string;
-	profileName: string;
-	runDir: string;
-	createdAt: string;
-	finishedAt?: string;
-	completedSteps: string[];
-	failedStep?: string;
-	resumedFrom?: string;
-}
-
-// --- Phase gate validation ---
-
-export interface PhaseGateResult {
-	passed: boolean;
-	errors: string[];
-	warnings?: string[];
 }

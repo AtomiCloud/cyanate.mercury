@@ -6,7 +6,6 @@ import {
 	rewriteAllContent,
 	rewriteImageUrls,
 	rewriteInternalLinks,
-	updatePageUrls,
 } from "./rewrites.js";
 
 // ---------------------------------------------------------------------------
@@ -259,34 +258,6 @@ describe("collectExternalLinks", () => {
 		expect(twitter?.fieldPath).toBe("social.twitter");
 		const github = links.find((l) => l.url.includes("github"));
 		expect(github?.fieldPath).toBe("links[0].href");
-	});
-});
-
-// ---------------------------------------------------------------------------
-// updatePageUrls
-// ---------------------------------------------------------------------------
-
-describe("updatePageUrls", () => {
-	it("updates page URLs via urlMap", () => {
-		const pages: PreparedPage[] = [
-			{ url: "/home-physio/", pagetype: "service", content: {}, schema: {} },
-			{ url: "/about/", pagetype: "about", content: {}, schema: {} },
-		];
-		const urlMap = {
-			"/home-physio/": "/service/home-physio/",
-			"/about/": "/about/",
-		};
-		const updated = updatePageUrls(pages, urlMap);
-		expect(updated[0].url).toBe("/service/home-physio/");
-		expect(updated[1].url).toBe("/about/");
-	});
-
-	it("leaves URL unchanged when not in map", () => {
-		const pages: PreparedPage[] = [
-			{ url: "/orphan/", pagetype: "orphan", content: {}, schema: {} },
-		];
-		const updated = updatePageUrls(pages, {});
-		expect(updated[0].url).toBe("/orphan/");
 	});
 });
 

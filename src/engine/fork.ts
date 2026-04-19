@@ -243,12 +243,3 @@ export async function mergeForks(plan: ForkPlan): Promise<MergeResult> {
 	await applyChanges(toApply, plan);
 	return { status: "clean", applied: toApply };
 }
-
-/**
- * Remove all fork directories.
- */
-export async function cleanupForks(plan: ForkPlan): Promise<void> {
-	for (const fork of plan.forks) {
-		await rm(fork.dir, { recursive: true, force: true });
-	}
-}

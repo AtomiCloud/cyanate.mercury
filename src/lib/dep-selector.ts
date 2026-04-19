@@ -11,6 +11,7 @@ import { search } from "@inquirer/prompts";
 import chalk from "chalk";
 import type { SegmentRegistry } from "../engine/registry.js";
 import { readRunState } from "../engine/state.js";
+import type { RunIdentity } from "../engine/types.js";
 
 /**
  * Interactively select dependency outputs for a segment.
@@ -90,6 +91,7 @@ export async function selectDependencies(
 interface RunInfo {
 	runId: string;
 	runDir: string;
+	identity?: RunIdentity;
 	segments: Record<string, { status: string; outputDir?: string }>;
 }
 
@@ -105,6 +107,7 @@ async function loadRunStates(
 			runs.push({
 				runId: dirName,
 				runDir,
+				identity: state.identity,
 				segments: state.segments,
 			});
 		}
@@ -122,14 +125,21 @@ function buildChoices(
 		const seg = run.segments[depSegmentId];
 		if (seg?.status === "completed" && seg.outputDir) {
 			const dateStr = formatRunDate(run.runId);
+			const identityStr = formatIdentity(run.identity);
 			choices.push({
-				name: `${dateStr}  ${chalk.green("completed")}  ${chalk.dim(seg.outputDir)}`,
+				name: `${dateStr}  ${chalk.green("completed")}  ${identityStr}  ${chalk.dim(seg.outputDir)}`,
 				value: seg.outputDir,
 			});
 		}
 	}
 
 	return choices;
+}
+
+function formatIdentity(identity: RunIdentity | undefined): string {
+	if (!identity) return chalk.yellow("identity: unknown");
+	const ref = identity.reference ? ` → ${identity.reference}` : "";
+	return chalk.cyan(`${identity.input}${ref}`);
 }
 
 function formatRunDate(runId: string): string {

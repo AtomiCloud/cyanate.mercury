@@ -64,7 +64,7 @@ function collectOptionalCommandError(
 	return undefined;
 }
 
-export interface ReviewerOpts {
+interface ReviewerOpts {
 	id: string;
 	name: string;
 	description: string;

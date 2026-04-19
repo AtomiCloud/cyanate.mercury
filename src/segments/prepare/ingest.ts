@@ -155,6 +155,41 @@ function extractRefName(ref: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// normalizeStructurePatterns
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize scraper-emitted placeholder names so they are identifier-safe.
+ *
+ * The scraper may emit placeholders containing hyphens (e.g. `/{service-path}/`,
+ * `/{legal-page}/`). Hyphens are illegal inside JS identifiers and would force
+ * bracket-notation access on `Astro.params` downstream, so we fold them to
+ * underscores at the ingest boundary. After normalization, every `{...}`
+ * placeholder is guaranteed to match `/^\{\w+\}$/`.
+ *
+ *   "/{service-path}/" → "/{service_path}/"
+ *   "/{legal-page}/"   → "/{legal_page}/"
+ *   "/team/{slug}/"    → "/team/{slug}/"   (unchanged)
+ */
+export function normalizePlaceholderName(pattern: string): string {
+	return pattern.replace(/\{([^}]+)\}/g, (_, name: string) => {
+		return `{${name.replace(/-/g, "_")}}`;
+	});
+}
+
+export function normalizeStructurePatterns(
+	structure: StructureData,
+): StructureData {
+	return {
+		...structure,
+		page_types: structure.page_types.map((pt) => ({
+			...pt,
+			url_pattern: normalizePlaceholderName(pt.url_pattern),
+		})),
+	};
+}
+
+// ---------------------------------------------------------------------------
 // convertUrlPattern
 // ---------------------------------------------------------------------------
 
@@ -172,22 +207,6 @@ export function convertUrlPattern(pattern: string): string {
 		return converted.slice(0, -1);
 	}
 	return converted;
-}
-
-// ---------------------------------------------------------------------------
-// extractSlugParam
-// ---------------------------------------------------------------------------
-
-/**
- * Extract the slug parameter name from a url_pattern.
- *
- *   "/team/{slug}/" → "slug"
- *   "/{service}/"   → "service"
- *   "/"             → undefined
- */
-export function extractSlugParam(urlPattern: string): string | undefined {
-	const match = /\{(\w+)\}/.exec(urlPattern);
-	return match ? match[1] : undefined;
 }
 
 // ---------------------------------------------------------------------------

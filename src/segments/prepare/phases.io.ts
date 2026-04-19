@@ -28,6 +28,7 @@ import {
 	buildPageTypeMeta,
 	buildPreparedPages,
 	flattenContent,
+	normalizeStructurePatterns,
 	type PageTypeMeta,
 	type PreparedPage,
 	reconcileMetaWithPages,
@@ -85,11 +86,17 @@ export const ingestPhase: PhaseDef = {
 			run: async (ctx) => {
 				const start = Date.now();
 				try {
-					const [structure, schema, content] = await Promise.all([
+					const [rawStructure, schema, content] = await Promise.all([
 						readJson<StructureData>(ctx.workdir, "structure.json"),
 						readJson<SchemaData>(ctx.workdir, "schema.json"),
 						readJson<ContentData>(ctx.workdir, "content.json"),
 					]);
+
+					// Normalize placeholder names (e.g. "{service-path}" → "{service_path}")
+					// so downstream regexes and Astro route params are identifier-safe.
+					// Write the normalized structure back so all later phases see it.
+					const structure = normalizeStructurePatterns(rawStructure);
+					await writeJson(ctx.workdir, "structure.json", structure);
 
 					const pages = flattenContent(content);
 					const resolvedSchemas = resolveSchemaPages(schema);
@@ -99,11 +106,11 @@ export const ingestPhase: PhaseDef = {
 						resolvedSchemas,
 					);
 					if (!validation.valid) {
-						ctx.logger.startStep(
+						ctx.logger.note(
 							`[prepare:ingest] ${validation.warnings.length} content/schema warnings`,
 						);
 						for (const w of validation.warnings) {
-							ctx.logger.startStep(
+							ctx.logger.note(
 								`  ${w.pageType} ${w.url}: missing ${w.missingField}`,
 							);
 						}
@@ -118,7 +125,7 @@ export const ingestPhase: PhaseDef = {
 						rawMeta.reduce((sum, m) => sum + m.urls.length, 0) -
 						meta.reduce((sum, m) => sum + m.urls.length, 0);
 					if (droppedCount > 0) {
-						ctx.logger.startStep(
+						ctx.logger.note(
 							`[prepare:ingest] dropped ${droppedCount} meta url(s) with no matching content`,
 						);
 					}
@@ -170,7 +177,7 @@ export const downloadAssetsPhase: PhaseDef = {
 					const pagesForScan = pages.map((p) => ({ content: p.content }));
 					const imageUrls = scanAllImageUrls(pagesForScan);
 
-					ctx.logger.startStep(
+					ctx.logger.note(
 						`[prepare:download] Found ${imageUrls.length} unique image URLs`,
 					);
 
@@ -191,7 +198,7 @@ export const downloadAssetsPhase: PhaseDef = {
 							);
 							entry.downloaded = true;
 						} catch (err) {
-							ctx.logger.startStep(
+							ctx.logger.note(
 								`[prepare:download] Failed: ${entry.originalUrl}: ${String(err)}`,
 							);
 							entry.downloaded = false;
@@ -206,7 +213,7 @@ export const downloadAssetsPhase: PhaseDef = {
 					await writeJson(ctx.workdir, "asset-manifest.json", manifest);
 
 					const downloaded = entries.filter((e) => e.downloaded).length;
-					ctx.logger.startStep(
+					ctx.logger.note(
 						`[prepare:download] ${downloaded}/${entries.length} images downloaded`,
 					);
 
@@ -292,18 +299,16 @@ export const resolveRoutesPhase: PhaseDef = {
 						(p) => p.rewritten,
 					);
 					if (rewritten.length > 0) {
-						ctx.logger.startStep(
+						ctx.logger.note(
 							`[prepare:routes] ${rewritten.length} page type(s) rewritten:`,
 						);
 						for (const r of rewritten) {
-							ctx.logger.startStep(
+							ctx.logger.note(
 								`  ${r.pageType}: ${r.originalPattern} → ${r.finalPattern}`,
 							);
 						}
 					} else {
-						ctx.logger.startStep(
-							"[prepare:routes] No route conflicts detected",
-						);
+						ctx.logger.note("[prepare:routes] No route conflicts detected");
 					}
 
 					return { status: "pass", duration: Date.now() - start };
@@ -359,7 +364,7 @@ export const applyRewritesPhase: PhaseDef = {
 						writeJson(ctx.workdir, "pages.json", preparedContent.pages),
 					]);
 
-					ctx.logger.startStep(
+					ctx.logger.note(
 						`[prepare:rewrites] ${preparedContent.externalLinks.length} external links collected`,
 					);
 
@@ -429,7 +434,7 @@ export const buildHeuristicsPhase: PhaseDef = {
 					const heuristics = buildHeuristicsData(pages);
 					await writeJson(ctx.workdir, "heuristics.json", heuristics);
 
-					ctx.logger.startStep(
+					ctx.logger.note(
 						`[prepare:heuristics] ${heuristics.totalPages} pages, ${heuristics.totalPageTypes} types, ${Object.keys(heuristics.fieldFrequency).length} fields`,
 					);
 
@@ -522,7 +527,7 @@ export const validateDatasetPhase: PhaseDef = {
 							)
 							.join("\n\n");
 
-						ctx.logger.startStep(`[prepare:validate] FAILED\n${details}`);
+						ctx.logger.note(`[prepare:validate] FAILED\n${details}`);
 
 						return {
 							status: "fail",
@@ -531,7 +536,7 @@ export const validateDatasetPhase: PhaseDef = {
 						};
 					}
 
-					ctx.logger.startStep("[prepare:validate] All 15 assertions passed");
+					ctx.logger.note("[prepare:validate] All 15 assertions passed");
 					return { status: "pass", duration: Date.now() - start };
 				} catch (err) {
 					return {

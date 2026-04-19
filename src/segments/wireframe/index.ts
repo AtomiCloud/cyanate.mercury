@@ -1,8 +1,15 @@
 /**
  * Wireframe segment registration.
  *
- * Segment 2 (FR-5): Transforms scraper output into a working unstyled Astro project.
- * No dependencies — runs independently in the DAG.
+ * Transforms classified content into a working unstyled Astro project.
+ * Depends on classify — receives classify's output (registry, content-model,
+ * resolved-entries, etc.) via mergeInputs.
+ *
+ * Note: the existing phases (reduce/classify/seed/generate/validate) still
+ * read raw scraper files via ctx.config.input. Full phase refactor per
+ * new/wireframe.md §4 (seed/generate-layouts/generate-components/
+ * generate-pages/content-gate) is deferred; this change only wires the DAG
+ * edge so run.json identity inheritance works correctly.
  */
 
 import { copyFile, cp, mkdir } from "node:fs/promises";
@@ -21,12 +28,38 @@ const wireframeSegment: SegmentDef = {
 	id: "wireframe",
 	name: "Wireframe",
 	description:
-		"Transform scraper output into an unstyled Astro project with content collections, routes, and wireframe components",
-	depends: [],
+		"Transform classified content into an unstyled Astro project with content collections, routes, and wireframe components",
+	depends: ["classify"],
 	phases: [reducePhase, classifyPhase, seedPhase, generatePhase, validatePhase],
-	mergeInputs: async (_workdir, _deps, _config) => {
-		// No-op: wireframe has no dependencies
-		// Input files are copied at step time by copyInputFilesToWorkdir()
+	mergeInputs: async (workdir, deps) => {
+		const classifyPath = deps.classify;
+		if (!classifyPath) return;
+
+		const files = [
+			// Core classified artifacts
+			"registry.json",
+			"globals.json",
+			"shared-components.json",
+			"field-classifications.json",
+			"render-maps.json",
+			"content-model-classified.json",
+			"content-model.json",
+			// Adapter-ready bundle
+			"resolved-entries.json",
+			"asset-manifest.json",
+			// Prepare pass-throughs (classify re-exports these)
+			"pages.json",
+			"page-type-meta.json",
+			"prepared-content.json",
+		];
+
+		for (const file of files) {
+			try {
+				await cp(join(classifyPath, file), join(workdir, file));
+			} catch {
+				// Not all files may exist — not fatal at merge time
+			}
+		}
 	},
 	extractOutput: async (workdir, outputDir) => {
 		await mkdir(outputDir, { recursive: true });

@@ -19,12 +19,6 @@ import type { DesignTokensV2 } from "../../types.js";
 // Public API
 // ---------------------------------------------------------------------------
 
-export interface ValidateAnalyzeOutputsInput {
-	fingerprint: unknown;
-	tokens: unknown;
-	recipes: unknown;
-}
-
 export interface ValidationResult {
 	valid: boolean;
 	errors: string[];
@@ -101,20 +95,4 @@ export function validateComponentRecipes(recipes: unknown): ValidationResult {
 	}
 
 	return { valid: errors.length === 0, errors };
-}
-
-/**
- * Run all analyze output validation checks.
- *
- * Composes validateDesignOutputs + validateComponentRecipes.
- */
-export function validateAnalyzeOutputs(
-	outputs: ValidateAnalyzeOutputsInput,
-): ValidationResult {
-	const design = validateDesignOutputs(outputs.fingerprint, outputs.tokens);
-	const components = validateComponentRecipes(outputs.recipes);
-	return {
-		valid: design.valid && components.valid,
-		errors: [...design.errors, ...components.errors],
-	};
 }

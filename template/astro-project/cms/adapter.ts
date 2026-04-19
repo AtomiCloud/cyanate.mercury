@@ -32,7 +32,7 @@ export interface FieldDef {
 
 export interface CollectionDef {
 	name: string;
-	type: "collection" | "singleton" | "global";
+	type: "collection" | "singleton" | "global" | "shared";
 	fields: FieldDef[];
 	slugField?: string; // which field is the slug (default: 'slug')
 }
@@ -50,7 +50,7 @@ export interface EntryData {
 
 export interface CollectionData {
 	name: string;
-	type: "collection" | "singleton" | "global";
+	type: "collection" | "singleton" | "global" | "shared";
 	entries: EntryData[];
 }
 

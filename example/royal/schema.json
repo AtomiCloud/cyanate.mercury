@@ -1,102 +1,26 @@
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://royal-healthcare.com/schema.json",
   "pages": {
     "landing": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
-      "description": "Homepage - Royal Healthcare landing page",
       "properties": {
-        "language_switcher": {
+        "skip_to_content_link": {
           "type": "object",
-          "description": "Language selection dropdown",
           "properties": {
-            "current_language": {
+            "href": {
               "type": "string"
-            },
-            "available_languages": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "code": {
-                    "type": "string"
-                  },
-                  "label": {
-                    "type": "string"
-                  },
-                  "url": {
-                    "type": "string"
-                  }
-                }
-              }
             }
           }
         },
         "header": {
-          "type": "object",
-          "description": "Site header with navigation",
-          "properties": {
-            "logo": {
-              "type": "object",
-              "properties": {
-                "src": {
-                  "type": "string"
-                },
-                "alt": {
-                  "type": "string"
-                }
-              }
-            },
-            "book_now_button": {
-              "type": "object",
-              "description": "Book appointment button triggers booking form",
-              "properties": {
-                "label": {
-                  "type": "string"
-                }
-              }
-            },
-            "primary_navigation": {
-              "type": "array",
-              "description": "Main navigation menu items",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "string"
-                  },
-                  "href": {
-                    "type": "string"
-                  },
-                  "has_dropdown": {
-                    "type": "boolean"
-                  },
-                  "dropdown_items": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "label": {
-                          "type": "string"
-                        },
-                        "href": {
-                          "type": "string"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "mobile_menu_toggle": {
-              "type": "string"
-            }
-          }
+          "$ref": "#/$defs/header"
         },
         "hero_section": {
           "type": "object",
-          "description": "Main hero/banner section",
           "properties": {
-            "image": {
+            "background_image": {
               "type": "object",
               "properties": {
                 "src": {
@@ -107,10 +31,13 @@
                 }
               }
             },
-            "heading": {
+            "headline": {
               "type": "string"
             },
-            "subheading": {
+            "subtitle": {
+              "type": "string"
+            },
+            "description": {
               "type": "string"
             },
             "cta_buttons": {
@@ -118,13 +45,10 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": {
+                  "text": {
                     "type": "string"
                   },
                   "href": {
-                    "type": "string"
-                  },
-                  "style": {
                     "type": "string"
                   }
                 }
@@ -132,14 +56,13 @@
             }
           }
         },
-        "services_overview": {
+        "services_section": {
           "type": "object",
-          "description": "Overview of main services",
           "properties": {
-            "section_title": {
+            "title": {
               "type": "string"
             },
-            "service_cards": {
+            "services": {
               "type": "array",
               "items": {
                 "type": "object",
@@ -161,10 +84,10 @@
                       }
                     }
                   },
-                  "cta": {
+                  "link": {
                     "type": "object",
                     "properties": {
-                      "label": {
+                      "text": {
                         "type": "string"
                       },
                       "href": {
@@ -177,48 +100,16 @@
             }
           }
         },
-        "about_section": {
+        "specialists_section": {
           "type": "object",
-          "description": "Brief about section",
           "properties": {
-            "heading": {
+            "title": {
               "type": "string"
             },
-            "content": {
+            "subtitle": {
               "type": "string"
             },
-            "image": {
-              "type": "object",
-              "properties": {
-                "src": {
-                  "type": "string"
-                },
-                "alt": {
-                  "type": "string"
-                }
-              }
-            },
-            "cta": {
-              "type": "object",
-              "properties": {
-                "label": {
-                  "type": "string"
-                },
-                "href": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "team_preview": {
-          "type": "object",
-          "description": "Preview of medical team",
-          "properties": {
-            "heading": {
-              "type": "string"
-            },
-            "team_members": {
+            "doctors": {
               "type": "array",
               "items": {
                 "type": "object",
@@ -226,7 +117,7 @@
                   "name": {
                     "type": "string"
                   },
-                  "title": {
+                  "specialty": {
                     "type": "string"
                   },
                   "image": {
@@ -251,10 +142,10 @@
                 }
               }
             },
-            "cta": {
+            "view_all_link": {
               "type": "object",
               "properties": {
-                "label": {
+                "text": {
                   "type": "string"
                 },
                 "href": {
@@ -266,12 +157,11 @@
         },
         "news_section": {
           "type": "object",
-          "description": "Latest news/articles preview",
           "properties": {
-            "heading": {
+            "title": {
               "type": "string"
             },
-            "articles": {
+            "news_items": {
               "type": "array",
               "items": {
                 "type": "object",
@@ -279,10 +169,10 @@
                   "title": {
                     "type": "string"
                   },
-                  "excerpt": {
+                  "date": {
                     "type": "string"
                   },
-                  "date": {
+                  "excerpt": {
                     "type": "string"
                   },
                   "image": {
@@ -306,123 +196,94 @@
                   }
                 }
               }
+            }
+          }
+        },
+        "contact_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
             },
-            "cta": {
+            "phone": {
               "type": "object",
               "properties": {
-                "label": {
+                "text": {
                   "type": "string"
                 },
                 "href": {
                   "type": "string"
                 }
               }
-            }
-          }
-        },
-        "testimonials": {
-          "type": "object",
-          "description": "Patient testimonials section",
-          "properties": {
-            "testimonials_list": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "quote": {
-                    "type": "string"
-                  },
-                  "author": {
-                    "type": "string"
-                  },
-                  "title": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "booking_form": {
-          "type": "object",
-          "description": "Appointment booking form (in modal/popup)",
-          "properties": {
-            "title": {
-              "type": "string"
             },
-            "note": {
-              "type": "string"
-            },
-            "form_fields": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "placeholder": {
-                    "type": "string"
-                  },
-                  "required": {
-                    "type": "boolean"
-                  },
-                  "options": {
-                    "type": "array",
-                    "description": "For select fields"
-                  }
-                }
-              }
-            },
-            "how_did_you_hear_options": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "acceptance_checkbox": {
+            "email": {
               "type": "object",
               "properties": {
-                "required": {
-                  "type": "boolean"
+                "text": {
+                  "type": "string"
                 },
-                "links": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "label": {
-                        "type": "string"
-                      },
-                      "href": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "submit_button": {
-              "type": "object",
-              "properties": {
-                "label": {
+                "href": {
                   "type": "string"
                 }
               }
+            },
+            "address": {
+              "type": "string"
             }
           }
         },
         "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        },
+        "language_switcher": {
+          "$ref": "#/$defs/language_switcher"
+        }
+      }
+    },
+    "doctor_profile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_to_content_link": {
           "type": "object",
-          "description": "Site footer",
           "properties": {
-            "logo": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "doctor_profile_section": {
+          "type": "object",
+          "properties": {
+            "profile_image": {
               "type": "object",
               "properties": {
                 "src": {
@@ -433,90 +294,67 @@
                 }
               }
             },
-            "social_links": {
+            "name": {
+              "type": "string"
+            },
+            "credentials": {
+              "type": "string"
+            },
+            "designations": {
               "type": "array",
               "items": {
-                "type": "object",
-                "properties": {
-                  "platform": {
-                    "type": "string"
-                  },
-                  "url": {
-                    "type": "string"
-                  }
-                }
+                "type": "string"
               }
             },
-            "app_store_links": {
+            "specialty": {
+              "type": "string"
+            },
+            "languages": {
               "type": "array",
               "items": {
-                "type": "object",
-                "properties": {
-                  "store": {
-                    "type": "string"
-                  },
-                  "url": {
-                    "type": "string"
-                  }
-                }
+                "type": "string"
               }
             },
-            "quick_links": {
+            "locations": {
               "type": "array",
               "items": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "string"
-                  },
-                  "href": {
-                    "type": "string"
-                  }
-                }
+                "type": "string"
               }
             },
-            "contact_info": {
+            "about_section": {
               "type": "object",
               "properties": {
-                "phone": {
-                  "type": "object",
-                  "properties": {
-                    "label": {
-                      "type": "string"
-                    },
-                    "href": {
-                      "type": "string"
-                    }
-                  }
+                "title": {
+                  "type": "string"
                 },
-                "email": {
-                  "type": "object",
-                  "properties": {
-                    "label": {
-                      "type": "string"
-                    },
-                    "href": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "address": {
+                "content": {
                   "type": "string"
                 }
               }
             },
-            "copyright": {
-              "type": "string"
-            },
-            "legal_links": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "label": {
+            "qualifications_section": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
                     "type": "string"
-                  },
-                  "href": {
+                  }
+                }
+              }
+            },
+            "experience_section": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
                     "type": "string"
                   }
                 }
@@ -524,45 +362,101 @@
             }
           }
         },
-        "whatsapp_chat": {
-          "type": "object",
-          "description": "WhatsApp floating chat button",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "phone_number": {
-              "type": "string"
-            },
-            "label": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "required": [
-        "language_switcher",
-        "header",
-        "footer"
-      ]
-    },
-    "about": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "type": "object",
-      "description": "About Us page",
-      "properties": {
-        "page_header": {
+        "related_services_section": {
           "type": "object",
           "properties": {
             "title": {
               "type": "string"
             },
-            "breadcrumbs": {
+            "services": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "link": {
+                    "type": "object",
+                    "properties": {
+                      "href": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "navigation_section": {
+          "type": "object",
+          "properties": {
+            "previous_doctor": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                }
+              }
+            },
+            "next_doctor": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "about": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
                     "type": "string"
                   },
                   "href": {
@@ -576,7 +470,7 @@
         "story_section": {
           "type": "object",
           "properties": {
-            "heading": {
+            "title": {
               "type": "string"
             },
             "content": {
@@ -592,30 +486,30 @@
                   "type": "string"
                 }
               }
-            },
-            "subsections": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "heading": {
-                    "type": "string"
-                  },
-                  "content": {
-                    "type": "string"
-                  }
-                }
+            }
+          }
+        },
+        "story_details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "content": {
+                "type": "string"
               }
             }
           }
         },
-        "royal_experience": {
+        "royal_experience_section": {
           "type": "object",
           "properties": {
-            "heading": {
+            "title": {
               "type": "string"
             },
-            "description": {
+            "subtitle": {
               "type": "string"
             },
             "image": {
@@ -659,7 +553,7 @@
         "awards_section": {
           "type": "object",
           "properties": {
-            "heading": {
+            "title": {
               "type": "string"
             },
             "description": {
@@ -680,32 +574,45 @@
               }
             }
           }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
         }
-      },
-      "required": [
-        "page_header",
-        "story_section",
-        "royal_experience",
-        "awards_section"
-      ]
+      }
     },
     "team_listing": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
-      "description": "Meet Our Team page listing all doctors and leadership",
       "properties": {
-        "page_header": {
+        "skip_to_content_link": {
           "type": "object",
           "properties": {
-            "title": {
+            "href": {
               "type": "string"
-            },
-            "breadcrumbs": {
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": {
+                  "text": {
                     "type": "string"
                   },
                   "href": {
@@ -719,11 +626,28 @@
         "doctors_section": {
           "type": "object",
           "properties": {
-            "id": {
+            "title": {
               "type": "string"
             },
-            "heading": {
+            "subtitle": {
               "type": "string"
+            },
+            "filters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
             },
             "doctors": {
               "type": "array",
@@ -731,9 +655,6 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string"
-                  },
-                  "title": {
                     "type": "string"
                   },
                   "credentials": {
@@ -753,8 +674,16 @@
                       }
                     }
                   },
-                  "profile_url": {
-                    "type": "string"
+                  "profile_link": {
+                    "type": "object",
+                    "properties": {
+                      "href": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    }
                   }
                 }
               }
@@ -764,10 +693,7 @@
         "leadership_section": {
           "type": "object",
           "properties": {
-            "id": {
-              "type": "string"
-            },
-            "heading": {
+            "title": {
               "type": "string"
             },
             "members": {
@@ -779,6 +705,9 @@
                     "type": "string"
                   },
                   "title": {
+                    "type": "string"
+                  },
+                  "description": {
                     "type": "string"
                   },
                   "image": {
@@ -796,31 +725,45 @@
               }
             }
           }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
         }
-      },
-      "required": [
-        "page_header",
-        "doctors_section",
-        "leadership_section"
-      ]
+      }
     },
-    "doctor_profile": {
+    "service_overview": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
-      "description": "Individual doctor profile page",
       "properties": {
-        "page_header": {
+        "skip_to_content_link": {
           "type": "object",
           "properties": {
-            "title": {
+            "href": {
               "type": "string"
-            },
-            "breadcrumbs": {
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": {
+                  "text": {
                     "type": "string"
                   },
                   "href": {
@@ -831,22 +774,94 @@
             }
           }
         },
-        "doctor_info": {
+        "hero_section": {
           "type": "object",
           "properties": {
-            "name": {
-              "type": "string"
-            },
             "title": {
               "type": "string"
             },
-            "credentials": {
+            "subtitle": {
               "type": "string"
-            },
-            "specialty": {
+            }
+          }
+        },
+        "services_grid": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "link": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "specialist_care": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
               "type": "string"
-            },
-            "profile_image": {
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "background_image": {
               "type": "object",
               "properties": {
                 "src": {
@@ -856,137 +871,8 @@
                   "type": "string"
                 }
               }
-            }
-          }
-        },
-        "biography_section": {
-          "type": "object",
-          "properties": {
-            "heading": {
-              "type": "string"
             },
-            "content": {
-              "type": "string"
-            }
-          }
-        },
-        "credentials_section": {
-          "type": "object",
-          "properties": {
-            "heading": {
-              "type": "string"
-            },
-            "items": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "specialties_section": {
-          "type": "object",
-          "properties": {
-            "heading": {
-              "type": "string"
-            },
-            "specialties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "achievements_section": {
-          "type": "object",
-          "properties": {
-            "heading": {
-              "type": "string"
-            },
-            "items": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "gallery_section": {
-          "type": "object",
-          "properties": {
-            "images": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "src": {
-                    "type": "string"
-                  },
-                  "alt": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "appointments_section": {
-          "type": "object",
-          "properties": {
-            "heading": {
-              "type": "string"
-            },
-            "cta_button": {
-              "type": "object",
-              "properties": {
-                "label": {
-                  "type": "string"
-                },
-                "action": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      },
-      "required": [
-        "page_header",
-        "doctor_info"
-      ]
-    },
-    "service_overview": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "type": "object",
-      "description": "Our Services overview page",
-      "properties": {
-        "page_header": {
-          "type": "object",
-          "properties": {
             "title": {
-              "type": "string"
-            },
-            "breadcrumbs": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "string"
-                  },
-                  "href": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "intro_section": {
-          "type": "object",
-          "properties": {
-            "heading": {
               "type": "string"
             },
             "description": {
@@ -994,7 +880,10 @@
             }
           }
         },
-        "services_grid": {
+        "key_sections_title": {
+          "type": "string"
+        },
+        "sections": {
           "type": "array",
           "items": {
             "type": "object",
@@ -1015,45 +904,59 @@
                     "type": "string"
                   }
                 }
-              },
-              "cta": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "string"
-                  },
-                  "href": {
-                    "type": "string"
-                  }
-                }
               }
             }
           }
-        }
-      },
-      "required": [
-        "page_header",
-        "intro_section",
-        "services_grid"
-      ]
-    },
-    "service_detail": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "type": "object",
-      "description": "Individual service detail pages (Specialist Care, Diagnostics, Longevity, Concierge)",
-      "properties": {
-        "page_header": {
+        },
+        "cta_button": {
           "type": "object",
           "properties": {
-            "title": {
+            "text": {
               "type": "string"
             },
-            "breadcrumbs": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "diagnostics_imaging": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": {
+                  "text": {
                     "type": "string"
                   },
                   "href": {
@@ -1067,7 +970,7 @@
         "hero_section": {
           "type": "object",
           "properties": {
-            "image": {
+            "background_image": {
               "type": "object",
               "properties": {
                 "src": {
@@ -1078,7 +981,7 @@
                 }
               }
             },
-            "heading": {
+            "title": {
               "type": "string"
             },
             "description": {
@@ -1086,10 +989,166 @@
             }
           }
         },
-        "features_section": {
+        "reference_center_badge": {
+          "type": "string"
+        },
+        "imaging_services": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "image": {
+                "type": "object",
+                "properties": {
+                  "src": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cta_button": {
           "type": "object",
           "properties": {
-            "heading": {
+            "text": {
+              "type": "string"
+            },
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "service_detail": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "background_image": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              }
+            },
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "programs_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "programs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "object",
+                    "properties": {
+                      "src": {
+                        "type": "string"
+                      },
+                      "alt": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "contact_info": {
+                    "type": "object",
+                    "properties": {
+                      "phone": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "offerings_section": {
+          "type": "object",
+          "properties": {
+            "title": {
               "type": "string"
             },
             "items": {
@@ -1116,44 +1175,61 @@
                   }
                 }
               }
+            },
+            "closing_text": {
+              "type": "string"
+            },
+            "cta_button": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                }
+              }
             }
           }
         },
-        "cta_button": {
-          "type": "object",
-          "properties": {
-            "label": {
-              "type": "string"
-            },
-            "action": {
-              "type": "string"
-            }
-          }
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
         }
-      },
-      "required": [
-        "page_header",
-        "hero_section",
-        "features_section"
-      ]
+      }
     },
     "patient_journey": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
-      "description": "Patient Journey page describing the process",
       "properties": {
-        "page_header": {
+        "skip_to_content_link": {
           "type": "object",
           "properties": {
-            "title": {
+            "href": {
               "type": "string"
-            },
-            "breadcrumbs": {
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": {
+                  "text": {
                     "type": "string"
                   },
                   "href": {
@@ -1164,14 +1240,35 @@
             }
           }
         },
-        "steps_section": {
+        "hero_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "image": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "journey_steps": {
           "type": "array",
-          "description": "Steps in the patient journey",
           "items": {
             "type": "object",
             "properties": {
               "step_number": {
-                "type": "integer"
+                "type": "string"
               },
               "title": {
                 "type": "string"
@@ -1193,43 +1290,44 @@
             }
           }
         },
-        "contact_section": {
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "news_listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_to_content_link": {
           "type": "object",
           "properties": {
-            "heading": {
-              "type": "string"
-            },
-            "phone": {
-              "type": "string"
-            },
-            "email": {
+            "href": {
               "type": "string"
             }
           }
-        }
-      },
-      "required": [
-        "page_header",
-        "steps_section"
-      ]
-    },
-    "blog_post": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "type": "object",
-      "description": "Blog/Article post page",
-      "properties": {
-        "page_header": {
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
           "type": "object",
           "properties": {
-            "title": {
-              "type": "string"
-            },
-            "breadcrumbs": {
+            "items": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": {
+                  "text": {
                     "type": "string"
                   },
                   "href": {
@@ -1240,19 +1338,162 @@
             }
           }
         },
-        "article_header": {
+        "news_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "excerpt": {
+                "type": "string"
+              },
+              "link": {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "event_listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_to_content_link": {
           "type": "object",
           "properties": {
-            "title": {
+            "href": {
               "type": "string"
-            },
-            "date": {
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "event_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "location": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "link": {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "blog_post": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
               "type": "string"
-            },
-            "author": {
-              "type": "string"
-            },
-            "image": {
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "post_header": {
+          "type": "object",
+          "properties": {
+            "featured_image": {
               "type": "object",
               "properties": {
                 "src": {
@@ -1262,32 +1503,30 @@
                   "type": "string"
                 }
               }
-            }
-          }
-        },
-        "article_content": {
-          "type": "object",
-          "properties": {
-            "excerpt": {
+            },
+            "title": {
+              "type": "string"
+            },
+            "publish_date": {
+              "type": "string"
+            },
+            "content": {
               "type": "string"
             },
             "external_link": {
               "type": "object",
               "properties": {
-                "label": {
+                "text": {
                   "type": "string"
                 },
                 "href": {
                   "type": "string"
                 }
               }
-            },
-            "full_content": {
-              "type": "string"
             }
           }
         },
-        "navigation": {
+        "pagination": {
           "type": "object",
           "properties": {
             "previous_post": {
@@ -1314,7 +1553,55 @@
             }
           }
         },
-        "related_posts": {
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "privacy_policy": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "content_sections": {
           "type": "array",
           "items": {
             "type": "object",
@@ -1322,174 +1609,282 @@
               "title": {
                 "type": "string"
               },
-              "href": {
+              "content": {
                 "type": "string"
               }
             }
           }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
         }
-      },
-      "required": [
-        "page_header",
-        "article_header",
-        "article_content"
-      ]
+      }
     },
-    "news_listing": {
+    "terms_conditions": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
-      "description": "News/Articles listing page",
       "properties": {
-        "page_header": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "content_sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "section_number": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "content": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "zh_doctor_profile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Chinese version of doctor profile page",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "doctor_profile_section": {
+          "type": "object",
+          "properties": {
+            "profile_image": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              }
+            },
+            "name": {
+              "type": "string"
+            },
+            "credentials": {
+              "type": "string"
+            },
+            "designations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "specialty": {
+              "type": "string"
+            },
+            "languages": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "locations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "about_section": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              }
+            },
+            "qualifications_section": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "experience_section": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "zh_service_page": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Chinese version of service pages",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "hero_section": {
           "type": "object",
           "properties": {
             "title": {
               "type": "string"
             },
-            "breadcrumbs": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "string"
-                  },
-                  "href": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "filters": {
-          "type": "object",
-          "properties": {
-            "categories": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "articles_grid": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "title": {
-                "type": "string"
-              },
-              "excerpt": {
-                "type": "string"
-              },
-              "date": {
-                "type": "string"
-              },
-              "category": {
-                "type": "string"
-              },
-              "image": {
-                "type": "object",
-                "properties": {
-                  "src": {
-                    "type": "string"
-                  },
-                  "alt": {
-                    "type": "string"
-                  }
-                }
-              },
-              "link": {
-                "type": "object",
-                "properties": {
-                  "href": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "pagination": {
-          "type": "object",
-          "properties": {
-            "current_page": {
-              "type": "integer"
-            },
-            "total_pages": {
-              "type": "integer"
-            },
-            "next_page": {
-              "type": "object",
-              "properties": {
-                "label": {
-                  "type": "string"
-                },
-                "href": {
-                  "type": "string"
-                }
-              }
-            },
-            "previous_page": {
-              "type": "object",
-              "properties": {
-                "label": {
-                  "type": "string"
-                },
-                "href": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      },
-      "required": [
-        "page_header",
-        "articles_grid"
-      ]
-    },
-    "event_listing": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "type": "object",
-      "description": "Events listing page",
-      "properties": {
-        "page_header": {
-          "type": "object",
-          "properties": {
-            "title": {
+            "description": {
               "type": "string"
             },
-            "breadcrumbs": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "string"
-                  },
-                  "href": {
-                    "type": "string"
-                  }
+            "image": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
                 }
               }
             }
           }
         },
-        "events_list": {
+        "services_grid": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "title": {
-                "type": "string"
-              },
-              "date": {
-                "type": "string"
-              },
-              "location": {
                 "type": "string"
               },
               "description": {
@@ -1516,30 +1911,369 @@
               }
             }
           }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
         }
-      },
-      "required": [
-        "page_header",
-        "events_list"
-      ]
+      }
     },
-    "legal": {
+    "zh_about_page": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
-      "description": "Legal pages (Privacy Policy, Terms & Conditions)",
+      "description": "Chinese version of about page",
       "properties": {
-        "page_header": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "story_section": {
           "type": "object",
           "properties": {
             "title": {
               "type": "string"
             },
-            "breadcrumbs": {
+            "content": {
+              "type": "string"
+            },
+            "image": {
+              "type": "object",
+              "properties": {
+                "src": {
+                  "type": "string"
+                },
+                "alt": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "experience_features": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "image": {
+                "type": "object",
+                "properties": {
+                  "src": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "zh_team_page": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Chinese version of team listing page",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "label": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "doctors_section": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "doctors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "specialty": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "object",
+                    "properties": {
+                      "src": {
+                        "type": "string"
+                      },
+                      "alt": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "profile_link": {
+                    "type": "object",
+                    "properties": {
+                      "href": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "zh_news_listing": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Chinese version of news listing page",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "news_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "link": {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "zh_privacy_policy": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Chinese version of privacy policy page",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "content_sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "content": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "zh_terms_conditions": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Chinese version of terms and conditions page",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
                     "type": "string"
                   },
                   "href": {
@@ -1563,18 +2297,516 @@
               },
               "content": {
                 "type": "string"
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "category_news": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Category page for news articles",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "articles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
               },
-              "subsections": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "title": {
-                      "type": "string"
-                    },
-                    "content": {
-                      "type": "string"
+              "link": {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "category_events": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Category page for events",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "link": {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "date_archive": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Archive page by date",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "posts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "link": {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "zh_date_archive": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Chinese archive page by date",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "posts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "link": {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    },
+    "doctor_category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "description": "Doctor category listing page",
+      "properties": {
+        "skip_to_content_link": {
+          "type": "object",
+          "properties": {
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "header": {
+          "$ref": "#/$defs/header"
+        },
+        "page_title": {
+          "type": "string"
+        },
+        "breadcrumbs": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "doctors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "credentials": {
+                "type": "string"
+              },
+              "specialty": {
+                "type": "string"
+              },
+              "image": {
+                "type": "object",
+                "properties": {
+                  "src": {
+                    "type": "string"
+                  },
+                  "alt": {
+                    "type": "string"
+                  }
+                }
+              },
+              "profile_link": {
+                "type": "object",
+                "properties": {
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "footer": {
+          "$ref": "#/$defs/footer"
+        },
+        "whatsapp_chat_widget": {
+          "$ref": "#/$defs/whatsapp_widget"
+        },
+        "booking_modal": {
+          "$ref": "#/$defs/booking_form"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "header": {
+      "type": "object",
+      "properties": {
+        "language_switcher": {
+          "$ref": "#/$defs/language_switcher"
+        },
+        "logo": {
+          "type": "object",
+          "properties": {
+            "src": {
+              "type": "string"
+            },
+            "alt": {
+              "type": "string"
+            },
+            "href": {
+              "type": "string"
+            }
+          }
+        },
+        "navigation": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  },
+                  "has_dropdown": {
+                    "type": "boolean"
+                  },
+                  "dropdown_items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "href": {
+                          "type": "string"
+                        }
+                      }
                     }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "book_now_button": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "footer": {
+      "type": "object",
+      "properties": {
+        "logo": {
+          "type": "object",
+          "properties": {
+            "src": {
+              "type": "string"
+            },
+            "alt": {
+              "type": "string"
+            }
+          }
+        },
+        "social_links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "platform": {
+                "type": "string"
+              },
+              "href": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "app_store_badges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "store": {
+                "type": "string"
+              },
+              "href": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "quick_links": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
                   }
                 }
               }
@@ -1584,22 +2816,199 @@
         "contact_info": {
           "type": "object",
           "properties": {
-            "department": {
+            "title": {
               "type": "string"
             },
-            "company": {
-              "type": "string"
+            "phone": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                }
+              }
             },
             "email": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                }
+              }
+            },
+            "address": {
+              "type": "string"
+            }
+          }
+        },
+        "copyright": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "links": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "whatsapp_widget": {
+      "type": "object",
+      "properties": {
+        "header_text": {
+          "type": "string"
+        },
+        "intro_text": {
+          "type": "string"
+        },
+        "reply_time_text": {
+          "type": "string"
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "whatsapp_link": {
+              "type": "object",
+              "properties": {
+                "href": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "booking_form": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "form_fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "placeholder": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "preferred_time_options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "referral_options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "privacy_links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "href": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "submit_button": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        "captcha": {
+          "type": "object",
+          "properties": {
+            "type": {
               "type": "string"
             }
           }
         }
-      },
-      "required": [
-        "page_header",
-        "content_sections"
-      ]
+      }
+    },
+    "language_switcher": {
+      "type": "object",
+      "properties": {
+        "current_language": {
+          "type": "string"
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "href": {
+                "type": "string"
+              },
+              "lang": {
+                "type": "string"
+              },
+              "hreflang": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

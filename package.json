@@ -10,8 +10,9 @@
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check src/",
 		"lint:fix": "biome check --write --unsafe src/",
-		"check": "biome check src/ && tsc --noEmit && knip",
+		"check": "biome check src/ && tsc --noEmit && knip && knip --production",
 		"knip": "knip",
+		"knip:prod": "knip --production",
 		"build": "tsc --declaration --outDir dist"
 	},
 	"dependencies": {
@@ -21,7 +22,9 @@
 		"chalk": "^5.6.2",
 		"commander": "^14.0.3",
 		"culori": "^4.0.2",
+		"ink": "^7.0.1",
 		"postcss-value-parser": "^4.2.0",
+		"react": "^19.2.5",
 		"yaml": "^2.8.3",
 		"zod": "^4.3.6"
 	},
@@ -30,6 +33,7 @@
 		"@types/bun": "latest",
 		"@types/culori": "^4.0.1",
 		"@types/node": "^25.5.2",
+		"@types/react": "^19.2.14",
 		"knip": "^5.88.1",
 		"typescript": "^6.0.2"
 	}

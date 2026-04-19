@@ -82,7 +82,7 @@ export async function runSelfCheckLoop(
 		const result = await runCheckCommands(config.commands, projectDir);
 		if (result.ok) return null;
 
-		logger.startStep(
+		logger.note(
 			`self-check fix (attempt ${attempt + 1}/${config.maxAttempts})`,
 		);
 
@@ -92,9 +92,8 @@ export async function runSelfCheckLoop(
 			cwd: projectDir,
 			profile,
 			stepName: `self-check-fix-${attempt + 1}`,
+			logger,
 		});
-
-		logger.completeStep();
 	}
 
 	// Final check after all fix attempts
