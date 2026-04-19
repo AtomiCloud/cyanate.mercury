@@ -10,7 +10,7 @@ reference: https://vercel.com/
 # Global LLM defaults (used when no profile override matches)
 defaults:
   provider: anthropic
-  model: zai-org/GLM-5
+  model: zai-org/GLM-5.1
   maxTurns: 80
   env:
     ANTHROPIC_BASE_URL: http://localhost:8317/
@@ -40,13 +40,22 @@ profiles:
 
   # ---- mm25: automated reviewers only (no real LLM reasoning needed) ----
   wireframe.generate.static-checks-review:
-    model: mm25
+    model: MiniMaxAI/MiniMax-M2.5
   wireframe.generate.console-error-review:
-    model: mm25
+    model: MiniMaxAI/MiniMax-M2.5
   design.qa.qa-static-checks:
-    model: mm25
+    model: MiniMaxAI/MiniMax-M2.5
   design.qa.qa-console-errors:
-    model: mm25
+    model: MiniMaxAI/MiniMax-M2.5
+
+  # ---- per-page classify A0 trial ----
+  classify.per-page-value-normalize.a0-normalize:
+    model: MiniMaxAI/MiniMax-M2.5
+
+# Classify segment config
+classify:
+  # Local SonicJS instance URL — Phase 9d hard-gates on roundtrip pass
+  localSonicJsUrl: http://localhost:8787
 
 # Heartbeat configuration
 heartbeat:
