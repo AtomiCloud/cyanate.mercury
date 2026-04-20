@@ -23,14 +23,30 @@ export function resolveProfile(
 ): LLMProfile {
 	const keys = [`${segment}.${phase}.${step}`, `${segment}.${phase}`, segment];
 
+	let profile: LLMProfile = { ...config.defaults };
 	for (const key of keys) {
 		const override = config.profiles[key];
 		if (override) {
-			return mergeProfile(config.defaults, override);
+			profile = mergeProfile(config.defaults, override);
+			break;
 		}
 	}
 
-	return { ...config.defaults };
+	// Model-keyed pricing: inline profile.pricing wins; otherwise look up by
+	// the resolved model so every occurrence of a model is priced the same.
+	if (!profile.pricing && config.modelPricing?.[profile.model]) {
+		profile = { ...profile, pricing: config.modelPricing[profile.model] };
+	}
+
+	// Model-keyed max output tokens — same pattern as pricing.
+	if (
+		profile.maxTokens === undefined &&
+		config.modelMaxTokens?.[profile.model]
+	) {
+		profile = { ...profile, maxTokens: config.modelMaxTokens[profile.model] };
+	}
+
+	return profile;
 }
 
 function mergeProfile(
@@ -41,6 +57,8 @@ function mergeProfile(
 		provider: override.provider ?? base.provider,
 		model: override.model ?? base.model,
 		maxTurns: override.maxTurns ?? base.maxTurns,
+		maxTokens: override.maxTokens ?? base.maxTokens,
 		env: override.env ? { ...base.env, ...override.env } : base.env,
+		pricing: override.pricing ?? base.pricing,
 	};
 }

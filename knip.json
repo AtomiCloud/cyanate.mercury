@@ -18,7 +18,6 @@
 		"src/segments/analyze/validate-tokens-cli.ts!",
 		"src/segments/prepare/index.ts!",
 		"src/segments/classify/index.ts!",
-		"src/segments/classify/check-cli.ts!",
 		"src/segments/wireframe/index.ts!"
 	],
 	"project": ["src/**/*.ts!"],

@@ -2,8 +2,9 @@
  * Phase 1 — `classify-prepare`
  *
  * Single programmatic step: materialize per-page `content.json` into
- * `classify-input/<hash>/` so every downstream fan-out phase has a stable
- * on-disk input surface.
+ * `classify-input/<pagetype>/<hash>/` so every downstream fan-out phase has a
+ * stable on-disk input surface. Nesting by `<pagetype>` makes it easy to
+ * eyeball which pages share a page_type cluster without cross-referencing.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -11,7 +12,7 @@ import { join } from "node:path";
 import type { PhaseDef } from "../../../engine/types.js";
 import { programmaticStep } from "../../../steps/step.js";
 import type { PreparedPage } from "../../prepare/ingest.js";
-import { classifyUnitHash } from "../per-page-classify.js";
+import { classifyUnitHash } from "../lib/path-utils.js";
 
 async function readJson<T>(workdir: string, filename: string): Promise<T> {
 	const raw = await readFile(join(workdir, filename), "utf-8");
@@ -21,14 +22,15 @@ async function readJson<T>(workdir: string, filename: string): Promise<T> {
 export const classifyPreparePhase: PhaseDef = {
 	id: "classify-prepare",
 	name: "Classify prepare",
-	description: "Write content.json per page into classify-input/<hash>/",
+	description:
+		"Write content.json per page into classify-input/<pagetype>/<hash>/",
 	maxRetries: 1,
 	steps: [
 		programmaticStep({
 			id: "write-classify-inputs",
 			name: "Write classify inputs",
 			description:
-				"Materialize classify-input/<hash>/content.json for every page",
+				"Materialize classify-input/<pagetype>/<hash>/content.json for every page",
 			run: async (ctx) => {
 				const start = Date.now();
 				try {
@@ -39,7 +41,12 @@ export const classifyPreparePhase: PhaseDef = {
 
 					for (const page of pages) {
 						const hash = classifyUnitHash(page.url);
-						const dir = join(ctx.workdir, "classify-input", hash);
+						const dir = join(
+							ctx.workdir,
+							"classify-input",
+							page.pagetype,
+							hash,
+						);
 						await mkdir(dir, { recursive: true });
 						await writeFile(
 							join(dir, "content.json"),

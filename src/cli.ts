@@ -232,26 +232,6 @@ program
 		console.log(formatTable(result));
 	});
 
-// --- check command ---
-
-const check = program
-	.command("check")
-	.description("Self-verification CLIs the pipeline agents can invoke");
-
-check
-	.command("normalization <unit-dir>")
-	.description(
-		"Verify a per-page A0 normalization artifact against its source content.json",
-	)
-	.action(async (unitDirArg: string) => {
-		const unitDir = resolve(unitDirArg);
-		const { checkNormalizationCli } = await import(
-			"./segments/classify/check-cli.js"
-		);
-		const exitCode = await checkNormalizationCli(unitDir);
-		process.exit(exitCode);
-	});
-
 // --- Helpers ---
 
 function parseDepFlags(deps?: string[]): Record<string, string> {

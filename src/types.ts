@@ -31,6 +31,7 @@ export interface SchemaData {
 		}
 	>;
 	definitions?: Record<string, unknown>;
+	$defs?: Record<string, unknown>;
 }
 
 export interface ContentData {

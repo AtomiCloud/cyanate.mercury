@@ -12,11 +12,19 @@ import type { CuiConfig } from "./engine/types.js";
  * Zod schema for LLMProfile — must be kept in sync with
  * the LLMProfile interface in engine/types.ts.
  */
+const TokenPricingSchema = z.object({
+	input: z.number().nonnegative(),
+	cachedInput: z.number().nonnegative(),
+	output: z.number().nonnegative(),
+});
+
 const LLMProfileSchema = z.object({
 	provider: z.string().default("anthropic"),
 	model: z.string(),
 	maxTurns: z.number().optional(),
+	maxTokens: z.number().int().positive().optional(),
 	env: z.record(z.string(), z.string()).optional(),
+	pricing: TokenPricingSchema.optional(),
 });
 
 const HeartbeatSchema = z
@@ -52,7 +60,9 @@ const CuiConfigSchema = z.object({
 				provider: z.string().optional(),
 				model: z.string().optional(),
 				maxTurns: z.number().optional(),
+				maxTokens: z.number().int().positive().optional(),
 				env: z.record(z.string(), z.string()).optional(),
+				pricing: TokenPricingSchema.optional(),
 			}),
 		)
 		.default({}),
@@ -61,6 +71,8 @@ const CuiConfigSchema = z.object({
 	providers: z.record(z.string(), LLMProfileSchema).optional(),
 	reviewer_matrix: z.record(z.string(), ReviewerMatrixEntrySchema).optional(),
 	step_matrix: z.record(z.string(), z.string()).optional(),
+	modelPricing: z.record(z.string(), TokenPricingSchema).optional(),
+	modelMaxTokens: z.record(z.string(), z.number().int().positive()).optional(),
 	classify: z
 		.object({
 			localSonicJsUrl: z.string().url(),

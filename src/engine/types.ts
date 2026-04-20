@@ -26,8 +26,31 @@ export interface LLMProfile {
 	model: string;
 	/** Max agent turns before aborting */
 	maxTurns?: number;
+	/**
+	 * Optional max output tokens. Populated from `modelMaxTokens[model]` by
+	 * `resolveProfile` when not set inline. Direct-API callers prefer
+	 * `opts.maxTokens ?? profile.maxTokens ?? DEFAULT_MAX_TOKENS`.
+	 */
+	maxTokens?: number;
 	/** Extra env vars merged when this profile is active */
 	env?: Record<string, string>;
+	/**
+	 * Optional per-million-token pricing. When set, direct-API callers
+	 * compute `cost` from the per-bucket token counts the provider returns.
+	 * Matches Friendli's three-bucket scheme (Input / Cached Input / Output);
+	 * Anthropic `cache_creation_input_tokens` is priced as `input`.
+	 */
+	pricing?: TokenPricing;
+}
+
+/** Per-million-token USD pricing, in the shape Friendli exposes. */
+export interface TokenPricing {
+	/** USD per 1M uncached input tokens (+ cache-creation input tokens) */
+	input: number;
+	/** USD per 1M cache-read input tokens */
+	cachedInput: number;
+	/** USD per 1M output tokens */
+	output: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -313,6 +336,20 @@ export interface CuiConfig {
 	defaults: LLMProfile;
 	/** Cascading profile overrides keyed by segment.phase.step */
 	profiles: Record<string, Partial<LLMProfile>>;
+	/**
+	 * Per-model token pricing (USD per 1M tokens), keyed by `profile.model`.
+	 * `resolveProfile` populates `profile.pricing` from this map when a
+	 * profile doesn't specify its own pricing inline. Friendli's three-bucket
+	 * scheme: input / cached-input / output.
+	 */
+	modelPricing?: Record<string, TokenPricing>;
+	/**
+	 * Per-model max output tokens, keyed by `profile.model`. `resolveProfile`
+	 * populates `profile.maxTokens` from this map when a profile doesn't set
+	 * its own inline. Lets reasoning models (e.g. GLM-5.1) get a larger budget
+	 * than providers' default 4096 cap.
+	 */
+	modelMaxTokens?: Record<string, number>;
 	/** Heartbeat timeout and interval configuration */
 	heartbeat: HeartbeatConfig;
 	/** Logging file configuration */

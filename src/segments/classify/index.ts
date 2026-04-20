@@ -1,32 +1,28 @@
 /**
  * Classify segment registration.
  *
- * Pipeline wired so far:
- *   1. classify-prepare            (programmatic — write per-page content.json inputs)
- *   2. per-page-value-normalize    (merged value-normalize + noise detection;
- *                                   every leaf is visited by the LLM at most once)
+ * Pipeline wired:
+ *   1. classify-prepare   (programmatic — write per-page content.json inputs
+ *                          under classify-input/<pagetype>/<hash>/)
  *
- * Stages 3–5 add phases 4 (chunk-remap), 5 (fate-scope), 6 (shape-and-kind).
- * Stage 6 re-introduces `page-classifications.json` in `extractOutput` with
- * the new `PageClassification[]` shape. See `CLASSIFY-REWRITE-PROGRESS.md`.
+ * Per-page chrome classify, per-pagetype harmonize, materialize + verify,
+ * and cross-pagetype harmonize land as later stages — see
+ * `CLASSIFY-PLAN.md` at the repo root.
  */
 
 import { cp, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { registry } from "../../engine/registry.js";
 import type { SegmentDef } from "../../engine/types.js";
-import {
-	classifyPreparePhase,
-	perPageValueNormalizePhase,
-} from "./phases.io.js";
+import { classifyPreparePhase } from "./phases.io.js";
 
 const classifySegment: SegmentDef = {
 	id: "classify",
 	name: "Classify",
 	description:
-		"Per-page AI classification — merged value normalization + noise detection (phases 4–6 land in follow-up stages)",
+		"Classify segment — currently only materializes per-page content.json inputs under classify-input/<pagetype>/<hash>/. Chrome detection + harmonize phases land incrementally.",
 	depends: ["prepare"],
-	phases: [classifyPreparePhase, perPageValueNormalizePhase],
+	phases: [classifyPreparePhase],
 	mergeInputs: async (workdir, deps) => {
 		const preparePath = deps.prepare;
 		if (!preparePath) return;
@@ -51,11 +47,9 @@ const classifySegment: SegmentDef = {
 	extractOutput: async (workdir, outputDir) => {
 		await mkdir(outputDir, { recursive: true });
 
-		// Pre-Stage-6: only pass through prepare outputs that downstream segments
-		// still depend on. `page-classifications.json` + coverage report are
-		// re-introduced in Stage 6 once the full block-level pipeline exists.
+		// Pass through prepare artifacts downstream segments still rely on.
+		// Chrome/body/template outputs will be added as later stages land.
 		const files = ["asset-manifest.json", "prepared-content.json"];
-
 		for (const file of files) {
 			try {
 				await cp(join(workdir, file), join(outputDir, file));

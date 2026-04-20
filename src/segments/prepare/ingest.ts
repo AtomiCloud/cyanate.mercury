@@ -74,19 +74,24 @@ export function flattenContent(data: ContentData): PageContent[] {
 /**
  * Extract per-page-type schemas, resolving top-level $ref pointers inline.
  *
- * Input shape:  { pages: { landing: { properties: { header: { "$ref": "#/definitions/header" } } } }, definitions: { header: {...} } }
- * Output shape: Record<pagetype, { type, properties, required? }> with $ref inlined.
+ * Accepts both draft-07 (`definitions` / `#/definitions/x`) and draft 2019+
+ * (`$defs` / `#/$defs/x`) containers — refs are keyed on the trailing segment,
+ * so the path prefix doesn't matter. When both are present, `$defs` wins.
  */
 export function resolveSchemaPages(
 	schema: SchemaData,
 ): Record<string, ResolvedSchema> {
+	const definitions: Record<string, unknown> = {
+		...(schema.definitions ?? {}),
+		...(schema.$defs ?? {}),
+	};
 	const resolved: Record<string, ResolvedSchema> = {};
 
 	for (const [pagetype, pageSchema] of Object.entries(schema.pages)) {
 		const properties: Record<string, unknown> = {};
 
 		for (const [key, value] of Object.entries(pageSchema.properties)) {
-			properties[key] = resolveRefValue(value, schema.definitions);
+			properties[key] = resolveRefValue(value, definitions);
 		}
 
 		resolved[pagetype] = {
@@ -148,7 +153,7 @@ function isRef(value: unknown): value is { $ref: string } {
 	);
 }
 
-/** Extract definition name from a $ref string like "#/definitions/header". */
+/** Extract definition name from a $ref like "#/definitions/header" or "#/$defs/header". */
 function extractRefName(ref: string): string {
 	const parts = ref.split("/");
 	return parts[parts.length - 1];

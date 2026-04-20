@@ -48,9 +48,30 @@ profiles:
   design.qa.qa-console-errors:
     model: MiniMaxAI/MiniMax-M2.5
 
-  # ---- per-page classify A0 trial ----
-  classify.per-page-value-normalize.a0-normalize:
-    model: MiniMaxAI/MiniMax-M2.5
+# Friendli per-1M-token pricing (USD), keyed by model id.
+# resolveProfile populates profile.pricing from this map when no inline
+# override is set, so every step using the same model is priced identically.
+# Buckets: input = uncached input + cache-creation | cachedInput = cache read | output
+modelPricing:
+  zai-org/GLM-5.1:
+    input: 1.4
+    cachedInput: 0.26
+    output: 4.4
+  accounts/fireworks/models/minimax-m2p7:
+    input: 0.3
+    cachedInput: 0.06
+    output: 1.2
+
+  MiniMaxAI/MiniMax-M2.5:
+    input: 0.3
+    cachedInput: 0.06
+    output: 1.2
+
+# Per-model max output tokens. Populated onto `profile.maxTokens` by
+# resolveProfile when not set inline. GLM-5.1 is a reasoning model whose
+# thinking burns output budget, so it needs more than the 4096 default.
+modelMaxTokens:
+  zai-org/GLM-5.1: 32768
 
 # Classify segment config
 classify:

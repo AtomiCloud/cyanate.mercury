@@ -30,6 +30,10 @@ Regenerates a complete website from scraped content using a reference site's des
 
  It's dense but thorough.
 
+## Ubiquitous Language
+
+See [UL.md](./UL.md) for the project vocabulary (scope, fate, structural role, partition mechanics, transformation terms, review terms). Use those terms exactly — if a concept isn't defined there, agree on a definition and add it before using it in conversation or code.
+
 - **Phase-specific reviewers** (× 2 models) M1 + M2)
 - **Generic reviewers** (× 2 models)
 - **Per-page reviewers** (one per page per check type)

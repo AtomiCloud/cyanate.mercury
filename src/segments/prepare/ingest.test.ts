@@ -154,6 +154,33 @@ describe("resolveSchemaPages", () => {
 		expect(resolved.landing.properties.hero).toEqual({ type: "string" });
 	});
 
+	it("resolves $ref against draft 2019+ $defs container", () => {
+		const defsSchema: SchemaData = {
+			pages: {
+				landing: {
+					type: "object",
+					properties: {
+						header: { $ref: "#/$defs/header" },
+						footer: { $ref: "#/$defs/footer" },
+					},
+				},
+			},
+			$defs: {
+				header: { type: "object", properties: { logo: { type: "string" } } },
+				footer: { type: "object", properties: { copy: { type: "string" } } },
+			},
+		};
+		const resolved = resolveSchemaPages(defsSchema);
+		expect(resolved.landing.properties.header).toEqual({
+			type: "object",
+			properties: { logo: { type: "string" } },
+		});
+		expect(resolved.landing.properties.footer).toEqual({
+			type: "object",
+			properties: { copy: { type: "string" } },
+		});
+	});
+
 	it("handles schemas without definitions", () => {
 		const noDefSchema: SchemaData = {
 			pages: {
