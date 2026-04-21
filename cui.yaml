@@ -38,6 +38,14 @@ profiles:
   design.qa.qa-vision-review:
     model: accounts/fireworks/models/qwen3p6-plus
 
+  # ---- Classify: per-page chrome classify (Stage 2) ----
+  # Classifier runs on every page with no cross-page context; reviewer audits
+  # one page at a time. Retries are per-page inside the fan-out step.
+  classify.chrome-classify.chrome-classify-agent:
+    model: zai-org/GLM-5
+  classify.chrome-classify.chrome-classify-reviewer:
+    model: zai-org/GLM-5.1
+
   # ---- mm25: automated reviewers only (no real LLM reasoning needed) ----
   wireframe.generate.static-checks-review:
     model: MiniMaxAI/MiniMax-M2.5
@@ -57,6 +65,10 @@ modelPricing:
     input: 1.4
     cachedInput: 0.26
     output: 4.4
+  zai-org/GLM-5:
+    input: 1
+    cachedInput: 0.5
+    output: 3.2
   accounts/fireworks/models/minimax-m2p7:
     input: 0.3
     cachedInput: 0.06
@@ -71,6 +83,7 @@ modelPricing:
 # resolveProfile when not set inline. GLM-5.1 is a reasoning model whose
 # thinking burns output budget, so it needs more than the 4096 default.
 modelMaxTokens:
+  zai-org/GLM-5: 32768
   zai-org/GLM-5.1: 32768
 
 # Classify segment config

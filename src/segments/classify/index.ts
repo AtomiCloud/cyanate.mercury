@@ -2,27 +2,28 @@
  * Classify segment registration.
  *
  * Pipeline wired:
- *   1. classify-prepare   (programmatic — write per-page content.json inputs
- *                          under classify-input/<pagetype>/<hash>/)
+ *   1. classify-prepare  (programmatic — write per-page content.json inputs
+ *                         under classify-input/<pagetype>/<hash>/)
+ *   2. chrome-classify   (agent fan-out — per-page chrome classify with
+ *                         inline reviewer, writes chrome-classify.json)
  *
- * Per-page chrome classify, per-pagetype harmonize, materialize + verify,
- * and cross-pagetype harmonize land as later stages — see
- * `CLASSIFY-PLAN.md` at the repo root.
+ * Per-pagetype harmonize, materialize + verify, and cross-pagetype harmonize
+ * land as later stages — see `CLASSIFY-PLAN.md` at the repo root.
  */
 
 import { cp, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { registry } from "../../engine/registry.js";
 import type { SegmentDef } from "../../engine/types.js";
-import { classifyPreparePhase } from "./phases.io.js";
+import { chromeClassifyPhase, classifyPreparePhase } from "./phases.io.js";
 
 const classifySegment: SegmentDef = {
 	id: "classify",
 	name: "Classify",
 	description:
-		"Classify segment — currently only materializes per-page content.json inputs under classify-input/<pagetype>/<hash>/. Chrome detection + harmonize phases land incrementally.",
+		"Classify segment — materializes per-page content.json inputs and runs per-page chrome classify with inline reviewer. Harmonize + materialize-verify phases land incrementally.",
 	depends: ["prepare"],
-	phases: [classifyPreparePhase],
+	phases: [classifyPreparePhase, chromeClassifyPhase],
 	mergeInputs: async (workdir, deps) => {
 		const preparePath = deps.prepare;
 		if (!preparePath) return;

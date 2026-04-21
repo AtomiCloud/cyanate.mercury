@@ -5,8 +5,13 @@
  * registration in `index.ts` and existing importers don't need to know about
  * the directory structure.
  *
- * Currently wired: phase 1 (prepare). Per-page chrome classify + per-pagetype
- * harmonize + materialize/verify land as later stages — see `CLASSIFY-PLAN.md`.
+ * Currently wired:
+ *   1. `classify-prepare`  — materialize per-page content.json inputs
+ *   2. `chrome-classify`   — per-page chrome classify + inline reviewer
+ *
+ * Per-page-type harmonize + materialize/verify land as later stages —
+ * see `CLASSIFY-PLAN.md`.
  */
 
+export { chromeClassifyPhase } from "./phases/chrome-classify.js";
 export { classifyPreparePhase } from "./phases/prepare.js";
