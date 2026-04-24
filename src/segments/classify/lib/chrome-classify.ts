@@ -19,6 +19,12 @@ import { isLeaf, readPath } from "./path-utils.js";
 export interface ClassifierPathEntry {
 	sourcePath: string;
 	suggestedCanonical?: string;
+	/**
+	 * Most source paths materialize as leaf values. Shape normalization can also
+	 * mark a source value as structural identity, e.g. an array item's `name`
+	 * field used as the dictionary key when reshaping form fields.
+	 */
+	materializeAs?: "value" | "identity-key" | "empty-object";
 }
 
 export interface ClassifierOutput {
@@ -73,11 +79,18 @@ export interface AgentCallTotals {
 	cost: number;
 }
 
-/** How the fan-out step reaches the Claude SDK. Injected so tests can stub it. */
+/**
+ * How the fan-out step reaches the Claude SDK. Injected so tests can stub it.
+ *
+ * The `fix` | `review-a` | `review-b` roles are used by the domain-ops generator's
+ * dual-reviewer consensus loop — outer dispatchers route each to a different
+ * model profile.
+ */
 export type RunAgentFn = (args: {
 	prompt: string;
-	role: "classify" | "review";
+	role: "classify" | "review" | "fix" | "review-a" | "review-b";
 	attempt: number;
+	workdir?: string;
 }) => Promise<{
 	output: string;
 	turns: number;
@@ -353,7 +366,7 @@ function extractJsonObject(raw: string): string | null {
 // Validate
 // ---------------------------------------------------------------------------
 
-const CANONICAL_NAME_RE = /^[A-Za-z0-9._[\]-]+$/;
+const CANONICAL_NAME_RE = /^[A-Za-z0-9._[\]*-]+$/;
 
 export function validateClassifierOutput(
 	content: unknown,

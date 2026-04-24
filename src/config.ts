@@ -76,6 +76,8 @@ const CuiConfigSchema = z.object({
 	classify: z
 		.object({
 			localSonicJsUrl: z.string().url(),
+			/** Batch size for harmonize-align per-iteration fan-out. Default: 5. */
+			pagesPerBatch: z.number().int().positive().optional(),
 		})
 		.optional(),
 	concurrency: z

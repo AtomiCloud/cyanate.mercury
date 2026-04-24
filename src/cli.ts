@@ -17,6 +17,7 @@ import { loadConfig } from "./config.js";
 import type { DagRunResult } from "./engine/dag.js";
 import { runDag } from "./engine/dag.js";
 import { registry } from "./engine/registry.js";
+import { looksLikePath, prepareResumeFromPath } from "./engine/resume-path.js";
 import { readRunState } from "./engine/state.js";
 import { currentQueueDepth } from "./lib/agent.js";
 import { createPipelineLogger } from "./lib/logger.js";
@@ -32,14 +33,21 @@ program
 	.command("run")
 	.description("Run the pipeline")
 	.option("--segment <id>", "Start from a specific segment")
-	.option("--from <phase>", "Start from a specific phase within the segment")
+	.option(
+		"--from <phase-or-path>",
+		"Phase id (e.g. harmonize-prepare), OR a path to seed from: runs/<run-id>/<segment> restarts the segment, runs/<run-id>/<segment>/iteration-<N>-<phase> resumes from iteration N (next phase if passed, same phase otherwise). Paths inherit --dep overrides from the source run's run.json.",
+	)
 	.option(
 		"--dep <mapping...>",
-		"Map dependency outputs (format: segmentId=path)",
+		"Map dependency outputs (format: segmentId=path). Overrides anything inherited from a path-based --from.",
 	)
 	.option("--input <path>", "Override cui.yaml input path")
 	.option("--reference <url>", "Override cui.yaml reference URL")
 	.option("--config <path>", "Path to cui.yaml", "cui.yaml")
+	.option(
+		"--run-id <id>",
+		"Reuse an existing run dir (runs/<id>) instead of generating a fresh timestamp. Lets you pre-seed iteration workdirs and resume mid-segment via --from.",
+	)
 	.option("--non-interactive", "Verbose logging mode", false)
 	.action(async (opts) => {
 		const config = loadConfig(opts.config);
@@ -54,13 +62,16 @@ program
 		const depOverrides = parseDepFlags(opts.dep);
 		await resolveInteractiveDeps(opts, depOverrides);
 
+		const runOpts = await resolveRunOpts(opts, depOverrides);
+
 		const result = await runDag({
 			registry,
 			config,
 			logger,
 			rootDir: process.cwd(),
-			startSegment: opts.segment,
-			fromPhase: opts.from,
+			startSegment: runOpts.startSegment,
+			fromPhase: runOpts.fromPhase,
+			runId: runOpts.runId,
 			depOverrides:
 				Object.keys(depOverrides).length > 0 ? depOverrides : undefined,
 		});
@@ -233,6 +244,65 @@ program
 	});
 
 // --- Helpers ---
+
+interface RunOptsFromCli {
+	segment?: string;
+	from?: string;
+	runId?: string;
+}
+
+interface ResolvedRunOpts {
+	startSegment: string | undefined;
+	fromPhase: string | undefined;
+	runId: string | undefined;
+}
+
+/**
+ * Resolve `--segment`, `--from`, `--run-id` into the shape `runDag` expects.
+ * Path-based `--from` seeds the target run dir and overrides the derived
+ * startSegment / fromPhase / runId. Mutates `depOverrides` in place to fill
+ * in inherited deps where the CLI didn't already set one.
+ */
+async function resolveRunOpts(
+	opts: RunOptsFromCli,
+	depOverrides: Record<string, string>,
+): Promise<ResolvedRunOpts> {
+	const direct: ResolvedRunOpts = {
+		startSegment: opts.segment,
+		fromPhase: opts.from,
+		runId: opts.runId,
+	};
+	if (!opts.from || !looksLikePath(opts.from)) return direct;
+
+	try {
+		const resumed = await prepareResumeFromPath({
+			rootDir: process.cwd(),
+			fromPath: opts.from,
+			targetRunId: opts.runId,
+			registry,
+		});
+		if (opts.segment && opts.segment !== resumed.startSegment) {
+			console.error(
+				chalk.red(
+					`--segment "${opts.segment}" conflicts with segment "${resumed.startSegment}" derived from --from path. Drop --segment or make them match.`,
+				),
+			);
+			process.exit(1);
+		}
+		// Fill in inherited deps only where the CLI didn't already set one.
+		for (const [k, v] of Object.entries(resumed.depOverrides)) {
+			if (!(k in depOverrides)) depOverrides[k] = v;
+		}
+		return {
+			startSegment: resumed.startSegment,
+			fromPhase: resumed.fromPhase,
+			runId: resumed.runId,
+		};
+	} catch (err) {
+		console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+		process.exit(1);
+	}
+}
 
 function parseDepFlags(deps?: string[]): Record<string, string> {
 	const overrides: Record<string, string> = {};

@@ -9,6 +9,27 @@
 
 import { createHash } from "node:crypto";
 
+/**
+ * Collapse positional array indices to the wildcard `[*]`. See `harmonize.md`
+ * for why the harmonize digest keys on collapsed paths: `share_buttons[3]`
+ * on one page and `share_buttons[0]` on another are the same candidate; the
+ * scraper's slot number is not semantically meaningful across pages.
+ */
+export function collapseArrayIndices(path: string): string {
+	return path.replace(/\[\d+\]/g, "[*]");
+}
+
+/** True if the path contains at least one `[*]` segment. */
+export function pathHasWildcard(path: string): boolean {
+	return path.includes("[*]");
+}
+
+/** Count the number of `[*]` wildcard markers in a path. */
+export function countWildcards(path: string): number {
+	const m = path.match(/\[\*\]/g);
+	return m ? m.length : 0;
+}
+
 /** Deterministic hash for a page URL (used for classify input subdirectories). */
 export function classifyUnitHash(url: string): string {
 	return createHash("sha1").update(url).digest("hex").slice(0, 12);

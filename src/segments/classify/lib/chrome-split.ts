@@ -22,6 +22,10 @@ export interface SplitOutput {
 	body: unknown;
 }
 
+export interface ExtractChromeOptions {
+	compactArrays?: boolean;
+}
+
 export function splitByChromePaths(
 	content: unknown,
 	chromePaths: readonly string[],
@@ -32,6 +36,21 @@ export function splitByChromePaths(
 		chrome: chrome ?? emptyLike(content),
 		body: body ?? emptyLike(content),
 	};
+}
+
+export function extractChromeByPaths(
+	content: unknown,
+	chromePaths: readonly string[],
+	options: ExtractChromeOptions = {},
+): unknown {
+	const chromeSet = new Set(chromePaths);
+	const chrome = extractChromeNode(
+		content,
+		"",
+		chromeSet,
+		options.compactArrays ?? true,
+	);
+	return chrome ?? emptyLike(content);
 }
 
 type Node = unknown | undefined;
@@ -91,6 +110,76 @@ function splitObject(
 		}
 	}
 	return [hasChrome ? chromeObj : undefined, hasBody ? bodyObj : undefined];
+}
+
+function extractChromeNode(
+	value: unknown,
+	path: string,
+	chromeSet: Set<string>,
+	compactArrays: boolean,
+): Node {
+	if (isLeaf(value)) {
+		return chromeSet.has(path) ? value : undefined;
+	}
+	if (Array.isArray(value)) {
+		return extractChromeArray(value, path, chromeSet, compactArrays);
+	}
+	if (typeof value === "object" && value !== null) {
+		return extractChromeObject(
+			value as Record<string, unknown>,
+			path,
+			chromeSet,
+			compactArrays,
+		);
+	}
+	return undefined;
+}
+
+function extractChromeArray(
+	value: readonly unknown[],
+	path: string,
+	chromeSet: Set<string>,
+	compactArrays: boolean,
+): Node {
+	const arr: unknown[] = [];
+	let hasChrome = false;
+	for (let i = 0; i < value.length; i++) {
+		const child = extractChromeNode(
+			value[i],
+			`${path}[${i}]`,
+			chromeSet,
+			compactArrays,
+		);
+		if (compactArrays) {
+			if (child === undefined) continue;
+			hasChrome = true;
+			arr.push(child);
+		} else {
+			arr[i] = child ?? null;
+			if (child !== undefined) {
+				hasChrome = true;
+			}
+		}
+	}
+	return hasChrome ? arr : undefined;
+}
+
+function extractChromeObject(
+	obj: Record<string, unknown>,
+	path: string,
+	chromeSet: Set<string>,
+	compactArrays: boolean,
+): Node {
+	const chromeObj: Record<string, unknown> = {};
+	let hasChrome = false;
+	for (const [k, v] of Object.entries(obj)) {
+		const childPath = path ? `${path}.${k}` : k;
+		const child = extractChromeNode(v, childPath, chromeSet, compactArrays);
+		if (child === undefined) continue;
+		chromeObj[k] = child;
+		hasChrome = true;
+	}
+	return hasChrome ? chromeObj : undefined;
 }
 
 function emptyLike(value: unknown): unknown {

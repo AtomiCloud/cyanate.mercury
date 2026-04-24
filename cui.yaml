@@ -46,6 +46,44 @@ profiles:
   classify.chrome-classify.chrome-classify-reviewer:
     model: zai-org/GLM-5.1
 
+  # ---- Classify: chrome harmonize per page-type (Stage 3, split design) ----
+  # harmonize-align is a dynamic per-pagetype tree-reduce over 20-page
+  # batches; it loops until each pagetype converges to ≤ 1 batch. The agent
+  # proposes rename ops per batch; a per-batch reviewer sees values so it
+  # can catch mis-judged aliases the programmatic validator can't. verdicts
+  # is where semantic judgment matters; assembler is programmatic.
+  classify.harmonize-align.align-agent:
+    model: zai-org/GLM-5
+    maxTurns: 200
+  classify.harmonize-align.align-reviewer:
+    model: zai-org/GLM-5.1
+  classify.harmonize-verdicts.verdicts-agent:
+    model: zai-org/GLM-5.1
+  classify.harmonize-verdicts.verdicts-reviewer:
+    model: zai-org/GLM-5
+
+  # `./suggest` spawns a fresh LLM sub-agent per call to propose alias clusters
+  # (replaces the old heuristic function). Shared across all align iterations.
+  classify.harmonize.suggest-agent:
+    model: zai-org/GLM-5
+
+  # `./review` spawns a fresh LLM sub-agent to audit the current ops.json
+  # before the outer align agent commits. Returns pass/fail so the agent knows
+  # whether it can stop or must continue. Shared across all align iterations.
+  classify.harmonize.review-agent:
+    model: zai-org/GLM-5.1
+
+  # `./ops-ify` materializes one accepted alias cluster into RichRenameOps via
+  # the domain-ops generator: one generator + two independent reviewers with
+  # AND-consensus. Different reviewer models give independent hallucination
+  # detection.
+  classify.harmonize-align.ops-ify-generate:
+    model: zai-org/GLM-5
+  classify.harmonize-align.ops-ify-review-a:
+    model: MiniMaxAI/MiniMax-M2.5
+  classify.harmonize-align.ops-ify-review-b:
+    model: zai-org/GLM-5.1
+
   # ---- mm25: automated reviewers only (no real LLM reasoning needed) ----
   wireframe.generate.static-checks-review:
     model: MiniMaxAI/MiniMax-M2.5
@@ -90,6 +128,11 @@ modelMaxTokens:
 classify:
   # Local SonicJS instance URL — Phase 9d hard-gates on roundtrip pass
   localSonicJsUrl: http://localhost:8787
+  # Optional: override the default harmonize-align batch size (default 5).
+  # Lower values keep agent prompts small but cost more iterations; higher
+  # values converge faster on sparse chrome but may exceed the model's
+  # reliable per-turn ceiling.
+  # pagesPerBatch: 5
 
 # Heartbeat configuration
 heartbeat:

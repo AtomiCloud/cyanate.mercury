@@ -364,6 +364,8 @@ export interface CuiConfig {
 	classify?: {
 		/** Local SonicJS instance URL for Phase 9d roundtrip gate. */
 		localSonicJsUrl: string;
+		/** Batch size for harmonize-align per-iteration fan-out. Default: 5. */
+		pagesPerBatch?: number;
 	};
 	/** Global concurrency controls */
 	concurrency?: {

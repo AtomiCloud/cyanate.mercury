@@ -113,6 +113,42 @@ The archived implementation (`web-generator-sdk-archived/`) went through extensi
 4. **Rejection context must be specific** -- "some images broken" doesn't help. Name exact file + exact issue
 5. **Phase independence is the core value** -- breaking ownership boundaries causes cascading regressions
 
+## Design principle — programmatic checks become agent-facing CLIs
+
+Whenever a step has a programmatic check (validator, schema, coverage assertion, lint, shape invariant), expose it as a **CLI** the agent invokes during its turn, not only as a post-agent gate the outer runner applies.
+
+The pattern is fix-before-submit, not propose-then-reject:
+
+1. Pipeline seeds the agent's workdir with the inputs (`digest.json`, `ops.json` = `[]`, etc.) and a `validate` shell wrapper.
+2. Agent writes its proposal to the output file.
+3. Agent runs `./validate` (Bash tool). The CLI prints `{valid, errors}` and exits 0/1.
+4. Agent edits the output file until validate passes.
+5. Runner reads the final file; re-runs the same checks as a safety net.
+
+Why: rejecting after the agent returns burns a full attempt on a 1-line mistake and loses the agent's intent. In-turn tool use lets the agent self-correct with specific error messages, preserves intent, and collapses the outer retry budget to genuine failures. The CLI is also runnable by humans for debugging.
+
+When adding a new step that has programmatic rules:
+
+- Put the rules in a pure function in `lib/`.
+- Add a CLI entry at `src/segments/<seg>/cli/<name>.ts` that wraps it, reading inputs from argv and writing `{valid, errors}` JSON to stdout.
+- Register the CLI as a knip entry in `knip.json`.
+- Seed the agent's iter workdir with inputs + `validate` wrapper (`chmod +x`); set `cwd: iterDir` and `tools: ["Read", "Write", "Edit", "Bash"]`.
+- Keep the prompt short — the CLI is the authority for rules, not the prompt.
+- Keep a same-logic safety-net in the runner after the agent exits.
+
+See `src/segments/classify/cli/validate-align-ops.ts` + `harmonize-align-shared.ts` `runConvergeIter` for the reference implementation.
+
+## Parallelization — subagents and teams first
+
+Before starting any non-trivial task (multi-file changes, research + implementation, orthogonal features), **split the work into independent subagents or a team**. This is the default, not a last resort.
+
+- **Independent research or file reads**: spawn multiple `Agent` calls in parallel (subagent_type `Explore` or `general-purpose`).
+- **Multi-file edits that don't overlap**: spawn one `Agent` per file or per logical group. Run them all in one message.
+- **Complex multi-step workflows with coordination**: use `TeamCreate` + `TaskCreate` to break the work into tasks, spawn teammates via `Agent` with `team_name`, and assign tasks with `TaskUpdate`.
+- **Rule of thumb**: if a task touches 3+ files or has 2+ independent phases, parallelize. The overhead of spawning agents is negligible compared to the speedup from concurrent execution.
+
+Always prefer parallel over sequential when there are no data dependencies between the subtasks.
+
 ## Development
 
 ```bash

@@ -165,9 +165,17 @@ function resolvePhases(
 }
 
 function recoverLastWorkdir(state: PipelineState): string | null {
-	if (state.iterations.length === 0) return null;
-	const last = state.iterations[state.iterations.length - 1];
-	return last.status === "passed" ? last.workdir : null;
+	// Walk backwards to the most recent iteration that actually passed — we
+	// want its workdir as the source for the next phase (or retry). If the
+	// last iteration is running/rejected/failed (a resumed-interrupt case or
+	// a resume-from-path targeting a failed iteration), we skip it rather
+	// than returning null and triggering a fresh-init merge.
+	for (let i = state.iterations.length - 1; i >= 0; i--) {
+		if (state.iterations[i].status === "passed") {
+			return state.iterations[i].workdir;
+		}
+	}
+	return null;
 }
 
 async function mergeIfNeeded(

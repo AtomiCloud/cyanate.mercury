@@ -1,5 +1,61 @@
 import { describe, expect, it } from "bun:test";
-import { classifyUnitHash, isLeaf, readPath } from "./path-utils.js";
+import {
+	classifyUnitHash,
+	collapseArrayIndices,
+	countWildcards,
+	isLeaf,
+	pathHasWildcard,
+	readPath,
+} from "./path-utils.js";
+
+describe("collapseArrayIndices", () => {
+	it("replaces a single index with [*]", () => {
+		expect(collapseArrayIndices("nav[0].href")).toBe("nav[*].href");
+	});
+
+	it("replaces multiple indices in the same path", () => {
+		expect(collapseArrayIndices("nav[0].items[3].href")).toBe(
+			"nav[*].items[*].href",
+		);
+	});
+
+	it("handles multi-digit indices", () => {
+		expect(collapseArrayIndices("items[12]")).toBe("items[*]");
+	});
+
+	it("leaves paths without brackets untouched", () => {
+		expect(collapseArrayIndices("header.title")).toBe("header.title");
+	});
+
+	it("leaves existing [*] untouched", () => {
+		expect(collapseArrayIndices("nav[*].items[2]")).toBe("nav[*].items[*]");
+	});
+});
+
+describe("pathHasWildcard", () => {
+	it("detects collapsed array paths", () => {
+		expect(pathHasWildcard("nav[*].href")).toBe(true);
+		expect(pathHasWildcard("nav.items[*]")).toBe(true);
+	});
+	it("rejects scalar paths", () => {
+		expect(pathHasWildcard("header.title")).toBe(false);
+	});
+});
+
+describe("countWildcards", () => {
+	it("returns 0 for scalar paths", () => {
+		expect(countWildcards("header.title")).toBe(0);
+	});
+	it("counts a single wildcard", () => {
+		expect(countWildcards("nav[*].href")).toBe(1);
+	});
+	it("counts multiple wildcards", () => {
+		expect(countWildcards("nav[*].children[*].href")).toBe(2);
+	});
+	it("ignores concrete indices", () => {
+		expect(countWildcards("nav[0].items[3]")).toBe(0);
+	});
+});
 
 describe("classifyUnitHash", () => {
 	it("is deterministic for the same URL", () => {

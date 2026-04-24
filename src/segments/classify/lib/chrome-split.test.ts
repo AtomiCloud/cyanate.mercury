@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { splitByChromePaths } from "./chrome-split.js";
+import { extractChromeByPaths, splitByChromePaths } from "./chrome-split.js";
 
 describe("splitByChromePaths", () => {
 	it("assigns leaves to chrome or body by exact path membership", () => {
@@ -91,6 +91,32 @@ describe("splitByChromePaths", () => {
 		const chromeLeaves = primitiveCount(chrome);
 		const bodyLeaves = primitiveCount(body);
 		expect(chromeLeaves + bodyLeaves).toBe(primitiveCount(content));
+	});
+});
+
+describe("extractChromeByPaths", () => {
+	it("can preserve original array positions for shape-normalize prompts", () => {
+		const content = {
+			items: [
+				{ kind: "body", value: 1 },
+				{ kind: "chrome", value: 2 },
+				{ kind: "body", value: 3 },
+				{ kind: "chrome", value: 4 },
+			],
+		};
+		const chrome = extractChromeByPaths(
+			content,
+			["items[1].kind", "items[1].value", "items[3].kind", "items[3].value"],
+			{ compactArrays: false },
+		);
+		expect(chrome).toEqual({
+			items: [
+				null,
+				{ kind: "chrome", value: 2 },
+				null,
+				{ kind: "chrome", value: 4 },
+			],
+		});
 	});
 });
 

@@ -22,6 +22,12 @@ export interface DagRunOptions {
 	startSegment?: string;
 	fromPhase?: string;
 	depOverrides?: Record<string, string>;
+	/**
+	 * Explicit runId to use instead of generating a fresh timestamp. When set,
+	 * `runs/<runId>/` is reused if it already exists — letting callers pre-seed
+	 * iteration workdirs + pipeline.json and resume mid-segment via --from.
+	 */
+	runId?: string;
 }
 
 export interface DagRunResult {
@@ -40,6 +46,7 @@ export async function runDag(opts: DagRunOptions): Promise<DagRunResult> {
 		startSegment,
 		fromPhase,
 		depOverrides,
+		runId: explicitRunId,
 	} = opts;
 
 	validateRegistry(registry);
@@ -64,7 +71,7 @@ export async function runDag(opts: DagRunOptions): Promise<DagRunResult> {
 		console.log(`[identity] ${divergence}`);
 	}
 
-	const runId = generateRunId();
+	const runId = explicitRunId ?? generateRunId();
 	const runDir = await createRunDir(rootDir, runId);
 	const metrics = new MetricsWriter(runDir);
 	const order = resolveOrder(registry, startSegment);

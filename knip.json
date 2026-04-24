@@ -18,10 +18,22 @@
 		"src/segments/analyze/validate-tokens-cli.ts!",
 		"src/segments/prepare/index.ts!",
 		"src/segments/classify/index.ts!",
+		"src/segments/classify/cli/validate-align-ops.ts!",
+		"src/segments/classify/cli/suggest-folds.ts!",
+		"src/segments/classify/cli/review-align.ts!",
+		"src/segments/classify/cli/remember-reject.ts!",
+		"src/segments/classify/cli/ops-ify.ts!",
+		"src/segments/classify/lib/ops-ify.ts!",
 		"src/segments/wireframe/index.ts!"
 	],
 	"project": ["src/**/*.ts!"],
 	"ignoreDependencies": [],
 	"ignore": [],
+	"ignoreIssues": {
+		"src/segments/classify/lib/chrome-shape-normalize.ts": ["exports"],
+		"src/segments/classify/lib/harmonize-batch.ts": ["exports"],
+		"src/segments/classify/lib/harmonize-types.ts": ["types"],
+		"src/segments/classify/lib/intent-ops.ts": ["exports"]
+	},
 	"ignoreExportsUsedInFile": true
 }

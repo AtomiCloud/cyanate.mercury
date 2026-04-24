@@ -15,12 +15,13 @@
  *          chrome-classify.json + meta.json.
  *        - Sum turns/tokens/cost across every sub-call and return them on the
  *          single StepResult so the engine records one accurate metric row.
- *
  *   2. `chrome-split` (programmatic)
  *        - Read each page's `content.json` and accepted
  *          `output/chrome-classify.json`.
  *        - Split programmatically into `output/chrome.json` +
- *          `output/body.json`. This is the partition later stages consume.
+ *          `output/body.json`.
+ *        - Also emit `output/chrome-shape-input.json` as the single
+ *          chrome-only prompt artifact for the next phase.
  *
  * Per-page retry keeps successful pages intact when others fail. Phase-level
  * retry kicks in only if any page exhausts its per-page budget.
@@ -45,7 +46,10 @@ import {
 	type PageClassifyResult,
 	type RunAgentFn,
 } from "../lib/chrome-classify.js";
-import { splitByChromePaths } from "../lib/chrome-split.js";
+import {
+	extractChromeByPaths,
+	splitByChromePaths,
+} from "../lib/chrome-split.js";
 
 const MAX_PER_PAGE_RETRIES = 5;
 
@@ -73,7 +77,7 @@ export const chromeClassifyPhase: PhaseDef = {
 			id: "chrome-split",
 			name: "Chrome split",
 			description:
-				"Split each page's content.json into chrome.json + body.json using the accepted chrome-classify paths.",
+				"Split each page's content.json into chrome.json + body.json using the accepted chrome-classify source paths.",
 			run: runChromeSplit,
 		}),
 	],
@@ -329,22 +333,42 @@ async function runChromeSplit(ctx: StepContext): Promise<StepResult> {
 
 async function splitOnePage(pageDir: string): Promise<void> {
 	const contentRaw = await readFile(join(pageDir, "content.json"), "utf-8");
-	const { content } = JSON.parse(contentRaw) as { content: unknown };
+	const { url, pagetype, content } = JSON.parse(contentRaw) as {
+		url: string;
+		pagetype: string;
+		content: unknown;
+	};
 
 	const classifyRaw = await readFile(
 		join(pageDir, "output", "chrome-classify.json"),
 		"utf-8",
 	);
 	const classify = JSON.parse(classifyRaw) as {
-		chromePaths: Array<{ sourcePath: string }>;
+		chromePaths: Array<{ sourcePath: string; suggestedCanonical?: string }>;
 	};
 	const chromePaths = classify.chromePaths.map((e) => e.sourcePath);
 
 	const { chrome, body } = splitByChromePaths(content, chromePaths);
+	const shapePromptChrome = extractChromeByPaths(content, chromePaths, {
+		compactArrays: false,
+	});
 
 	const outDir = join(pageDir, "output");
 	await writeFile(join(outDir, "chrome.json"), JSON.stringify(chrome, null, 2));
 	await writeFile(join(outDir, "body.json"), JSON.stringify(body, null, 2));
+	await writeFile(
+		join(outDir, "chrome-shape-input.json"),
+		JSON.stringify(
+			{
+				pagetype,
+				url,
+				chrome: shapePromptChrome,
+				chromePaths: classify.chromePaths,
+			},
+			null,
+			2,
+		),
+	);
 }
 
 // ---------------------------------------------------------------------------
